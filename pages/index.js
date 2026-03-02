@@ -63,19 +63,29 @@ export default function Home() {
       setMessage("Profile already exists. Role locked.");
     } else {
       // Insert into profiles
-      const { error: profileError } = await supabase.from("profiles").insert([
-        {
-          id: user.id,
-          email: user.email,
-          role: selectedRole,
-        },
-      ]);
+      const { error: profileError } = // Make sure user info is loaded first
+const { data: { user } } = await supabase.auth.getUser();
 
-      if (profileError) {
-        setMessage(profileError.message);
-        setLoading(false);
-        return;
-      }
+if (!user) {
+  setMessage("User not logged in yet.");
+  setLoading(false);
+  return;
+}
+
+// Now insert into profiles safely
+const { error: profileError } = await supabase.from("profiles").insert([
+  {
+    id: user.id,
+    email: user.email,
+    role: selectedRole,
+  },
+]);
+
+if (profileError) {
+  setMessage(profileError.message);
+  setLoading(false);
+  return;
+}
 
       // Insert default subscription
       const { error: subError } = await supabase.from("subscriptions").insert([
