@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import Logo from "../public/logo.png"; // Replace with your logo in /public
+"<img src="/logo.png" alt="Entre PRO Market" style={{ width: 180, marginBottom: 20 }} /> // Replace with your logo in /public
 
 export default function Dashboard() {
   const [profiles, setProfiles] = useState([]);
