@@ -7,7 +7,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  // Get current session (Supabase v2 compatible)
   useEffect(() => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -16,11 +15,9 @@ export default function Dashboard() {
     getSession();
   }, []);
 
-  // Fetch vendor profiles
   useEffect(() => {
     const fetchProfiles = async () => {
       setLoading(true);
-
       const { data, error } = await supabase
         .from("profiles")
         .select("id, email, role, subscription")
@@ -31,7 +28,6 @@ export default function Dashboard() {
       } else {
         setProfiles(data || []);
       }
-
       setLoading(false);
     };
 
@@ -50,7 +46,6 @@ export default function Dashboard() {
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 30 }}>
-      {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 30 }}>
         <img
           src="/logo.png"
@@ -85,12 +80,10 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Status */}
       {message && (
         <p style={{ fontWeight: "bold", marginBottom: 20 }}>{message}</p>
       )}
 
-      {/* Vendor Grid */}
       {loading ? (
         <p>Loading Vendors...</p>
       ) : (
@@ -121,9 +114,7 @@ export default function Dashboard() {
                   {vendor.email}
                 </h2>
 
-                <p>
-                  Subscription: {vendor.subscription || "free"}
-                </p>
+                <p>Subscription: {vendor.subscription || "free"}</p>
 
                 {showContact ? (
                   <p>Email: {vendor.email}</p>
