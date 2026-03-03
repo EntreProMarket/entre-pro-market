@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import Logo from "../public/logo.png"; // your logo image
+import Logo from "../public/logo.png"; // Replace with your logo in /public
 
 export default function Dashboard() {
   const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   // Fetch current user session
   useEffect(() => {
-    const session = supabase.auth.session() || supabase.auth.getSession();
-    setUser(session?.user ?? null);
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+    };
+    getSession();
   }, []);
 
   // Fetch Vendor profiles
@@ -20,8 +23,8 @@ export default function Dashboard() {
       setLoading(true);
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, role, subscription, products") // products as a JSON column or relationship
-        .eq("role", "vendor"); // only vendors
+        .select("id, email, role, subscription")
+        .eq("role", "vendor");
 
       if (error) {
         setMessage(error.message);
@@ -33,7 +36,6 @@ export default function Dashboard() {
     fetchProfiles();
   }, []);
 
-  // Check if current user is a paid Premium Vendor
   const isPremium = user && profiles.find(p => p.id === user.id)?.subscription === "premium";
 
   const handleLogout = async () => {
@@ -70,7 +72,7 @@ export default function Dashboard() {
       {/* Status message */}
       {message && <p style={{ fontWeight: "bold", marginBottom: 20 }}>{message}</p>}
 
-      {/* Vendor cards grid */}
+      {/* Vendor cards */}
       {loading ? (
         <p>Loading Vendors...</p>
       ) : (
@@ -81,10 +83,8 @@ export default function Dashboard() {
             gap: 20
           }}
         >
-          {profiles.map((vendor) => {
-            // Hide contact info for free vendors if viewer is not premium
-            const showContact =
-              vendor.subscription === "premium" || isPremium;
+          {profiles.map(vendor => {
+            const showContact = vendor.subscription === "premium" || isPremium;
 
             return (
               <div
@@ -100,11 +100,10 @@ export default function Dashboard() {
               >
                 <h2 style={{ fontWeight: "bold", fontSize: "1.5rem" }}>{vendor.email}</h2>
                 <p>Subscription: {vendor.subscription ?? "free"}</p>
-                <p>Products: {vendor.products?.length ?? 0}</p>
                 {showContact ? (
                   <div>
                     <p>Email: {vendor.email}</p>
-                    {/* Add phone, socials if available */}
+                    {/* Add phone, socials here if available */}
                   </div>
                 ) : (
                   <p style={{ fontStyle: "italic" }}>Contact info hidden (Free Vendor)</p>
