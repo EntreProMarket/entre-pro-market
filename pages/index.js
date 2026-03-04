@@ -10,18 +10,12 @@ export default function Home() {
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
-
-    const { user, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+    const { user, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
-
     setMessage("Check your email for confirmation.");
     setLoading(false);
   };
@@ -29,32 +23,31 @@ export default function Home() {
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
-
-    const { user, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
-
     setMessage("Logged in successfully!");
     setLoading(false);
   };
 
   return (
-    <div style={{ textAlign: "center", padding: 20 }}>
+    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
       {/* Logo */}
       <img
-        src="/logo.png.jpg" // <-- Replace this if your filename is different
+        src="/logo.png.jpg" // Replace with your uploaded filename
         alt="Entre PRO Market"
         style={{ width: 180, marginBottom: 20 }}
       />
 
-      <h1>Welcome to Entre PRO Market</h1>
+      {/* Branded title */}
+      <h1 style={{ fontSize: 32, marginBottom: 20 }}>
+        <span style={{ color: "#701890" }}>ENTRE </span>
+        <span style={{ color: "#AABB23" }}>PRO </span>
+        <span style={{ color: "black", fontWeight: "bold" }}>MARKET</span>
+      </h1>
 
       <div style={{ marginTop: 20 }}>
         <input
@@ -89,7 +82,9 @@ export default function Home() {
         </button>
       </div>
 
-      {message && <p style={{ marginTop: 20 }}>{message}</p>}
+      {message && (
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>{message}</p>
+      )}
     </div>
   );
 }
