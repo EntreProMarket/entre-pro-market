@@ -1,36 +1,54 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/router";
 
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
+
     const { user, error } = await supabase.auth.signUp({ email, password });
+
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
-    setMessage("Check your email for confirmation.");
+
+    // Redirect new users to /role
+    setMessage("Account created! Redirecting to role selection...");
     setLoading(false);
+
+    setTimeout(() => {
+      router.push("/role");
+    }, 1000);
   };
 
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
+
     const { user, error } = await supabase.auth.signInWithPassword({ email, password });
+
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
+
     setMessage("Logged in successfully!");
     setLoading(false);
+
+    // Redirect to dashboard after login
+    setTimeout(() => {
+      router.push("/dashboard");
+    }, 1000);
   };
 
   return (
@@ -42,12 +60,7 @@ export default function Home() {
         style={{ width: 180, marginBottom: 20 }}
       />
 
-      {/* Branded title */}
-      <h1 style={{ fontSize: 32, marginBottom: 20 }}>
-        <span style={{ color: "#701890" }}>ENTRE </span>
-        <span style={{ color: "#AABB23" }}>PRO </span>
-        <span style={{ color: "black", fontWeight: "bold" }}>MARKET</span>
-      </h1>
+      {/* You said no business name under logo for now */}
 
       <div style={{ marginTop: 20 }}>
         <input
@@ -69,21 +82,40 @@ export default function Home() {
         <button
           onClick={handleSignUp}
           disabled={loading}
-          style={{ padding: "10px 20px", marginRight: 10 }}
+          style={{
+            padding: "10px 20px",
+            marginRight: 10,
+            backgroundColor: "#AABB23",
+            color: "white",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
         >
           Sign Up
         </button>
         <button
           onClick={handleLogin}
           disabled={loading}
-          style={{ padding: "10px 20px" }}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#701890",
+            color: "white",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
         >
           Log In
         </button>
       </div>
 
       {message && (
-        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>{message}</p>
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+          {message}
+        </p>
       )}
     </div>
   );
