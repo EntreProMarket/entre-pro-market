@@ -2,31 +2,29 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 export default function Dashboard() {
-  const [profiles, setProfiles] = useState([]);
   const [user, setUser] = useState(null);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-    };
-    getSession();
-  }, []);
+    // Get current session user
+    const sessionUser = supabase.auth.user();
+    if (!sessionUser) {
+      setMessage("You are not logged in.");
+      setLoading(false);
+      return;
+    }
+    setUser(sessionUser);
 
-  useEffect(() => {
+    // Fetch profiles from Supabase
     const fetchProfiles = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, role, subscription")
-        .eq("role", "vendor");
-
+      const { data, error } = await supabase.from("profiles").select("*");
       if (error) {
         setMessage(error.message);
       } else {
-        setProfiles(data || []);
+        setProfiles(data);
       }
       setLoading(false);
     };
@@ -34,100 +32,88 @@ export default function Dashboard() {
     fetchProfiles();
   }, []);
 
-  const isPremium =
-    user &&
-    profiles.find((p) => p.id === user.id)?.subscription === "premium";
-
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setMessage("Logged out.");
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setUser(null);
+      setProfiles([]);
+      setMessage("Logged out successfully.");
+    }
   };
 
-  return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 30 }}>
-      <div style={{ textAlign: "center", marginBottom: 30 }}>
+  if (loading) {
+    return <p style={{ textAlign: "center" }}>Loading...</p>;
+  }
+
+  if (!user) {
+    return (
+      <div style={{ textAlign: "center", padding: 20 }}>
         <img
-          src="/logo.png"
+          src="/logo.png.jpg" // <-- Replace with your filename if needed
           alt="Entre PRO Market"
           style={{ width: 180, marginBottom: 20 }}
         />
-
-        <h1 style={{ color: "#701890", fontWeight: "bold", fontSize: "3rem" }}>
-          ENTRE
-        </h1>
-        <h1 style={{ color: "#AABB23", fontWeight: "bold", fontSize: "3rem" }}>
-          PRO
-        </h1>
-        <h1 style={{ color: "#000000", fontWeight: 900, fontSize: "3rem" }}>
-          MARKET
-        </h1>
-
-        <button
-          onClick={handleLogout}
-          style={{
-            marginTop: 15,
-            backgroundColor: "#DF9AF1",
-            color: "#000",
-            padding: "10px 20px",
-            borderRadius: 8,
-            fontWeight: "bold",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          Logout
-        </button>
+        <p>{message || "Please log in first."}</p>
       </div>
+    );
+  }
 
-      {message && (
-        <p style={{ fontWeight: "bold", marginBottom: 20 }}>{message}</p>
-      )}
+  return (
+    <div style={{ textAlign: "center", padding: 20 }}>
+      {/* Logo */}
+      <img
+        src="/logo.png.jpg" // <-- Replace with your filename if needed
+        alt="Entre PRO Market"
+        style={{ width: 180, marginBottom: 20 }}
+      />
 
-      {loading ? (
-        <p>Loading Vendors...</p>
+      <h1>Welcome, {user.email}</h1>
+      <button
+        onClick={handleLogout}
+        style={{ padding: "10px 20px", marginBottom: 20 }}
+      >
+        Log Out
+      </button>
+
+      <h2>All Profiles</h2>
+      {profiles.length === 0 ? (
+        <p>No profiles found.</p>
       ) : (
-        <div
+        <table
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: 20,
+            margin: "0 auto",
+            borderCollapse: "collapse",
+            width: "80%",
           }}
         >
-          {profiles.map((vendor) => {
-            const showContact =
-              vendor.subscription === "premium" || isPremium;
-
-            return (
-              <div
-                key={vendor.id}
-                style={{
-                  backgroundColor: "#A3BFBE",
-                  padding: 20,
-                  borderRadius: 16,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                }}
-              >
-                <h2 style={{ fontWeight: "bold", fontSize: "1.5rem" }}>
-                  {vendor.email}
-                </h2>
-
-                <p>Subscription: {vendor.subscription || "free"}</p>
-
-                {showContact ? (
-                  <p>Email: {vendor.email}</p>
-                ) : (
-                  <p style={{ fontStyle: "italic" }}>
-                    Contact info hidden (Free Vendor)
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+          <thead>
+            <tr>
+              <th style={{ border: "1px solid #ddd", padding: 8 }}>ID</th>
+              <th style={{ border: "1px solid #ddd", padding: 8 }}>Email</th>
+              <th style={{ border: "1px solid #ddd", padding: 8 }}>Role</th>
+              <th style={{ border: "1px solid #ddd", padding: 8 }}>
+                Created At
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {profiles.map((p) => (
+              <tr key={p.id}>
+                <td style={{ border: "1px solid #ddd", padding: 8 }}>{p.id}</td>
+                <td style={{ border: "1px solid #ddd", padding: 8 }}>{p.email}</td>
+                <td style={{ border: "1px solid #ddd", padding: 8 }}>{p.role}</td>
+                <td style={{ border: "1px solid #ddd", padding: 8 }}>
+                  {p.created_at}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
+
+      {message && <p style={{ marginTop: 20 }}>{message}</p>}
     </div>
   );
 }
