@@ -8,7 +8,6 @@ export default function Dashboard() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    // Get current session user
     const sessionUser = supabase.auth.user();
     if (!sessionUser) {
       setMessage("You are not logged in.");
@@ -17,7 +16,6 @@ export default function Dashboard() {
     }
     setUser(sessionUser);
 
-    // Fetch profiles from Supabase
     const fetchProfiles = async () => {
       setLoading(true);
       const { data, error } = await supabase.from("profiles").select("*");
@@ -43,33 +41,35 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) {
-    return <p style={{ textAlign: "center" }}>Loading...</p>;
-  }
+  if (loading) return <p style={{ textAlign: "center" }}>Loading...</p>;
 
-  if (!user) {
+  if (!user)
     return (
       <div style={{ textAlign: "center", padding: 20 }}>
         <img
-          src="/logo.png.jpg" // <-- Replace with your filename if needed
+          src="/logo.png.jpg"
           alt="Entre PRO Market"
           style={{ width: 180, marginBottom: 20 }}
         />
         <p>{message || "Please log in first."}</p>
       </div>
     );
-  }
 
   return (
-    <div style={{ textAlign: "center", padding: 20 }}>
+    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
       {/* Logo */}
       <img
-        src="/logo.png.jpg" // <-- Replace with your filename if needed
+        src="/logo.png.jpg"
         alt="Entre PRO Market"
         style={{ width: 180, marginBottom: 20 }}
       />
 
-      <h1>Welcome, {user.email}</h1>
+      <h1 style={{ fontSize: 28, marginBottom: 15 }}>
+        <span style={{ color: "#701890" }}>ENTRE </span>
+        <span style={{ color: "#AABB23" }}>PRO </span>
+        <span style={{ color: "black", fontWeight: "bold" }}>MARKET</span>
+      </h1>
+
       <button
         onClick={handleLogout}
         style={{ padding: "10px 20px", marginBottom: 20 }}
@@ -77,7 +77,7 @@ export default function Dashboard() {
         Log Out
       </button>
 
-      <h2>All Profiles</h2>
+      <h2 style={{ color: "#701890", marginBottom: 15 }}>All Profiles</h2>
       {profiles.length === 0 ? (
         <p>No profiles found.</p>
       ) : (
@@ -85,7 +85,7 @@ export default function Dashboard() {
           style={{
             margin: "0 auto",
             borderCollapse: "collapse",
-            width: "80%",
+            width: "90%",
           }}
         >
           <thead>
@@ -93,9 +93,7 @@ export default function Dashboard() {
               <th style={{ border: "1px solid #ddd", padding: 8 }}>ID</th>
               <th style={{ border: "1px solid #ddd", padding: 8 }}>Email</th>
               <th style={{ border: "1px solid #ddd", padding: 8 }}>Role</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>
-                Created At
-              </th>
+              <th style={{ border: "1px solid #ddd", padding: 8 }}>Created At</th>
             </tr>
           </thead>
           <tbody>
@@ -113,7 +111,11 @@ export default function Dashboard() {
         </table>
       )}
 
-      {message && <p style={{ marginTop: 20 }}>{message}</p>}
+      {message && (
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }
