@@ -162,4 +162,7 @@ export default function Home() {
         >
           Sign Up
         </button>
-      </
+      </div>
+    </div>
+  );
+}
