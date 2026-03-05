@@ -1,10 +1,10 @@
-// /pages/index.js
 import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
 export default function Home() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -14,7 +14,7 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    const { user, session, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -25,27 +25,7 @@ export default function Home() {
       return;
     }
 
-    // Check if profile already exists
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile) {
-      // New user: redirect to role selection
-      router.push("/role");
-    } else {
-      // Existing profile: redirect based on role
-      if (profile.role === "vendor") {
-        router.push("/vendor-profile");
-      } else if (profile.role === "organizer") {
-        router.push("/organizer-dashboard");
-      } else {
-        router.push("/role");
-      }
-    }
-
+    router.push("/role");
     setLoading(false);
   };
 
@@ -53,7 +33,7 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    const { user, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -64,47 +44,109 @@ export default function Home() {
       return;
     }
 
-    // Fetch profile and redirect based on role
-    const { data: profile, error: profileError } = await supabase
+    const user = data.user;
+
+    const { data: profile } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile) {
-      router.push("/role"); // no profile? select role
-    } else {
-      if (profile.role === "vendor") {
-        router.push("/vendor-profile");
-      } else if (profile.role === "organizer") {
-        router.push("/organizer-dashboard");
-      } else {
-        router.push("/role");
-      }
+    if (!profile) {
+      router.push("/role");
+    } else if (profile.role === "vendor") {
+      router.push("/vendor-profile");
+    } else if (profile.role === "organizer") {
+      router.push("/organizer-dashboard");
     }
 
     setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: "auto", padding: 20 }}>
-      <h1>Entre PRO Market</h1>
-      {message && <p>{message}</p>}
+    <div
+      style={{
+        maxWidth: 420,
+        margin: "auto",
+        paddingTop: 80,
+        textAlign: "center",
+        fontFamily: "Arial",
+      }}
+    >
+      <img
+        src="/logo.png"
+        alt="Entre PRO Market"
+        style={{ width: 220, marginBottom: 40 }}
+      />
 
-      <label>Email</label>
-      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <h2 style={{ marginBottom: 20 }}>Login or Sign Up</h2>
 
-      <label>Password</label>
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      {message && (
+        <p style={{ color: "red", marginBottom: 20 }}>{message}</p>
+      )}
 
-      <div style={{ marginTop: 20 }}>
-        <button onClick={handleLogin} disabled={loading}>
-          {loading ? "Logging in..." : "Login"}
-        </button>
-        <button onClick={handleSignUp} disabled={loading} style={{ marginLeft: 10 }}>
-          {loading ? "Signing up..." : "Sign Up"}
-        </button>
-      </div>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{
+          width: "100%",
+          padding: 12,
+          marginBottom: 12,
+          borderRadius: 6,
+          border: "1px solid #ccc",
+        }}
+      />
+
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={{
+          width: "100%",
+          padding: 12,
+          marginBottom: 20,
+          borderRadius: 6,
+          border: "1px solid #ccc",
+        }}
+      />
+
+      <button
+        onClick={handleLogin}
+        disabled={loading}
+        style={{
+          width: "100%",
+          padding: 14,
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          marginBottom: 10,
+          cursor: "pointer",
+        }}
+      >
+        Login
+      </button>
+
+      <button
+        onClick={handleSignUp}
+        disabled={loading}
+        style={{
+          width: "100%",
+          padding: 14,
+          backgroundColor: "#AABB23",
+          color: "black",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        Sign Up
+      </button>
     </div>
   );
 }
