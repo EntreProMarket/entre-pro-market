@@ -1,97 +1,122 @@
-import React from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
+import { useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/router";
 
 export default function Home() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  const handleSignUp = async () => {
+    setLoading(true);
+    setMessage("");
+
+    const { user, error } = await supabase.auth.signUp({ email, password });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Redirect new users to /role
+    setMessage("Account created! Redirecting to role selection...");
+    setLoading(false);
+
+    setTimeout(() => {
+      router.push("/role");
+    }, 1000);
+  };
+
+  const handleLogin = async () => {
+    setLoading(true);
+    setMessage("");
+
+    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    setMessage("Logged in successfully!");
+    setLoading(false);
+
+    // Redirect to dashboard after login
+    setTimeout(() => {
+      router.push("/dashboard");
+    }, 1000);
+  };
+
   return (
-    <View style={styles.container}>
-      
-      <Image
-        source={require("../assets/logo.png")}
-        style={styles.logo}
-        resizeMode="contain"
+    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
+      {/* Logo */}
+      <img
+        src="/logo.png.jpg" // Replace with your uploaded filename
+        alt="Entre PRO Market"
+        style={{ width: 180, marginBottom: 20 }}
       />
 
-      <Text style={styles.title}>Entre PRO Market</Text>
+      {/* You said no business name under logo for now */}
 
-      <TouchableOpacity
-        style={styles.vendorButton}
-        onPress={() => router.push("/vendor/login")}
-      >
-        <Text style={styles.buttonText}>Vendor Login</Text>
-      </TouchableOpacity>
+      <div style={{ marginTop: 20 }}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ padding: 10, width: 250, marginBottom: 10 }}
+        />
+        <br />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ padding: 10, width: 250, marginBottom: 10 }}
+        />
+        <br />
+        <button
+          onClick={handleSignUp}
+          disabled={loading}
+          style={{
+            padding: "10px 20px",
+            marginRight: 10,
+            backgroundColor: "#AABB23",
+            color: "white",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
+        >
+          Sign Up
+        </button>
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#701890",
+            color: "white",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
+        >
+          Log In
+        </button>
+      </div>
 
-      <TouchableOpacity
-        style={styles.organizerButton}
-        onPress={() => router.push("/organizer/login")}
-      >
-        <Text style={styles.buttonText}>Event Organizer Login</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.signupButton}
-        onPress={() => router.push("/signup")}
-      >
-        <Text style={styles.signupText}>Create Account</Text>
-      </TouchableOpacity>
-
-    </View>
+      {message && (
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
+    </div>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20
-  },
-
-  logo: {
-    width: 180,
-    height: 180,
-    marginBottom: 20
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 40
-  },
-
-  vendorButton: {
-    width: "80%",
-    padding: 15,
-    backgroundColor: "#1E90FF",
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 15
-  },
-
-  organizerButton: {
-    width: "80%",
-    padding: 15,
-    backgroundColor: "#6A5ACD",
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 20
-  },
-
-  signupButton: {
-    marginTop: 10
-  },
-
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-
-  signupText: {
-    fontSize: 16,
-    color: "#333"
-  }
-});
