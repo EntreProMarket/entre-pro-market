@@ -1,19 +1,23 @@
+// /pages/index.js
 import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
 export default function Home() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
 
-    const { user, error } = await supabase.auth.signUp({ email, password });
+    const { user, session, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
     if (error) {
       setMessage(error.message);
@@ -21,20 +25,38 @@ export default function Home() {
       return;
     }
 
-    // Redirect new users to /role
-    setMessage("Account created! Redirecting to role selection...");
-    setLoading(false);
+    // Check if profile already exists
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
 
-    setTimeout(() => {
+    if (!profile) {
+      // New user: redirect to role selection
       router.push("/role");
-    }, 1000);
+    } else {
+      // Existing profile: redirect based on role
+      if (profile.role === "vendor") {
+        router.push("/vendor-profile");
+      } else if (profile.role === "organizer") {
+        router.push("/organizer-dashboard");
+      } else {
+        router.push("/role");
+      }
+    }
+
+    setLoading(false);
   };
 
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
 
-    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { user, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (error) {
       setMessage(error.message);
@@ -42,81 +64,47 @@ export default function Home() {
       return;
     }
 
-    setMessage("Logged in successfully!");
-    setLoading(false);
+    // Fetch profile and redirect based on role
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
 
-    // Redirect to dashboard after login
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1000);
+    if (profileError || !profile) {
+      router.push("/role"); // no profile? select role
+    } else {
+      if (profile.role === "vendor") {
+        router.push("/vendor-profile");
+      } else if (profile.role === "organizer") {
+        router.push("/organizer-dashboard");
+      } else {
+        router.push("/role");
+      }
+    }
+
+    setLoading(false);
   };
 
   return (
-    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
-      {/* Logo */}
-      <img
-        src="/logo.png.jpg" // Replace with your uploaded filename
-        alt="Entre PRO Market"
-        style={{ width: 180, marginBottom: 20 }}
-      />
+    <div style={{ maxWidth: 400, margin: "auto", padding: 20 }}>
+      <h1>Entre PRO Market</h1>
+      {message && <p>{message}</p>}
 
-      {/* You said no business name under logo for now */}
+      <label>Email</label>
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+
+      <label>Password</label>
+      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
       <div style={{ marginTop: 20 }}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: 10, width: 250, marginBottom: 10 }}
-        />
-        <br />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: 10, width: 250, marginBottom: 10 }}
-        />
-        <br />
-        <button
-          onClick={handleSignUp}
-          disabled={loading}
-          style={{
-            padding: "10px 20px",
-            marginRight: 10,
-            backgroundColor: "#AABB23",
-            color: "white",
-            fontWeight: "bold",
-            border: "none",
-            borderRadius: 5,
-            cursor: "pointer",
-          }}
-        >
-          Sign Up
+        <button onClick={handleLogin} disabled={loading}>
+          {loading ? "Logging in..." : "Login"}
         </button>
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#701890",
-            color: "white",
-            fontWeight: "bold",
-            border: "none",
-            borderRadius: 5,
-            cursor: "pointer",
-          }}
-        >
-          Log In
+        <button onClick={handleSignUp} disabled={loading} style={{ marginLeft: 10 }}>
+          {loading ? "Signing up..." : "Sign Up"}
         </button>
       </div>
-
-      {message && (
-        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
-          {message}
-        </p>
-      )}
     </div>
   );
 }
