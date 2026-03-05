@@ -21,7 +21,6 @@ export default function Home() {
       return;
     }
 
-    // Redirect new users to /role
     setMessage("Account created! Redirecting to role selection...");
     setLoading(false);
 
@@ -45,17 +44,36 @@ export default function Home() {
     setMessage("Logged in successfully!");
     setLoading(false);
 
-    // Redirect to dashboard after login
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1000);
+    // Role-based redirect
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) {
+        router.push("/dashboard"); // fallback
+        return;
+      }
+
+      if (profile.role === "vendor") {
+        router.push("/vendor-dashboard");
+      } else if (profile.role === "organizer") {
+        router.push("/organizer-dashboard");
+      } else {
+        router.push("/dashboard"); // fallback for unexpected roles
+      }
+    } catch {
+      router.push("/dashboard"); // fallback
+    }
   };
 
   return (
     <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
       {/* Logo */}
       <img
-        src="/logo.png.jpg" // Replace with your uploaded filename
+        src="/logo.png.jpg" // Keep your uploaded filename
         alt="Entre PRO Market"
         style={{ width: 180, marginBottom: 20 }}
       />
