@@ -1,57 +1,71 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/router";
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
-  const [profiles, setProfiles] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     const sessionUser = supabase.auth.user();
     if (!sessionUser) {
-      setMessage("You are not logged in.");
       setLoading(false);
       return;
     }
+
     setUser(sessionUser);
 
-    const fetchProfiles = async () => {
-      setLoading(true);
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (error) {
-        setMessage(error.message);
-      } else {
-        setProfiles(data);
+    const loadData = async () => {
+      // Get current user's profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", sessionUser.id)
+        .single();
+
+      if (profileError) {
+        setMessage(profileError.message);
+        setLoading(false);
+        return;
       }
+
+      setProfile(profileData);
+
+      // If Organizer → fetch all Vendors
+      if (profileData.role === "Event Organizer") {
+        const { data: vendorData, error: vendorError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("role", "Vendor");
+
+        if (vendorError) {
+          setMessage(vendorError.message);
+        } else {
+          setVendors(vendorData);
+        }
+      }
+
       setLoading(false);
     };
 
-    fetchProfiles();
+    loadData();
   }, []);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setUser(null);
-      setProfiles([]);
-      setMessage("Logged out successfully.");
-    }
+    await supabase.auth.signOut();
+    router.push("/");
   };
 
   if (loading) return <p style={{ textAlign: "center" }}>Loading...</p>;
 
   if (!user)
     return (
-      <div style={{ textAlign: "center", padding: 20 }}>
-        <img
-          src="/logo.png.jpg"
-          alt="Entre PRO Market"
-          style={{ width: 180, marginBottom: 20 }}
-        />
-        <p>{message || "Please log in first."}</p>
+      <div style={{ textAlign: "center", padding: 30 }}>
+        <p>Please log in first.</p>
       </div>
     );
 
@@ -64,55 +78,89 @@ export default function Dashboard() {
         style={{ width: 180, marginBottom: 20 }}
       />
 
-      <h1 style={{ fontSize: 28, marginBottom: 15 }}>
-        <span style={{ color: "#701890" }}>ENTRE </span>
-        <span style={{ color: "#AABB23" }}>PRO </span>
-        <span style={{ color: "black", fontWeight: "bold" }}>MARKET</span>
-      </h1>
-
       <button
         onClick={handleLogout}
-        style={{ padding: "10px 20px", marginBottom: 20 }}
+        style={{
+          padding: "8px 16px",
+          marginBottom: 20,
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 5,
+          cursor: "pointer",
+        }}
       >
         Log Out
       </button>
 
-      <h2 style={{ color: "#701890", marginBottom: 15 }}>All Profiles</h2>
-      {profiles.length === 0 ? (
-        <p>No profiles found.</p>
-      ) : (
-        <table
-          style={{
-            margin: "0 auto",
-            borderCollapse: "collapse",
-            width: "90%",
-          }}
-        >
-          <thead>
-            <tr>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>ID</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>Email</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>Role</th>
-              <th style={{ border: "1px solid #ddd", padding: 8 }}>Created At</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profiles.map((p) => (
-              <tr key={p.id}>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>{p.id}</td>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>{p.email}</td>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>{p.role}</td>
-                <td style={{ border: "1px solid #ddd", padding: 8 }}>
-                  {p.created_at}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <h2 style={{ color: "#701890" }}>
+        Welcome, {profile?.email}
+      </h2>
+
+      <p>
+        Role: <strong>{profile?.role}</strong>
+      </p>
+
+      {profile?.role === "Vendor" && (
+        <div style={{ marginTop: 30 }}>
+          <h3>Your Subscription</h3>
+          <p>
+            Current Plan:{" "}
+            <strong>
+              {profile?.subscription ? profile.subscription : "Free"}
+            </strong>
+          </p>
+
+          {profile?.subscription !== "premium" && (
+            <p style={{ color: "#701890" }}>
+              Your contact info is hidden from organizers.
+            </p>
+          )}
+
+          {profile?.subscription === "premium" && (
+            <p style={{ color: "#AABB23", fontWeight: "bold" }}>
+              Your contact info is visible to organizers.
+            </p>
+          )}
+        </div>
+      )}
+
+      {profile?.role === "Event Organizer" && (
+        <div style={{ marginTop: 40 }}>
+          <h3 style={{ color: "#701890" }}>Available Vendors</h3>
+
+          {vendors.length === 0 ? (
+            <p>No vendors found.</p>
+          ) : (
+            vendors.map((vendor) => (
+              <div
+                key={vendor.id}
+                style={{
+                  border: "1px solid #ddd",
+                  padding: 15,
+                  marginBottom: 15,
+                  borderRadius: 6,
+                }}
+              >
+                <p><strong>{vendor.email}</strong></p>
+
+                {vendor.subscription === "premium" ? (
+                  <p style={{ color: "#AABB23", fontWeight: "bold" }}>
+                    Contact: {vendor.email}
+                  </p>
+                ) : (
+                  <p style={{ color: "#701890" }}>
+                    Contact info hidden (Free Vendor)
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       )}
 
       {message && (
-        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+        <p style={{ marginTop: 20, color: "#701890" }}>
           {message}
         </p>
       )}
