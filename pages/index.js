@@ -1,168 +1,97 @@
-import { useState } from "react";
-import { useRouter } from "next/router";
-import { supabase } from "../lib/supabaseClient";
+import React from "react";
+import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
 
 export default function Home() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    setLoading(true);
-    setMessage("");
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      setLoading(false);
-      return;
-    }
-
-    const user = data.user;
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile) {
-      router.push("/role");
-      return;
-    }
-
-    if (profile.role === "vendor") {
-      router.push("/vendor-profile");
-      return;
-    }
-
-    if (profile.role === "organizer") {
-      router.push("/organizer-dashboard");
-      return;
-    }
-
-    setLoading(false);
-  };
-
-  const handleSignUp = async () => {
-    setLoading(true);
-    setMessage("");
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage(error.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push("/role");
-  };
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#f4f4f4",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "Arial",
-      }}
-    >
-      <div
-        style={{
-          background: "white",
-          padding: "40px",
-          width: "380px",
-          borderRadius: "10px",
-          textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-        }}
+    <View style={styles.container}>
+      
+      <Image
+        source={require("../assets/logo.png")}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+
+      <Text style={styles.title}>Entre PRO Market</Text>
+
+      <TouchableOpacity
+        style={styles.vendorButton}
+        onPress={() => router.push("/vendor/login")}
       >
-        <img
-          src="/logo.png"
-          alt="Entre PRO Market"
-          style={{ width: "220px", marginBottom: "25px" }}
-        />
+        <Text style={styles.buttonText}>Vendor Login</Text>
+      </TouchableOpacity>
 
-        {message && (
-          <p style={{ color: "red", marginBottom: "15px" }}>{message}</p>
-        )}
+      <TouchableOpacity
+        style={styles.organizerButton}
+        onPress={() => router.push("/organizer/login")}
+      >
+        <Text style={styles.buttonText}>Event Organizer Login</Text>
+      </TouchableOpacity>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "12px",
-            marginBottom: "12px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-          }}
-        />
+      <TouchableOpacity
+        style={styles.signupButton}
+        onPress={() => router.push("/signup")}
+      >
+        <Text style={styles.signupText}>Create Account</Text>
+      </TouchableOpacity>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "12px",
-            marginBottom: "20px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-          }}
-        />
-
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "14px",
-            background: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: "bold",
-            marginBottom: "10px",
-            cursor: "pointer",
-          }}
-        >
-          Login
-        </button>
-
-        <button
-          onClick={handleSignUp}
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "14px",
-            background: "#AABB23",
-            color: "black",
-            border: "none",
-            borderRadius: "6px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          Sign Up
-        </button>
-      </div>
-    </div>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20
+  },
+
+  logo: {
+    width: 180,
+    height: 180,
+    marginBottom: 20
+  },
+
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    marginBottom: 40
+  },
+
+  vendorButton: {
+    width: "80%",
+    padding: 15,
+    backgroundColor: "#1E90FF",
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 15
+  },
+
+  organizerButton: {
+    width: "80%",
+    padding: 15,
+    backgroundColor: "#6A5ACD",
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 20
+  },
+
+  signupButton: {
+    marginTop: 10
+  },
+
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600"
+  },
+
+  signupText: {
+    fontSize: 16,
+    color: "#333"
+  }
+});
