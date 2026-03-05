@@ -10,7 +10,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleLogin() {
+  const handleLogin = async () => {
     setLoading(true);
     setMessage("");
 
@@ -49,9 +49,9 @@ export default function Home() {
     }
 
     setLoading(false);
-  }
+  };
 
-  async function handleSignUp() {
+  const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
 
@@ -67,7 +67,7 @@ export default function Home() {
     }
 
     router.push("/role");
-  }
+  };
 
   return (
     <div
