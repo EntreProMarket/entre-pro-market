@@ -13,10 +13,26 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
+    // Sign up user
     const { user, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
       setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Create a profile row for the new user with role placeholder
+    const { error: profileError } = await supabase.from("profiles").insert([
+      {
+        id: user.id,
+        email: user.email,
+        role: null, // role will be selected on /role page
+      },
+    ]);
+
+    if (profileError) {
+      setMessage("Error creating profile: " + profileError.message);
       setLoading(false);
       return;
     }
@@ -52,7 +68,7 @@ export default function Home() {
         .eq("id", user.id)
         .single();
 
-      if (profileError) {
+      if (profileError || !profile) {
         router.push("/dashboard"); // fallback
         return;
       }
@@ -62,7 +78,7 @@ export default function Home() {
       } else if (profile.role === "organizer") {
         router.push("/organizer-dashboard");
       } else {
-        router.push("/dashboard"); // fallback for unexpected roles
+        router.push("/role"); // new users without role go to role selection
       }
     } catch {
       router.push("/dashboard"); // fallback
@@ -73,12 +89,10 @@ export default function Home() {
     <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
       {/* Logo */}
       <img
-        src="/logo.png.jpg" // Keep your uploaded filename
+        src="/logo.png.jpg"
         alt="Entre PRO Market"
         style={{ width: 180, marginBottom: 20 }}
       />
-
-      {/* You said no business name under logo for now */}
 
       <div style={{ marginTop: 20 }}>
         <input
