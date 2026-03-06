@@ -1,157 +1,175 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useRouter } from "next/router";
+import Link from "next/link";
 
-export default function SearchVendors() {
+export default function Search() {
 
   const [vendors, setVendors] = useState([]);
-  const [filteredVendors, setFilteredVendors] = useState([]);
-
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
-
-  const router = useRouter();
-
-  const categories = [
-    "All",
-    "Music",
-    "Catering",
-    "Photography",
-    "Videography",
-    "Decor",
-    "Lighting",
-    "Security",
-    "Staffing",
-    "Transportation"
-  ];
+  const [searchText, setSearchText] = useState("");
+  const [category, setCategory] = useState("");
+  const [tag, setTag] = useState("");
 
   useEffect(() => {
     fetchVendors();
   }, []);
 
-  const fetchVendors = async () => {
+  async function fetchVendors() {
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("vendors")
       .select("*");
 
-    if (!error) {
+    if (searchText) {
+      query = query.ilike("handle", `%${searchText}%`);
+    }
+
+    if (category) {
+      query = query.eq("category", category);
+    }
+
+    if (tag) {
+      query = query.ilike("tags", `%${tag}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.log(error);
+    } else {
       setVendors(data);
-      setFilteredVendors(data);
     }
-
-  };
-
-  const runFilter = (text, cat) => {
-
-    let results = vendors;
-
-    if (text) {
-      results = results.filter(vendor =>
-        vendor.handle?.toLowerCase().includes(text.toLowerCase()) ||
-        vendor.name?.toLowerCase().includes(text.toLowerCase())
-      );
-    }
-
-    if (cat !== "All") {
-      results = results.filter(vendor =>
-        vendor.category === cat
-      );
-    }
-
-    setFilteredVendors(results);
-
-  };
-
-  const handleSearch = (value) => {
-    setSearch(value);
-    runFilter(value, category);
-  };
-
-  const handleCategory = (value) => {
-    setCategory(value);
-    runFilter(search, value);
-  };
-
-  const openProfile = (handle) => {
-    router.push(`/vendor/${handle}`);
-  };
+  }
 
   return (
 
-    <div style={{ padding: 30, fontFamily: "sans-serif" }}>
+    <div style={{ padding: 40, fontFamily: "sans-serif" }}>
 
       <h1>Find Vendors</h1>
 
-      {/* Search */}
+      {/* SEARCH BAR */}
 
       <input
         type="text"
-        placeholder="Search vendors..."
-        value={search}
-        onChange={(e) => handleSearch(e.target.value)}
-        style={{
-          padding: 10,
-          width: 300,
-          marginBottom: 20,
-          borderRadius: 5,
-          border: "1px solid #ccc"
-        }}
+        placeholder="Search by vendor handle..."
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        style={{ padding: 10, width: 250, marginRight: 10 }}
       />
 
-      <br/>
+      <button
+        onClick={fetchVendors}
+        style={{
+          padding: "10px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 5,
+          fontWeight: "bold",
+          cursor: "pointer"
+        }}
+      >
+        Search
+      </button>
 
-      {/* Category Filter */}
+      <br /><br />
+
+      {/* CATEGORY FILTER */}
 
       <select
         value={category}
-        onChange={(e) => handleCategory(e.target.value)}
-        style={{
-          padding: 10,
-          marginBottom: 30,
-          borderRadius: 5
-        }}
+        onChange={(e) => setCategory(e.target.value)}
+        style={{ padding: 10, marginRight: 10 }}
       >
-        {categories.map((cat) => (
-          <option key={cat}>{cat}</option>
-        ))}
+
+        <option value="">All Categories</option>
+        <option value="DJ">DJ</option>
+        <option value="Catering">Catering</option>
+        <option value="Photography">Photography</option>
+        <option value="Venue">Venue</option>
+        <option value="Decor">Decor</option>
+
       </select>
 
-      {/* Results */}
+      {/* TAG FILTER */}
 
-      <div>
+      <input
+        type="text"
+        placeholder="Tag (wedding, party, corporate)"
+        value={tag}
+        onChange={(e) => setTag(e.target.value)}
+        style={{ padding: 10, width: 200 }}
+      />
 
-        {filteredVendors.length === 0 && (
-          <p>No vendors found.</p>
-        )}
+      <button
+        onClick={fetchVendors}
+        style={{
+          padding: "10px 20px",
+          marginLeft: 10,
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 5,
+          fontWeight: "bold",
+          cursor: "pointer"
+        }}
+      >
+        Apply Filters
+      </button>
 
-        {filteredVendors.map((vendor) => (
+      <hr style={{ margin: "30px 0" }} />
 
-          <div
-            key={vendor.id}
-            onClick={() => openProfile(vendor.handle)}
-            style={{
-              padding: 20,
-              marginBottom: 15,
-              border: "1px solid #ddd",
-              borderRadius: 8,
-              cursor: "pointer"
-            }}
-          >
+      {/* RESULTS */}
 
-            <h3>{vendor.name || vendor.handle}</h3>
+      {vendors.map((vendor) => (
 
-            <p>@{vendor.handle}</p>
+        <div
+          key={vendor.id}
+          style={{
+            border: "1px solid #ddd",
+            padding: 20,
+            marginBottom: 20,
+            borderRadius: 10
+          }}
+        >
 
-            <p>{vendor.category}</p>
+          <h2>
 
-          </div>
+            <Link href={`/vendor/${vendor.handle}`}>
+              @{vendor.handle}
+            </Link>
 
-        ))}
+            {vendor.premium && (
+              <span
+                style={{
+                  marginLeft: 10,
+                  color: "#AABB23",
+                  fontWeight: "bold"
+                }}
+              >
+                PREMIUM
+              </span>
+            )}
 
-      </div>
+          </h2>
+
+          <p>{vendor.bio}</p>
+
+          <p>
+            <strong>Category:</strong> {vendor.category}
+          </p>
+
+          {vendor.tags && (
+            <p>
+              <strong>Tags:</strong> {vendor.tags}
+            </p>
+          )}
+
+        </div>
+
+      ))}
 
     </div>
 
   );
+
 }
