@@ -8,7 +8,7 @@ export default function VendorPage() {
 
   const [vendor, setVendor] = useState(null);
   const [portfolio, setPortfolio] = useState([]);
-  const [videos, setVideos] = useState([]);
+  const [newImageUrl, setNewImageUrl] = useState("");
 
   // Fetch vendor info
   useEffect(() => {
@@ -21,11 +21,8 @@ export default function VendorPage() {
         .eq("handle", handle)
         .single();
 
-      if (error) {
-        console.log("Vendor fetch error:", error.message);
-      } else {
-        setVendor(data);
-      }
+      if (error) console.log("Vendor fetch error:", error.message);
+      else setVendor(data);
     }
 
     fetchVendor();
@@ -41,35 +38,28 @@ export default function VendorPage() {
         .select("*")
         .eq("vendor_handle", handle);
 
-      if (error) {
-        console.log("Portfolio fetch error:", error.message);
-      } else {
-        setPortfolio(data);
-      }
+      if (error) console.log("Portfolio fetch error:", error.message);
+      else setPortfolio(data);
     }
 
     fetchPortfolio();
   }, [handle]);
 
-  // Fetch premium videos (only if vendor is premium)
-  useEffect(() => {
-    if (!handle || !vendor || !vendor.premium) return;
+  // Upload new image
+  const handleUpload = async () => {
+    if (!newImageUrl) return;
 
-    async function fetchVideos() {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("*")
-        .eq("vendor_handle", handle);
+    const { data, error } = await supabase
+      .from("portfolio")
+      .insert([{ vendor_handle: handle, image_url: newImageUrl }]);
 
-      if (error) {
-        console.log("Videos fetch error:", error.message);
-      } else {
-        setVideos(data);
-      }
+    if (error) {
+      console.log("Upload error:", error.message);
+    } else {
+      setPortfolio([...portfolio, data[0]]);
+      setNewImageUrl("");
     }
-
-    fetchVideos();
-  }, [handle, vendor]);
+  };
 
   return (
     <div style={{ padding: "40px", fontFamily: "Arial" }}>
@@ -80,7 +70,6 @@ export default function VendorPage() {
         <div>
           <h2>{vendor.business_name}</h2>
           <p>{vendor.bio}</p>
-          <p>Status: {vendor.premium ? "Premium Vendor" : "Standard Vendor"}</p>
         </div>
       )}
 
@@ -92,7 +81,7 @@ export default function VendorPage() {
               <img
                 key={item.id}
                 src={item.image_url}
-                alt={item.caption || "Portfolio Image"}
+                alt="Portfolio Image"
                 style={{ width: 150, height: 150, objectFit: "cover", borderRadius: 5 }}
               />
             ))}
@@ -100,19 +89,30 @@ export default function VendorPage() {
         </div>
       )}
 
-      {videos.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <h3>Premium Videos</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {videos.map((vid) => (
-              <video key={vid.id} controls width={300}>
-                <source src={vid.video_url} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Upload section */}
+      <div style={{ marginTop: 20 }}>
+        <h3>Add New Image</h3>
+        <input
+          type="text"
+          placeholder="Image URL"
+          value={newImageUrl}
+          onChange={(e) => setNewImageUrl(e.target.value)}
+          style={{ padding: 8, width: 250, marginRight: 10 }}
+        />
+        <button
+          onClick={handleUpload}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#701890",
+            color: "white",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
+        >
+          Upload
+        </button>
+      </div>
     </div>
   );
 }
