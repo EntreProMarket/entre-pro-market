@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient"; // Correct path matches homepage
+import { supabase } from "../lib/supabaseClient"; // Correct import
 
 export default function VendorProfile() {
   const router = useRouter();
