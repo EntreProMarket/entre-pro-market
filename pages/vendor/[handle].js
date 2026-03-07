@@ -1,3 +1,4 @@
+// pages/vendor/[handle].js
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient"; // relative import
@@ -83,4 +84,4 @@ export default function VendorProfile() {
       )}
     </div>
   );
-}
+      }
