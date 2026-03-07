@@ -1,7 +1,6 @@
-// pages/vendor/[handle].js
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient"; // relative import, works
+import { supabase } from "../lib/supabaseClient"; // relative import
 
 export default function VendorProfile() {
   const router = useRouter();
@@ -14,13 +13,14 @@ export default function VendorProfile() {
   useEffect(() => {
     if (!handle) return;
 
-    async function loadData() {
+    async function fetchData() {
       try {
         const { data: vendorData, error: vendorError } = await supabase
           .from("vendors")
           .select("*")
           .eq("handle", handle)
           .single();
+
         if (vendorError) {
           console.log("Vendor load error:", vendorError.message);
           setVendor(null);
@@ -32,6 +32,7 @@ export default function VendorProfile() {
           .from("vendor_portfolio")
           .select("*")
           .eq("vendor_handle", handle);
+
         if (portfolioError) {
           console.log("Portfolio load error:", portfolioError.message);
           setPortfolio([]);
@@ -47,7 +48,7 @@ export default function VendorProfile() {
       }
     }
 
-    loadData();
+    fetchData();
   }, [handle]);
 
   if (loading) return <div style={{ padding: 40 }}>Loading vendor...</div>;
