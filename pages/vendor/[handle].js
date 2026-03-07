@@ -1,6 +1,7 @@
+// pages/vendor/[handle].js
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient"; // Correct import
+import { supabase } from "lib/supabaseClient"; // absolute import for safety
 
 export default function VendorProfile() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function VendorProfile() {
           setVendor(vendorData);
         }
 
-        // Fetch portfolio
+        // Fetch portfolio items
         const { data: portfolioData, error: portfolioError } = await supabase
           .from("vendor_portfolio")
           .select("*")
@@ -56,9 +57,11 @@ export default function VendorProfile() {
 
   return (
     <div style={{ maxWidth: 900, margin: "auto", padding: 40 }}>
+      {/* Vendor Info */}
       <h1>{vendor.business_name || "Unnamed Vendor"}</h1>
       <p>{vendor.bio || "No bio provided."}</p>
 
+      {/* Portfolio Section */}
       <h2 style={{ marginTop: 40 }}>Portfolio</h2>
       {portfolio.length === 0 ? (
         <p style={{ marginTop: 10 }}>No portfolio items yet.</p>
