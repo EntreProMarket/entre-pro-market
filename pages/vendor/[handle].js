@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function VendorPage() {
   const router = useRouter();
@@ -9,85 +9,98 @@ export default function VendorPage() {
   const [vendor, setVendor] = useState(null);
   const [portfolio, setPortfolio] = useState([]);
   const [newImageUrl, setNewImageUrl] = useState("");
-  const [loading, setLoading] = useState(false);
 
   // Fetch vendor info
   useEffect(() => {
     if (!handle) return;
 
-    const fetchVendor = async () => {
+    async function fetchVendor() {
       const { data, error } = await supabase
         .from("vendors")
         .select("*")
         .eq("handle", handle)
         .single();
-      if (!error) setVendor(data);
-    };
+
+      if (error) console.log("Vendor fetch error:", error.message);
+      else setVendor(data);
+    }
 
     fetchVendor();
   }, [handle]);
 
-  // Fetch portfolio
+  // Fetch portfolio images
   useEffect(() => {
-    if (!vendor) return;
+    if (!handle) return;
 
-    const fetchPortfolio = async () => {
+    async function fetchPortfolio() {
       const { data, error } = await supabase
-        .from("vendor_portfolio")
+        .from("portfolio")
         .select("*")
-        .eq("vendor_handle", vendor.handle);
+        .eq("vendor_handle", handle);
 
-      if (!error) setPortfolio(data);
-    };
+      if (error) console.log("Portfolio fetch error:", error.message);
+      else setPortfolio(data);
+    }
 
     fetchPortfolio();
-  }, [vendor]);
+  }, [handle]);
 
-  // Add new image
-  const handleAddImage = async () => {
+  // Upload new image
+  const handleUpload = async () => {
     if (!newImageUrl) return;
 
-    setLoading(true);
     const { data, error } = await supabase
-      .from("vendor_portfolio")
-      .insert([{ vendor_handle: vendor.handle, image_url: newImageUrl }]);
+      .from("portfolio")
+      .insert([{ vendor_handle: handle, image_url: newImageUrl }]);
 
-    if (!error) setPortfolio([...portfolio, data[0]]);
-    setNewImageUrl("");
-    setLoading(false);
+    if (error) {
+      console.log("Upload error:", error.message);
+    } else {
+      setPortfolio([...portfolio, data[0]]);
+      setNewImageUrl("");
+    }
   };
 
-  if (!vendor) return <p>Loading vendor...</p>;
-
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: 20 }}>
-      <h1>{vendor.business_name}</h1>
-      <p>{vendor.bio}</p>
+    <div style={{ padding: "40px", fontFamily: "Arial" }}>
+      <h1>Vendor Page</h1>
+      <p>Handle: {handle}</p>
 
-      <h2>Portfolio</h2>
-      {portfolio.length === 0 && <p>No images yet.</p>}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        {portfolio.map((item) => (
-          <img
-            key={item.id}
-            src={item.image_url}
-            alt="Portfolio"
-            style={{ width: 150, height: 150, objectFit: "cover" }}
-          />
-        ))}
-      </div>
+      {vendor && (
+        <div>
+          <h2>{vendor.business_name}</h2>
+          <p>{vendor.bio}</p>
+        </div>
+      )}
 
+      {portfolio.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3>Portfolio Images</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {portfolio.map((item) => (
+              <img
+                key={item.id}
+                src={item.image_url}
+                alt="Portfolio Image"
+                style={{ width: 150, height: 150, objectFit: "cover", borderRadius: 5 }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upload section */}
       <div style={{ marginTop: 20 }}>
+        <h3>Add New Image</h3>
         <input
           type="text"
-          placeholder="New image URL"
+          placeholder="Image URL"
           value={newImageUrl}
           onChange={(e) => setNewImageUrl(e.target.value)}
-          style={{ padding: 8, width: 300, marginRight: 10 }}
+          style={{ padding: 8, width: 250, marginRight: 10 }}
         />
         <button
-          onClick={handleAddImage}
-          disabled={loading}
+          onClick={handleUpload}
           style={{
             padding: "8px 16px",
             backgroundColor: "#701890",
@@ -97,7 +110,7 @@ export default function VendorPage() {
             cursor: "pointer",
           }}
         >
-          Add Image
+          Upload
         </button>
       </div>
     </div>
