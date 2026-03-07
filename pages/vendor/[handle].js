@@ -1,6 +1,6 @@
 import { useRouter } from "next/router"
 import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabaseClient" // Correct path for your project
+import { supabase } from "../lib/supabase" // Matches your homepage
 
 export default function VendorProfile() {
   const router = useRouter()
@@ -13,43 +13,42 @@ export default function VendorProfile() {
   useEffect(() => {
     if (!handle) return
 
-    async function loadVendor() {
+    async function loadData() {
       try {
-        const { data, error } = await supabase
+        // Fetch vendor
+        const { data: vendorData, error: vendorError } = await supabase
           .from("vendors")
           .select("*")
           .eq("handle", handle)
           .single()
-
-        if (error) {
-          console.log("Vendor load error:", error.message)
+        if (vendorError) {
+          console.log("Vendor load error:", vendorError.message)
           setVendor(null)
         } else {
-          setVendor(data)
+          setVendor(vendorData)
         }
-      } catch (err) {
-        console.log("Vendor fetch failed:", err)
-        setVendor(null)
-      }
-    }
 
-    async function loadPortfolio() {
-      try {
-        const { data, error } = await supabase
+        // Fetch portfolio
+        const { data: portfolioData, error: portfolioError } = await supabase
           .from("vendor_portfolio")
           .select("*")
           .eq("vendor_handle", handle)
-
-        if (!error && data) {
-          setPortfolio(data)
+        if (portfolioError) {
+          console.log("Portfolio load error:", portfolioError.message)
+          setPortfolio([])
+        } else {
+          setPortfolio(portfolioData || [])
         }
       } catch (err) {
-        console.log("Portfolio fetch failed:", err)
+        console.log("Fetch failed:", err)
+        setVendor(null)
         setPortfolio([])
+      } finally {
+        setLoading(false)
       }
     }
 
-    Promise.all([loadVendor(), loadPortfolio()]).finally(() => setLoading(false))
+    loadData()
   }, [handle])
 
   if (loading) return <div style={{ padding: 40 }}>Loading vendor...</div>
