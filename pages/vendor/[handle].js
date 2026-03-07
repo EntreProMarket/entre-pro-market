@@ -50,7 +50,7 @@ export default function VendorPage() {
     if (!newImageUrl) return;
 
     const { data, error } = await supabase
-      .from("portfolio")
+      .from("vendor_portfolio")
       .insert([{ vendor_handle: handle, image_url: newImageUrl }]);
 
     if (error) {
