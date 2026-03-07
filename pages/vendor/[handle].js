@@ -7,7 +7,9 @@ export default function VendorPage() {
   const { handle } = router.query;
 
   const [vendor, setVendor] = useState(null);
+  const [portfolio, setPortfolio] = useState([]);
 
+  // Fetch vendor info
   useEffect(() => {
     if (!handle) return;
 
@@ -19,13 +21,33 @@ export default function VendorPage() {
         .single();
 
       if (error) {
-        console.log(error);
+        console.log("Vendor fetch error:", error.message);
       } else {
         setVendor(data);
       }
     }
 
     fetchVendor();
+  }, [handle]);
+
+  // Fetch portfolio images
+  useEffect(() => {
+    if (!handle) return;
+
+    async function fetchPortfolio() {
+      const { data, error } = await supabase
+        .from("portfolio")
+        .select("*")
+        .eq("vendor_handle", handle);
+
+      if (error) {
+        console.log("Portfolio fetch error:", error.message);
+      } else {
+        setPortfolio(data);
+      }
+    }
+
+    fetchPortfolio();
   }, [handle]);
 
   return (
@@ -37,6 +59,22 @@ export default function VendorPage() {
         <div>
           <h2>{vendor.business_name}</h2>
           <p>{vendor.bio}</p>
+        </div>
+      )}
+
+      {portfolio.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3>Portfolio</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {portfolio.map((item) => (
+              <img
+                key={item.id}
+                src={item.image_url}
+                alt={item.caption || "Portfolio Image"}
+                style={{ width: 150, height: 150, objectFit: "cover", borderRadius: 5 }}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
