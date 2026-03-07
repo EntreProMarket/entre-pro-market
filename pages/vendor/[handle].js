@@ -8,6 +8,7 @@ export default function VendorPage() {
 
   const [vendor, setVendor] = useState(null);
   const [portfolio, setPortfolio] = useState([]);
+  const [videos, setVideos] = useState([]);
 
   // Fetch vendor info
   useEffect(() => {
@@ -50,6 +51,26 @@ export default function VendorPage() {
     fetchPortfolio();
   }, [handle]);
 
+  // Fetch premium videos (only if vendor is premium)
+  useEffect(() => {
+    if (!handle || !vendor || !vendor.premium) return;
+
+    async function fetchVideos() {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("vendor_handle", handle);
+
+      if (error) {
+        console.log("Videos fetch error:", error.message);
+      } else {
+        setVideos(data);
+      }
+    }
+
+    fetchVideos();
+  }, [handle, vendor]);
+
   return (
     <div style={{ padding: "40px", fontFamily: "Arial" }}>
       <h1>Vendor Page</h1>
@@ -59,12 +80,13 @@ export default function VendorPage() {
         <div>
           <h2>{vendor.business_name}</h2>
           <p>{vendor.bio}</p>
+          <p>Status: {vendor.premium ? "Premium Vendor" : "Standard Vendor"}</p>
         </div>
       )}
 
       {portfolio.length > 0 && (
         <div style={{ marginTop: 20 }}>
-          <h3>Portfolio</h3>
+          <h3>Portfolio Images</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {portfolio.map((item) => (
               <img
@@ -73,6 +95,20 @@ export default function VendorPage() {
                 alt={item.caption || "Portfolio Image"}
                 style={{ width: 150, height: 150, objectFit: "cover", borderRadius: 5 }}
               />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {videos.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3>Premium Videos</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {videos.map((vid) => (
+              <video key={vid.id} controls width={300}>
+                <source src={vid.video_url} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
             ))}
           </div>
         </div>
