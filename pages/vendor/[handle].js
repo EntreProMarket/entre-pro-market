@@ -1,17 +1,17 @@
-import { useRouter } from "next/router"
-import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase" // Matches your homepage
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient"; // Correct path matches homepage
 
 export default function VendorProfile() {
-  const router = useRouter()
-  const { handle } = router.query
+  const router = useRouter();
+  const { handle } = router.query;
 
-  const [vendor, setVendor] = useState(null)
-  const [portfolio, setPortfolio] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [vendor, setVendor] = useState(null);
+  const [portfolio, setPortfolio] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!handle) return
+    if (!handle) return;
 
     async function loadData() {
       try {
@@ -20,39 +20,39 @@ export default function VendorProfile() {
           .from("vendors")
           .select("*")
           .eq("handle", handle)
-          .single()
+          .single();
         if (vendorError) {
-          console.log("Vendor load error:", vendorError.message)
-          setVendor(null)
+          console.log("Vendor load error:", vendorError.message);
+          setVendor(null);
         } else {
-          setVendor(vendorData)
+          setVendor(vendorData);
         }
 
         // Fetch portfolio
         const { data: portfolioData, error: portfolioError } = await supabase
           .from("vendor_portfolio")
           .select("*")
-          .eq("vendor_handle", handle)
+          .eq("vendor_handle", handle);
         if (portfolioError) {
-          console.log("Portfolio load error:", portfolioError.message)
-          setPortfolio([])
+          console.log("Portfolio load error:", portfolioError.message);
+          setPortfolio([]);
         } else {
-          setPortfolio(portfolioData || [])
+          setPortfolio(portfolioData || []);
         }
       } catch (err) {
-        console.log("Fetch failed:", err)
-        setVendor(null)
-        setPortfolio([])
+        console.log("Fetch failed:", err);
+        setVendor(null);
+        setPortfolio([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    loadData()
-  }, [handle])
+    loadData();
+  }, [handle]);
 
-  if (loading) return <div style={{ padding: 40 }}>Loading vendor...</div>
-  if (!vendor) return <div style={{ padding: 40 }}>Vendor not found.</div>
+  if (loading) return <div style={{ padding: 40 }}>Loading vendor...</div>;
+  if (!vendor) return <div style={{ padding: 40 }}>Vendor not found.</div>;
 
   return (
     <div style={{ maxWidth: 900, margin: "auto", padding: 40 }}>
@@ -68,7 +68,7 @@ export default function VendorProfile() {
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
             gap: 12,
-            marginTop: 20
+            marginTop: 20,
           }}
         >
           {portfolio.map((item) => (
@@ -82,5 +82,5 @@ export default function VendorProfile() {
         </div>
       )}
     </div>
-  )
+  );
 }
