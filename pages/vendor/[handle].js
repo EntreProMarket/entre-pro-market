@@ -1,37 +1,93 @@
-import { supabase } from "../../lib/supabaseClient"
+import { useRouter } from "next/router"
+import { useEffect, useState } from "react"
+import { supabase } from "../../lib/supabase"
 
-export async function getServerSideProps(context){
+export default function VendorProfile() {
 
-const { handle } = context.params
+  const router = useRouter()
+  const { handle } = router.query
 
-const { data } = await supabase
-.from("vendors")
-.select("*")
-.eq("handle",handle)
-.single()
+  const [vendor, setVendor] = useState(null)
+  const [portfolio, setPortfolio] = useState([])
 
-return { props:{vendor:data}}
+  useEffect(() => {
 
-}
+    if (!handle) return
 
-export default function VendorPage({vendor}){
+    async function loadVendor() {
 
-if(!vendor) return <p>Vendor not found</p>
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("*")
+        .eq("handle", handle)
+        .single()
 
-return(
+      if (!error && data) {
+        setVendor(data)
+      }
 
-<div style={{padding:40,fontFamily:"sans-serif"}}>
+    }
 
-<h1>{vendor.business_name}</h1>
+    async function loadPortfolio() {
 
-<p>{vendor.bio}</p>
+      const { data, error } = await supabase
+        .from("vendor_portfolio")
+        .select("*")
+        .eq("vendor_handle", handle)
 
-{vendor.website && (
-<a href={vendor.website}>Visit Website</a>
-)}
+      if (!error && data) {
+        setPortfolio(data)
+      }
 
-</div>
+    }
 
-)
+    loadVendor()
+    loadPortfolio()
+
+  }, [handle])
+
+  if (!vendor) {
+    return <div style={{padding:"40px"}}>Loading vendor...</div>
+  }
+
+  return (
+
+    <div style={{maxWidth:"900px", margin:"auto", padding:"40px"}}>
+
+      <h1>{vendor.business_name}</h1>
+
+      <p>{vendor.bio}</p>
+
+      <h2 style={{marginTop:"40px"}}>Portfolio</h2>
+
+      <div
+        style={{
+          display:"grid",
+          gridTemplateColumns:"repeat(3, 1fr)",
+          gap:"12px",
+          marginTop:"20px"
+        }}
+      >
+
+        {portfolio.map((item) => (
+
+          <img
+            key={item.id}
+            src={item.image_url}
+            alt="portfolio"
+            style={{
+              width:"100%",
+              borderRadius:"8px",
+              objectFit:"cover"
+            }}
+          />
+
+        ))}
+
+      </div>
+
+    </div>
+
+  )
 
 }
