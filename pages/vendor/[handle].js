@@ -36,8 +36,9 @@ export default function VendorPage() {
 
   }, [handle])
 
-  if (!vendor) return <p style={{padding:40}}>Loading vendor...</p>
+  if (!handle) return <p style={{padding:40}}>Loading...</p>
 
+if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
   return (
 
     <div style={{maxWidth:900, margin:"auto", padding:40}}>
