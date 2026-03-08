@@ -1,56 +1,83 @@
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/router"
+import { useEffect, useState } from "react"
+import { supabase } from "../../lib/supabaseClient"
 
 export default function VendorPage() {
-  const router = useRouter();
-  const { handle } = router.query;
+  const router = useRouter()
+  const { handle } = router.query
 
-  const [vendor, setVendor] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [vendor, setVendor] = useState(null)
+  const [portfolio, setPortfolio] = useState([])
 
   useEffect(() => {
-    if (!handle) return; // Wait until handle is available from router
+    if (!handle) return
 
-    console.log("handle value:", handle); // FACT: what is the handle at runtime
+    const loadVendor = async () => {
 
-    const fetchVendor = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("vendors")
-          .select("*")
-          .eq("handle", handle)
-          .single();
+      const { data: vendorData } = await supabase
+        .from("vendors")
+        .select("*")
+        .eq("handle", handle)
+        .single()
 
-        if (error) {
-          console.log("Supabase error:", error);
-          setVendor(null);
-        } else {
-          setVendor(data);
-        }
-      } catch (err) {
-        console.log("Fetch error:", err);
-        setVendor(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setVendor(vendorData)
 
-    fetchVendor();
-  }, [handle]);
+      if (!vendorData) return
 
-  if (!handle) return <p style={{ padding: 40 }}>Loading...</p>;
-  if (loading) return <p style={{ padding: 40 }}>Loading vendor...</p>;
-  if (!vendor) return <p style={{ padding: 40 }}>Vendor not found.</p>;
+      const { data: portfolioData } = await supabase
+        .from("vendor_portfolio")
+        .select("*")
+        .eq("vendor_handle", handle)
 
+      setPortfolio(portfolioData || [])
+    }
+
+    loadVendor()
+
+  }, [handle])
+
+  if (!handle) return <p style={{padding:40}}>Loading...</p>
+
+if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
   return (
-    <div style={{ padding: 40 }}>
+
+    <div style={{maxWidth:900, margin:"auto", padding:40}}>
+
       <h1>{vendor.business_name}</h1>
-      <p>{vendor.bio || "No bio provided."}</p>
-      <div>
-        <h2>Portfolio</h2>
-        {/* Portfolio images would go here */}
+
+      <p>{vendor.bio}</p>
+
+      <h2 style={{marginTop:40}}>Portfolio</h2>
+
+      {portfolio.length === 0 && (
+        <p>No images uploaded yet.</p>
+      )}
+
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:"repeat(auto-fill,200px)",
+        gap:"20px",
+        marginTop:"20px"
+      }}>
+
+        {portfolio.map((item) => (
+
+          <img
+            key={item.id}
+            src={item.image_url}
+            style={{
+              width:"200px",
+              height:"200px",
+              objectFit:"cover",
+              borderRadius:"8px"
+            }}
+          />
+
+        ))}
+
       </div>
+
     </div>
-  );
+
+  )
 }
