@@ -1,83 +1,81 @@
-import { useRouter } from "next/router"
-import { useEffect, useState } from "react"
-import { supabase } from "../../lib/supabaseClient"
+// pages/vendor/[handle].js
+
+import { useState, useEffect } from "react";
+import { supabase } from "../../supabaseClient"; // adjust path if needed
+import VendorPortfolio from "../../components/VendorPortfolio"; // import the new portfolio component
+import { useRouter } from "next/router";
 
 export default function VendorPage() {
-  const router = useRouter()
-  const { handle } = router.query
+  const router = useRouter();
+  const { handle } = router.query;
+  const [vendor, setVendor] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [vendor, setVendor] = useState(null)
-  const [portfolio, setPortfolio] = useState([])
-
+  // Fetch vendor data by handle
   useEffect(() => {
-    if (!handle) return
+    if (!handle) return;
 
-    const loadVendor = async () => {
-
-      const { data: vendorData } = await supabase
+    const fetchVendor = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
         .from("vendors")
         .select("*")
         .eq("handle", handle)
-        .single()
+        .single();
 
-      setVendor(vendorData)
+      if (error) {
+        console.error("Error fetching vendor:", error.message);
+        setVendor(null);
+      } else {
+        setVendor(data);
+      }
+      setLoading(false);
+    };
 
-      if (!vendorData) return
+    fetchVendor();
+  }, [handle]);
 
-      const { data: portfolioData } = await supabase
-        .from("vendor_portfolio")
-        .select("*")
-        .eq("vendor_handle", handle)
+  if (loading) return <p>Loading vendor...</p>;
+  if (!vendor) return <p>Vendor not found</p>;
 
-      setPortfolio(portfolioData || [])
-    }
-
-    loadVendor()
-
-  }, [handle])
-
-  if (!handle) return <p style={{padding:40}}>Loading...</p>
-
-if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
   return (
-
-    <div style={{maxWidth:900, margin:"auto", padding:40}}>
-
+    <div style={{ padding: "20px" }}>
       <h1>{vendor.business_name}</h1>
+      {vendor.bio && <p>{vendor.bio}</p>}
 
-      <p>{vendor.bio}</p>
-
-      <h2 style={{marginTop:40}}>Portfolio</h2>
-
-      {portfolio.length === 0 && (
-        <p>No images uploaded yet.</p>
-      )}
-
-      <div style={{
-        display:"grid",
-        gridTemplateColumns:"repeat(auto-fill,200px)",
-        gap:"20px",
-        marginTop:"20px"
-      }}>
-
-        {portfolio.map((item) => (
-
-          <img
-            key={item.id}
-            src={item.image_url}
-            style={{
-              width:"200px",
-              height:"200px",
-              objectFit:"cover",
-              borderRadius:"8px"
-            }}
-          />
-
-        ))}
-
+      {/* Add your social links if they exist */}
+      <div style={{ marginTop: "10px" }}>
+        {vendor.website && (
+          <p>
+            Website: <a href={vendor.website}>{vendor.website}</a>
+          </p>
+        )}
+        {vendor.instagram && (
+          <p>
+            Instagram: <a href={vendor.instagram}>{vendor.instagram}</a>
+          </p>
+        )}
+        {vendor.facebook && (
+          <p>
+            Facebook: <a href={vendor.facebook}>{vendor.facebook}</a>
+          </p>
+        )}
+        {vendor.tiktok && (
+          <p>
+            TikTok: <a href={vendor.tiktok}>{vendor.tiktok}</a>
+          </p>
+        )}
+        {vendor.youtube && (
+          <p>
+            YouTube: <a href={vendor.youtube}>{vendor.youtube}</a>
+          </p>
+        )}
       </div>
 
+      {/* Portfolio section */}
+      <div style={{ marginTop: "20px" }}>
+        <VendorPortfolio vendorId={vendor.id} />
+      </div>
     </div>
-
-  )
+  );
 }
