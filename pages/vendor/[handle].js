@@ -50,35 +50,11 @@ if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
 
       <h2 style={{marginTop:40}}>Portfolio</h2>
 
-<VendorPortfolio vendorHandle={vendor.handle} />
-    
-{portfolio.length === 0 && (
-        <p>No images uploaded yet.</p>
-      )}
-
-      <div style={{
-        display:"grid",
-        gridTemplateColumns:"repeat(auto-fill,200px)",
-        gap:"20px",
-        marginTop:"20px"
-      }}>
-
-        {portfolio.map((item) => (
-
-          <img
-            key={item.id}
-            src={item.image_url}
-            style={{
-              width:"200px",
-              height:"200px",
-              objectFit:"cover",
-              borderRadius:"8px"
-            }}
-          />
-
-        ))}
-
-      </div>
+<VendorPortfolio 
+  vendorHandle={vendor.handle} 
+  portfolio={portfolio} 
+  setPortfolio={setPortfolio} 
+/>
 
     </div>
 
