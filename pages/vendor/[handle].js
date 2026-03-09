@@ -49,7 +49,9 @@ if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
 
       <h2 style={{marginTop:40}}>Portfolio</h2>
 
-      {portfolio.length === 0 && (
+<VendorPortfolio vendorHandle={vendor.handle} />
+    
+{portfolio.length === 0 && (
         <p>No images uploaded yet.</p>
       )}
 
