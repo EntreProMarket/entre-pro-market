@@ -6,7 +6,6 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
   const [file, setFile] = useState(null)
 
   const handleUpload = async () => {
-
     if (!file) {
       alert("Please select a file")
       return
@@ -16,6 +15,7 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
 
     const filePath = `${cleanHandle}/${Date.now()}-${file.name}`
 
+    // Upload to storage bucket
     const { error: uploadError } = await supabase.storage
       .from("vendor-portfolio")
       .upload(filePath, file)
@@ -25,6 +25,7 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
       return
     }
 
+    // Get public URL of uploaded file
     const { data } = supabase
       .storage
       .from("vendor-portfolio")
@@ -32,6 +33,7 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
 
     const imageUrl = data.publicUrl
 
+    // Insert row into vendor_portfolio table
     const { data: newRow, error: insertError } = await supabase
       .from("vendor_portfolio")
       .insert([
@@ -48,52 +50,51 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
       return
     }
 
+    // Update portfolio grid
     setPortfolio([...portfolio, newRow])
-
     alert("Upload successful!")
-
     setFile(null)
   }
 
   return (
-
     <div>
-
       <input
         type="file"
         onChange={(e) => setFile(e.target.files[0])}
       />
-
       <button onClick={handleUpload}>
         Upload Image
       </button>
 
-      <div style={{
-        display:"grid",
-        gridTemplateColumns:"repeat(auto-fill,200px)",
-        gap:"20px",
-        marginTop:"20px"
-      }}>
+      {/* Show message if portfolio is empty */}
+      {portfolio.length === 0 && (
+        <p>No images uploaded yet.</p>
+      )}
 
-        {portfolio.map((item) => (
-
-          <img
-            key={item.id}
-            src={item.image_url}
-            style={{
-              width:"200px",
-              height:"200px",
-              objectFit:"cover",
-              borderRadius:"8px"
-            }}
-          />
-
-        ))}
-
-      </div>
+      {/* Only render grid if there are images */}
+      {portfolio.length > 0 && (
+        <div style={{
+          display:"grid",
+          gridTemplateColumns:"repeat(auto-fill,200px)",
+          gap:"20px",
+          marginTop:"20px"
+        }}>
+          {portfolio.map((item) => (
+            <img
+              key={item.id}
+              src={item.image_url}
+              style={{
+                width:"200px",
+                height:"200px",
+                objectFit:"cover",
+                borderRadius:"8px"
+              }}
+              alt="Portfolio"
+            />
+          ))}
+        </div>
+      )}
 
     </div>
-
   )
-
 }
