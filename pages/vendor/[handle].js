@@ -1,7 +1,7 @@
-import VendorPortfolio from "../../components/VendorPortfolio";
 import { useRouter } from "next/router"
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabaseClient"
+import VendorPortfolio from "../../components/VendorPortfolio"
 
 export default function VendorPage() {
   const router = useRouter()
@@ -38,25 +38,24 @@ export default function VendorPage() {
   }, [handle])
 
   if (!handle) return <p style={{padding:40}}>Loading...</p>
+  if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
 
-if (!vendor) return <p style={{padding:40}}>Vendor not found.</p>
   return (
-
     <div style={{maxWidth:900, margin:"auto", padding:40}}>
 
       <h1>{vendor.business_name}</h1>
-
       <p>{vendor.bio}</p>
 
-      <h2 style={{marginTop:40}}>Portfolio</h2>
+      {/* Only show Portfolio heading if there are images */}
+      {portfolio.length > 0 && <h2 style={{marginTop:40}}>Portfolio</h2>}
 
-<VendorPortfolio 
-  vendorHandle={vendor.handle} 
-  portfolio={portfolio} 
-  setPortfolio={setPortfolio} 
-/>
+      {/* VendorPortfolio component handles grid and uploads */}
+      <VendorPortfolio 
+        vendorHandle={vendor.handle} 
+        portfolio={portfolio} 
+        setPortfolio={setPortfolio} 
+      />
 
     </div>
-
   )
 }
