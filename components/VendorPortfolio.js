@@ -1,100 +1,98 @@
-import { useState } from "react"
-import { supabase } from "../lib/supabaseClient"
+import { useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio }) {
-
-  const [file, setFile] = useState(null)
+  const [file, setFile] = useState(null);
 
   const handleUpload = async () => {
     if (!file) {
-      alert("Please select a file")
-      return
+      alert("Please choose a file first");
+      return;
     }
 
-    const cleanHandle = vendorHandle.trim()
+    const cleanHandle = vendorHandle.trim();
+    const filePath = `${cleanHandle}/${Date.now()}-${file.name}`;
 
-    const filePath = `${cleanHandle}/${Date.now()}-${file.name}`
-
-    // Upload to storage bucket
+    // Upload image to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from("vendor-portfolio")
-      .upload(filePath, file)
+      .upload(filePath, file);
 
     if (uploadError) {
-      alert("Upload failed: " + uploadError.message)
-      return
+      alert("Upload failed: " + uploadError.message);
+      return;
     }
 
-    // Get public URL of uploaded file
-    const { data } = supabase
-      .storage
+    // Get public URL
+    const { data } = supabase.storage
       .from("vendor-portfolio")
-      .getPublicUrl(filePath)
+      .getPublicUrl(filePath);
 
-    const imageUrl = data.publicUrl
+    const imageUrl = data.publicUrl;
 
-    // Insert row into vendor_portfolio table
+    // Insert into database
     const { data: newRow, error: insertError } = await supabase
       .from("vendor_portfolio")
-      .insert([
-        {
-          vendor_handle: cleanHandle,
-          image_url: imageUrl
-        }
-      ])
+      .insert([{ vendor_handle: cleanHandle, image_url: imageUrl }])
       .select()
-      .single()
+      .single();
 
     if (insertError) {
-      alert("Database insert failed: " + insertError.message)
-      return
+      alert("Database insert failed: " + insertError.message);
+      return;
     }
 
-    // Update portfolio grid
-    setPortfolio([...portfolio, newRow])
-    alert("Upload successful!")
-    setFile(null)
-  }
+    // Update state
+    setPortfolio([...portfolio, newRow]);
+    setFile(null);
+
+    alert("Upload successful!");
+  };
 
   return (
-    <div>
-      <input
-        type="file"
-        onChange={(e) => setFile(e.target.files[0])}
-      />
-      <button onClick={handleUpload}>
-        Upload Image
-      </button>
+    <div style={{ marginTop: 20 }}>
+      {/* File upload controls */}
+      <div style={{ marginBottom: 20 }}>
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files[0])}
+        />
+        <button onClick={handleUpload} style={{ marginLeft: 10 }}>
+          Upload Image
+        </button>
+      </div>
 
-      {/* Show message if portfolio is empty */}
+      {/* No images message */}
       {portfolio.length === 0 && (
         <p>No images uploaded yet.</p>
       )}
 
-      {/* Only render grid if there are images */}
+      {/* Portfolio grid */}
       {portfolio.length > 0 && (
-        <div style={{
-          display:"grid",
-          gridTemplateColumns:"repeat(auto-fill,200px)",
-          gap:"20px",
-          marginTop:"20px"
-        }}>
-          {portfolio.map((item) => (
-            <img
-              key={item.id}
-              src={item.image_url}
-              style={{
-                width:"200px",
-                height:"200px",
-                objectFit:"cover",
-                borderRadius:"8px"
-              }}
-              alt="Portfolio"
-            />
-          ))}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, 200px)",
+            gap: "20px",
+          }}
+        >
+          {portfolio
+            .filter((item) => item.image_url) // ensures no empty src
+            .map((item) => (
+              <img
+                key={item.id}
+                src={item.image_url}
+                alt="Portfolio"
+                style={{
+                  width: "200px",
+                  height: "200px",
+                  objectFit: "cover",
+                  borderRadius: "8px",
+                }}
+              />
+            ))}
         </div>
       )}
-
     </div>
-  )
+  );
 }
