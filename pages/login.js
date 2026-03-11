@@ -4,24 +4,20 @@ import { useRouter } from "next/router";
 
 export default function LoginPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setLoading(true);
     setErrorMsg("");
 
-    if (!email || !password) {
-      setErrorMsg("Please enter both email and password.");
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: password,
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
     if (error) {
@@ -30,48 +26,60 @@ export default function LoginPage() {
       return;
     }
 
-    // Redirect to vendor page or home
-    router.push(`/vendor/${data.user?.user_metadata?.handle || "test-vendor"}`);
-    setLoading(false);
+    // Temporary safe redirect so the vendor page crash doesn't trigger
+    router.push("/");
   };
 
   return (
     <div style={{ padding: 40 }}>
       <h1>Login</h1>
 
-      {errorMsg && <p style={{ color: "red" }}>{errorMsg}</p>}
+      {errorMsg && (
+        <p style={{ color: "red", marginBottom: 20 }}>{errorMsg}</p>
+      )}
 
-      <div style={{ marginBottom: 20 }}>
+      <form onSubmit={handleLogin}>
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ width: "100%", padding: 10, marginBottom: 10 }}
+          style={{
+            display: "block",
+            width: "100%",
+            marginBottom: 10,
+            padding: 10,
+          }}
         />
+
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ width: "100%", padding: 10 }}
+          style={{
+            display: "block",
+            width: "100%",
+            marginBottom: 20,
+            padding: 10,
+          }}
         />
-      </div>
 
-      <button
-        onClick={handleLogin}
-        disabled={loading}
-        style={{
-          padding: 10,
-          width: "100%",
-          backgroundColor: "#0066ff",
-          color: "#fff",
-          border: "none",
-          borderRadius: 5,
-        }}
-      >
-        {loading ? "Logging in..." : "Login"}
-      </button>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: 12,
+            width: "100%",
+            background: "#2563eb",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+          }}
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
+      </form>
     </div>
   );
-        }
+}
