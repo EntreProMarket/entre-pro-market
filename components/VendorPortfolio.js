@@ -12,6 +12,7 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
     }
 
     const cleanHandle = vendorHandle.trim()
+
     const filePath = `${cleanHandle}/${Date.now()}-${file.name}`
 
     // Upload to storage bucket
@@ -57,26 +58,17 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
 
   return (
     <div>
-
-      {/* Hidden file input */}
       <input
-        id="fileUploadButton"
         type="file"
         onChange={(e) => setFile(e.target.files[0])}
-        style={{ display: "none" }}
       />
-
-      {/* Custom buttons */}
-      <button onClick={() => document.getElementById('fileUploadButton').click()}>
-        Choose File
-      </button>
-      <button onClick={handleUpload} style={{ marginLeft: "10px" }}>
+      <button onClick={handleUpload}>
         Upload Image
       </button>
 
       {/* Show message if portfolio is empty */}
       {portfolio.length === 0 && (
-        <p style={{ marginTop: "20px" }}>No images uploaded yet.</p>
+        <p>No images uploaded yet.</p>
       )}
 
       {/* Only render grid if there are images */}
@@ -88,19 +80,9 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
           marginTop:"20px"
         }}>
           {portfolio.map((item) => (
-
-  <img
-    key={item.id}
-    src={item.image_url}
-    style={{
-      width:"200px",
-      height:"200px",
-      objectFit:"cover",
-      borderRadius:"8px"
-    }}
-  />
-
-))}
+            <img
+              key={item.id}
+              src={item.image_url}
               style={{
                 width:"200px",
                 height:"200px",
