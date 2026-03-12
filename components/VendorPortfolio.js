@@ -56,10 +56,12 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
           marginTop: "20px"
         }}
       >
-        {portfolio.map((item) => (
-          <img
-            key={item.id}
-            src={item.image_url}
+        {portfolio
+  .filter(item => item.image_url)
+  .map((item) => (
+    <img
+      key={item.id}
+      src={item.image_url}
             style={{
               width: "100%",
               height: "120px",
