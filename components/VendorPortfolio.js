@@ -13,12 +13,12 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
 
       const fileName = `${vendorHandle}/${Date.now()}-${file.name}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error } = await supabase.storage
         .from("vendor-portfolio")
         .upload(fileName, file, { upsert: true });
 
-      if (uploadError) {
-        alert("Upload failed: " + uploadError.message);
+      if (error) {
+        alert("Upload failed: " + error.message);
         setUploading(false);
         return;
       }
@@ -33,26 +33,24 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
         .from("vendor_portfolio")
         .insert({
           vendor_handle: vendorHandle,
-          image_url: imageUrl,
+          image_url: imageUrl
         })
         .select();
 
-      if (insertError) {
-        alert("Database insert failed: " + insertError.message);
-      } else {
+      if (!insertError && inserted) {
         setPortfolio([...portfolio, ...inserted]);
-        alert("Upload successful!");
       }
+
+      alert("Upload successful");
     } catch (err) {
-      alert("Unexpected error: " + err.message);
+      alert(err.message);
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div style={{ marginTop: 30 }}>
-      <h2>Portfolio</h2>
+    <div style={{ marginTop: 20 }}>
 
       <input
         type="file"
@@ -66,26 +64,26 @@ export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio 
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
           gap: 10,
-          marginTop: 20,
+          marginTop: 20
         }}
       >
         {portfolio &&
-          portfolio.map((item) =>
-            item.image_url ? (
+          portfolio
+            .filter((item) => item.image_url)
+            .map((item) => (
               <img
                 key={item.id}
                 src={item.image_url}
-                alt="Vendor work"
                 style={{
                   width: "100%",
-                  height: 120,
+                  height: 140,
                   objectFit: "cover",
-                  borderRadius: 6,
+                  borderRadius: 6
                 }}
               />
-            ) : null
-          )}
+            ))}
       </div>
+
     </div>
   );
 }
