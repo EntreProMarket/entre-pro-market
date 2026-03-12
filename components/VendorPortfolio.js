@@ -1,89 +1,77 @@
-import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useState } from "react"
+import { supabase } from "../lib/supabaseClient"
 
 export default function VendorPortfolio({ vendorHandle, portfolio, setPortfolio }) {
-  const [uploading, setUploading] = useState(false);
 
-  const uploadImage = async (event) => {
-    try {
-      setUploading(true);
+  const handleUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
 
-      const file = event.target.files[0];
-      if (!file) return;
+    const fileName = `${vendorHandle}/${Date.now()}-${file.name}`
 
-      const fileName = `${vendorHandle}/${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage
+      .from("vendor-portfolio")
+      .upload(fileName, file)
 
-      const { error } = await supabase.storage
-        .from("vendor-portfolio")
-        .upload(fileName, file, { upsert: true });
+    if (error) {
+      alert("Upload failed: " + error.message)
+      return
+    }
 
-      if (error) {
-        alert("Upload failed: " + error.message);
-        setUploading(false);
-        return;
-      }
+    const { data } = supabase
+      .storage
+      .from("vendor-portfolio")
+      .getPublicUrl(fileName)
 
-      const { data } = supabase.storage
-        .from("vendor-portfolio")
-        .getPublicUrl(fileName);
+    const imageUrl = data.publicUrl
 
-      const imageUrl = data.publicUrl;
-
-      const { data: inserted, error: insertError } = await supabase
-        .from("vendor_portfolio")
-        .insert({
+    const { data: newRow, error: dbError } = await supabase
+      .from("vendor_portfolio")
+      .insert([
+        {
           vendor_handle: vendorHandle,
           image_url: imageUrl
-        })
-        .select();
+        }
+      ])
+      .select()
 
-      if (!insertError && inserted) {
-        setPortfolio([...portfolio, ...inserted]);
-      }
-
-      alert("Upload successful");
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setUploading(false);
+    if (dbError) {
+      alert("Database error: " + dbError.message)
+      return
     }
-  };
+
+    setPortfolio([...portfolio, ...newRow])
+  }
 
   return (
-    <div style={{ marginTop: 20 }}>
+    <div>
 
-      <input
-        type="file"
-        accept="image/*"
-        onChange={uploadImage}
-        disabled={uploading}
-      />
+      <input type="file" onChange={handleUpload} />
 
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 10,
-          marginTop: 20
+          gap: "10px",
+          marginTop: "20px"
         }}
       >
-        {portfolio &&
-          portfolio
-            .filter((item) => item.image_url)
-            .map((item) => (
-              <img
-                key={item.id}
-                src={item.image_url}
-                style={{
-                  width: "100%",
-                  height: 140,
-                  objectFit: "cover",
-                  borderRadius: 6
-                }}
-              />
-            ))}
+        {portfolio.map((item) => (
+          <img
+            key={item.id}
+            src={item.image_url}
+            style={{
+              width: "100%",
+              height: "120px",
+              objectFit: "cover",
+              borderRadius: "8px",
+              cursor: "pointer"
+            }}
+            onClick={() => window.open(item.image_url, "_blank")}
+          />
+        ))}
       </div>
 
     </div>
-  );
+  )
 }
