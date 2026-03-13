@@ -1,175 +1,47 @@
-import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+import { useRouter } from "next/router";
 
-export default function Search() {
-
+export default function SearchPage() {
   const [vendors, setVendors] = useState([]);
-  const [searchText, setSearchText] = useState("");
-  const [category, setCategory] = useState("");
-  const [tag, setTag] = useState("");
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
+    async function fetchVendors() {
+      setLoading(true);
+      let { data, error } = await supabase
+        .from("vendors")
+        .select("handle, business_name, category, city, state")
+        .order("business_name", { ascending: true });
+
+      if (error) {
+        console.log("Error fetching vendors:", error.message);
+      } else {
+        setVendors(data);
+      }
+      setLoading(false);
+    }
+
     fetchVendors();
   }, []);
 
-  async function fetchVendors() {
-
-    let query = supabase
-      .from("vendors")
-      .select("*");
-
-    if (searchText) {
-      query = query.ilike("handle", `%${searchText}%`);
-    }
-
-    if (category) {
-      query = query.eq("category", category);
-    }
-
-    if (tag) {
-      query = query.ilike("tags", `%${tag}%`);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.log(error);
-    } else {
-      setVendors(data);
-    }
-  }
+  if (loading) return <p className="p-4">Loading vendors...</p>;
+  if (!vendors.length) return <p className="p-4">No vendors found.</p>;
 
   return (
-
-    <div style={{ padding: 40, fontFamily: "sans-serif" }}>
-
-      <h1>Find Vendors</h1>
-
-      {/* SEARCH BAR */}
-
-      <input
-        type="text"
-        placeholder="Search by vendor handle..."
-        value={searchText}
-        onChange={(e) => setSearchText(e.target.value)}
-        style={{ padding: 10, width: 250, marginRight: 10 }}
-      />
-
-      <button
-        onClick={fetchVendors}
-        style={{
-          padding: "10px 20px",
-          backgroundColor: "#701890",
-          color: "white",
-          border: "none",
-          borderRadius: 5,
-          fontWeight: "bold",
-          cursor: "pointer"
-        }}
-      >
-        Search
-      </button>
-
-      <br /><br />
-
-      {/* CATEGORY FILTER */}
-
-      <select
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-        style={{ padding: 10, marginRight: 10 }}
-      >
-
-        <option value="">All Categories</option>
-        <option value="DJ">DJ</option>
-        <option value="Catering">Catering</option>
-        <option value="Photography">Photography</option>
-        <option value="Venue">Venue</option>
-        <option value="Decor">Decor</option>
-
-      </select>
-
-      {/* TAG FILTER */}
-
-      <input
-        type="text"
-        placeholder="Tag (wedding, party, corporate)"
-        value={tag}
-        onChange={(e) => setTag(e.target.value)}
-        style={{ padding: 10, width: 200 }}
-      />
-
-      <button
-        onClick={fetchVendors}
-        style={{
-          padding: "10px 20px",
-          marginLeft: 10,
-          backgroundColor: "#AABB23",
-          color: "white",
-          border: "none",
-          borderRadius: 5,
-          fontWeight: "bold",
-          cursor: "pointer"
-        }}
-      >
-        Apply Filters
-      </button>
-
-      <hr style={{ margin: "30px 0" }} />
-
-      {/* RESULTS */}
-
+    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
       {vendors.map((vendor) => (
-
         <div
-          key={vendor.id}
-          style={{
-            border: "1px solid #ddd",
-            padding: 20,
-            marginBottom: 20,
-            borderRadius: 10
-          }}
+          key={vendor.handle}
+          className="p-4 border rounded shadow cursor-pointer hover:shadow-lg transition"
+          onClick={() => router.push(`/vendor/${vendor.handle}`)}
         >
-
-          <h2>
-
-            <Link href={`/vendor/${vendor.handle}`}>
-              @{vendor.handle}
-            </Link>
-
-            {vendor.premium && (
-              <span
-                style={{
-                  marginLeft: 10,
-                  color: "#AABB23",
-                  fontWeight: "bold"
-                }}
-              >
-                PREMIUM
-              </span>
-            )}
-
-          </h2>
-
-          <p>{vendor.bio}</p>
-
-          <p>
-            <strong>Category:</strong> {vendor.category}
-          </p>
-
-          {vendor.tags && (
-            <p>
-              <strong>Tags:</strong> {vendor.tags}
-            </p>
-          )}
-
+          <h2 className="font-bold text-lg">{vendor.business_name}</h2>
+          <p className="text-sm text-gray-600">{vendor.category}</p>
+          <p className="text-sm text-gray-600">{vendor.city}, {vendor.state}</p>
         </div>
-
       ))}
-
     </div>
-
   );
-
 }
