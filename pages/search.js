@@ -1,47 +1,95 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { useRouter } from "next/router";
+import { useEffect, useState } from "react"
+import { supabase } from "../lib/supabase"
+import { useRouter } from "next/router"
 
 export default function SearchPage() {
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const [vendors, setVendors] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const router = useRouter()
 
   useEffect(() => {
     async function fetchVendors() {
-      setLoading(true);
-      let { data, error } = await supabase
+
+      const { data, error } = await supabase
         .from("vendors")
-        .select("handle, business_name, category, city, state")
-        .order("business_name", { ascending: true });
+        .select("*")
+        .order("created_at", { ascending: false })
 
       if (error) {
-        console.log("Error fetching vendors:", error.message);
+        console.log("Error loading vendors:", error)
       } else {
-        setVendors(data);
+        setVendors(data)
       }
-      setLoading(false);
+
+      setLoading(false)
     }
 
-    fetchVendors();
-  }, []);
+    fetchVendors()
+  }, [])
 
-  if (loading) return <p className="p-4">Loading vendors...</p>;
-  if (!vendors.length) return <p className="p-4">No vendors found.</p>;
+  if (loading) return <p style={{padding:20}}>Loading vendors...</p>
 
   return (
-    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-      {vendors.map((vendor) => (
-        <div
-          key={vendor.handle}
-          className="p-4 border rounded shadow cursor-pointer hover:shadow-lg transition"
-          onClick={() => router.push(`/vendor/${vendor.handle}`)}
-        >
-          <h2 className="font-bold text-lg">{vendor.business_name}</h2>
-          <p className="text-sm text-gray-600">{vendor.category}</p>
-          <p className="text-sm text-gray-600">{vendor.city}, {vendor.state}</p>
-        </div>
-      ))}
+    <div style={{padding:20}}>
+
+      <h1 style={{
+        fontSize:24,
+        fontWeight:"bold",
+        marginBottom:20
+      }}>
+        Vendors
+      </h1>
+
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:"1fr",
+        gap:20
+      }}>
+
+        {vendors.map((vendor) => (
+
+          <div
+            key={vendor.handle}
+            onClick={() => router.push(`/vendor/${vendor.handle}`)}
+            style={{
+              border:"1px solid #ddd",
+              borderRadius:10,
+              padding:16,
+              cursor:"pointer",
+              background:"#fff",
+              boxShadow:"0 2px 6px rgba(0,0,0,0.05)"
+            }}
+          >
+
+            <div style={{
+              fontSize:18,
+              fontWeight:"600",
+              marginBottom:6
+            }}>
+              {vendor.business_name}
+            </div>
+
+            <div style={{
+              color:"#666",
+              marginBottom:4
+            }}>
+              {vendor.category}
+            </div>
+
+            <div style={{
+              color:"#888",
+              fontSize:14
+            }}>
+              {vendor.city}, {vendor.state}
+            </div>
+
+          </div>
+
+        ))}
+
+      </div>
+
     </div>
-  );
+  )
 }
