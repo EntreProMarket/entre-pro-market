@@ -7,7 +7,9 @@ export default function SearchPage() {
   const [vendors, setVendors] = useState([])
   const [filtered, setFiltered] = useState([])
   const [loading, setLoading] = useState(true)
+
   const [category, setCategory] = useState("All")
+  const [query, setQuery] = useState("")
 
   const router = useRouter()
 
@@ -17,13 +19,27 @@ export default function SearchPage() {
 
   useEffect(() => {
 
-    if (category === "All") {
-      setFiltered(vendors)
-    } else {
-      setFiltered(vendors.filter(v => v.category === category))
+    let results = vendors
+
+    if (category !== "All") {
+      results = results.filter(v => v.category === category)
     }
 
-  }, [category, vendors])
+    if (query.trim() !== "") {
+
+      const q = query.toLowerCase()
+
+      results = results.filter(v =>
+        v.business_name?.toLowerCase().includes(q) ||
+        v.city?.toLowerCase().includes(q) ||
+        v.category?.toLowerCase().includes(q)
+      )
+
+    }
+
+    setFiltered(results)
+
+  }, [vendors, category, query])
 
   async function loadVendors() {
 
@@ -49,9 +65,29 @@ export default function SearchPage() {
 
     <div style={{padding:20}}>
 
-      <h1 style={{fontSize:24,fontWeight:"bold",marginBottom:10}}>
+      <h1 style={{
+        fontSize:24,
+        fontWeight:"bold",
+        marginBottom:10
+      }}>
         Vendors
       </h1>
+
+      {/* SEARCH BAR */}
+
+      <input
+        type="text"
+        placeholder="Search vendor or city..."
+        value={query}
+        onChange={(e)=>setQuery(e.target.value)}
+        style={{
+          width:"100%",
+          padding:"10px 12px",
+          marginBottom:20,
+          borderRadius:8,
+          border:"1px solid #ddd"
+        }}
+      />
 
       {/* CATEGORY FILTERS */}
 
@@ -66,7 +102,7 @@ export default function SearchPage() {
 
           <button
             key={cat}
-            onClick={() => setCategory(cat)}
+            onClick={()=>setCategory(cat)}
             style={{
               padding:"8px 14px",
               borderRadius:20,
@@ -94,7 +130,7 @@ export default function SearchPage() {
 
           <div
             key={vendor.handle}
-            onClick={() => router.push(`/vendor/${vendor.handle}`)}
+            onClick={()=>router.push(`/vendor/${vendor.handle}`)}
             style={{
               border:"1px solid #ddd",
               borderRadius:10,
