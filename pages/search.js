@@ -25,22 +25,7 @@ export default function SearchPage() {
       return
     }
 
-    // Attach image path for vendor card
-    const vendorsWithImages = data.map(vendor => {
-
-      let image = null
-
-      if (vendor.handle === "test-vendor") {
-        image = "https://oikftedsjtvjzhdbnkue.supabase.co/storage/v1/object/public/vendor-portfolio/test-vendor/1773117845542-Test-Face-EPM.jpg"
-      }
-
-      return {
-        ...vendor,
-        image
-      }
-    })
-
-    setVendors(vendorsWithImages)
+    setVendors(data)
     setLoading(false)
   }
 
@@ -80,9 +65,9 @@ export default function SearchPage() {
             }}
           >
 
-            {vendor.image && (
+            {vendor.profile_image && (
               <img
-                src={vendor.image}
+                src={vendor.profile_image}
                 style={{
                   width: "100%",
                   height: 180,
