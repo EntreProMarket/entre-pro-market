@@ -1,54 +1,67 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { useRouter } from "next/router";
+import { useEffect, useState } from "react"
+import { supabase } from "../lib/supabase"
+import VendorFeatured from "../components/VendorFeatured"
 
 export default function Dashboard() {
-  const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [vendor, setVendor] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  // Get the current user session
   useEffect(() => {
-    const session = supabase.auth.getSession().then(({ data }) => {
-      if (!data?.session?.user) {
-        router.push("/login"); // redirect to login if not logged in
-      } else {
-        setUser(data.session.user);
+    async function loadVendor() {
+      const user = supabase.auth.user()
+      if (!user) {
+        setLoading(false)
+        return
       }
-      setLoading(false);
-    });
-  }, [router]);
 
-  if (loading) {
-    return (
-      <div style={{ padding: 40 }}>
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("*")
+        .eq("email", user.email)
+        .single()
 
-  if (errorMsg) {
-    return (
-      <div style={{ padding: 40 }}>
-        <p style={{ color: "red" }}>{errorMsg}</p>
-      </div>
-    );
-  }
+      if (error) {
+        console.log(error)
+        setLoading(false)
+        return
+      }
+
+      setVendor(data)
+      setLoading(false)
+    }
+
+    loadVendor()
+  }, [])
+
+  if (loading) return <div style={{padding:20}}>Loading dashboard...</div>
+  if (!vendor) return <div style={{padding:20}}>No vendor profile found.</div>
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Dashboard</h1>
+    <div style={{padding:20, maxWidth:600, margin:"0 auto"}}>
+      <h1 style={{fontSize:24, fontWeight:"bold", marginBottom:20}}>
+        Welcome, {vendor.business_name}!
+      </h1>
 
-      {user ? (
-        <div>
-          <p>Welcome, {user.email}!</p>
-          <p>This is a safe, working dashboard page.</p>
-          <p>You can now test vendor portfolio and uploads without crashing.</p>
-        </div>
-      ) : (
-        <p>No user session found. Redirecting to login...</p>
-      )}
+      <div style={{
+        display:"flex",
+        flexDirection:"column",
+        gap:12,
+        marginBottom:20
+      }}>
+        <div><strong>Category:</strong> {vendor.category}</div>
+        <div><strong>City, State:</strong> {vendor.city}, {vendor.state}</div>
+        <div><strong>Bio:</strong> {vendor.bio}</div>
+        <div><strong>Website:</strong> {vendor.website || "N/A"}</div>
+        <div><strong>Instagram:</strong> {vendor.instagram || "N/A"}</div>
+        <div><strong>TikTok:</strong> {vendor.tiktok || "N/A"}</div>
+        <div><strong>YouTube:</strong> {vendor.youtube || "N/A"}</div>
+        <div><strong>Phone:</strong> {vendor.phone || "N/A"}</div>
+        <div><strong>Email:</strong> {vendor.email}</div>
+      </div>
+
+      {/* Promote to Featured Button */}
+      <VendorFeatured vendor={vendor} />
+
     </div>
-  );
+  )
 }
