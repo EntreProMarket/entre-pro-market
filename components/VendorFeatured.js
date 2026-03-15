@@ -33,11 +33,16 @@ export default function VendorFeatured() {
   return (
     <div style={{ maxWidth: 1000, margin: "auto", padding: 40 }}>
       <h2 style={{ fontSize: 24, marginBottom: 20 }}>Featured Vendors</h2>
+      
+      {/* Container: grid on desktop, horizontal scroll on mobile */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
           gap: 20,
+          overflowX: "auto",
+          scrollSnapType: "x mandatory",
+          paddingBottom: 10,
         }}
       >
         {vendors.map((vendor) => (
@@ -51,8 +56,9 @@ export default function VendorFeatured() {
                 textDecoration: "none",
                 color: "inherit",
                 transition: "transform 0.2s, box-shadow 0.2s",
+                scrollSnapAlign: "start",
+                minWidth: 200, // ensures cards are scrollable on mobile
               }}
-              // Hover effect
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.03)";
                 e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
@@ -62,16 +68,11 @@ export default function VendorFeatured() {
                 e.currentTarget.style.boxShadow = "none";
               }}
             >
-              {/* Vendor image or placeholder */}
               {vendor.image_url ? (
                 <img
                   src={vendor.image_url}
                   alt={vendor.business_name}
-                  style={{
-                    width: "100%",
-                    height: 150,
-                    objectFit: "cover",
-                  }}
+                  style={{ width: "100%", height: 150, objectFit: "cover" }}
                 />
               ) : (
                 <div
@@ -90,7 +91,6 @@ export default function VendorFeatured() {
                 </div>
               )}
 
-              {/* Vendor info */}
               <div style={{ padding: 10 }}>
                 <h3 style={{ margin: 5, fontSize: 16, fontWeight: 600 }}>
                   {vendor.business_name}
