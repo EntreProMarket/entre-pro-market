@@ -1,52 +1,111 @@
-import { useState } from "react"
-import { supabase } from "../lib/supabase"
+// components/VendorFeatured.js
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { supabase } from "../lib/supabaseClient";
 
-export default function VendorFeatured({ vendor }) {
-  const [loading, setLoading] = useState(false)
-  const [featured, setFeatured] = useState(vendor.featured)
+export default function VendorFeatured() {
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  async function handlePromote() {
-    setLoading(true)
+  useEffect(() => {
+    const loadFeatured = async () => {
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("*")
+        .eq("is_featured", true)
+        .order("featured_order", { ascending: true });
 
-    // Placeholder: Stripe integration will go here later
-    await new Promise(resolve => setTimeout(resolve, 1000))
+      if (error) {
+        console.error("Error fetching featured vendors:", error);
+        setVendors([]);
+      } else {
+        setVendors(data || []);
+      }
+      setLoading(false);
+    };
 
-    // For now, simulate vendor becoming featured
-    setFeatured(true)
-    alert("✅ Featured status would be updated after Stripe payment")
-    setLoading(false)
-  }
+    loadFeatured();
+  }, []);
 
-  if (featured) {
-    return (
-      <div style={{
-        padding: 12,
-        background: "#e0ffe0",
-        borderRadius: 6,
-        marginTop: 10,
-        fontWeight: "600"
-      }}>
-        ⭐ You are a Featured Vendor!
-      </div>
-    )
-  }
+  if (loading) return <p style={{ padding: 40 }}>Loading featured vendors...</p>;
+  if (vendors.length === 0) return <p style={{ padding: 40 }}>No featured vendors yet.</p>;
 
   return (
-    <button
-      onClick={handlePromote}
-      disabled={loading}
-      style={{
-        padding: "12px 18px",
-        borderRadius: 6,
-        border: "none",
-        background: "#000",
-        color: "#fff",
-        cursor: "pointer",
-        marginTop: 10,
-        fontWeight: "600"
-      }}
-    >
-      {loading ? "Processing..." : "Promote to Featured"}
-    </button>
-  )
+    <div style={{ maxWidth: 1000, margin: "auto", padding: 40 }}>
+      <h2 style={{ fontSize: 24, marginBottom: 20 }}>Featured Vendors</h2>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: 20,
+        }}
+      >
+        {vendors.map((vendor) => (
+          <Link key={vendor.id} href={`/vendor/${vendor.handle}`}>
+            <a
+              style={{
+                display: "block",
+                border: "1px solid #ddd",
+                borderRadius: 10,
+                overflow: "hidden",
+                textDecoration: "none",
+                color: "inherit",
+                transition: "transform 0.2s, box-shadow 0.2s",
+              }}
+              // Hover effect
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.03)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              {/* Vendor image or placeholder */}
+              {vendor.image_url ? (
+                <img
+                  src={vendor.image_url}
+                  alt={vendor.business_name}
+                  style={{
+                    width: "100%",
+                    height: 150,
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: 150,
+                    backgroundColor: "#eee",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#999",
+                    fontSize: 14,
+                  }}
+                >
+                  No Image
+                </div>
+              )}
+
+              {/* Vendor info */}
+              <div style={{ padding: 10 }}>
+                <h3 style={{ margin: 5, fontSize: 16, fontWeight: 600 }}>
+                  {vendor.business_name}
+                </h3>
+                <p style={{ margin: 2, fontSize: 14, color: "#555" }}>
+                  {vendor.category}
+                </p>
+                <p style={{ margin: 2, fontSize: 12, color: "#777" }}>
+                  {vendor.location}
+                </p>
+              </div>
+            </a>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 }
