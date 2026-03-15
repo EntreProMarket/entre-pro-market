@@ -33,7 +33,7 @@ export default function VendorFeatured() {
   return (
     <div style={{ maxWidth: 1000, margin: "auto", padding: 40 }}>
       <h2 style={{ fontSize: 24, marginBottom: 20 }}>Featured Vendors</h2>
-      
+
       {/* Container: grid on desktop, horizontal scroll on mobile */}
       <div
         style={{
@@ -43,6 +43,8 @@ export default function VendorFeatured() {
           overflowX: "auto",
           scrollSnapType: "x mandatory",
           paddingBottom: 10,
+          paddingLeft: 10,  // padding at start
+          paddingRight: 10, // padding at end
         }}
       >
         {vendors.map((vendor) => (
@@ -57,7 +59,7 @@ export default function VendorFeatured() {
                 color: "inherit",
                 transition: "transform 0.2s, box-shadow 0.2s",
                 scrollSnapAlign: "start",
-                minWidth: 200, // ensures cards are scrollable on mobile
+                minWidth: 180, // slightly smaller for mobile spacing
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.03)";
@@ -72,13 +74,13 @@ export default function VendorFeatured() {
                 <img
                   src={vendor.image_url}
                   alt={vendor.business_name}
-                  style={{ width: "100%", height: 150, objectFit: "cover" }}
+                  style={{ width: "100%", height: 140, objectFit: "cover" }}
                 />
               ) : (
                 <div
                   style={{
                     width: "100%",
-                    height: 150,
+                    height: 140,
                     backgroundColor: "#eee",
                     display: "flex",
                     alignItems: "center",
@@ -92,10 +94,10 @@ export default function VendorFeatured() {
               )}
 
               <div style={{ padding: 10 }}>
-                <h3 style={{ margin: 5, fontSize: 16, fontWeight: 600 }}>
+                <h3 style={{ margin: 5, fontSize: 15, fontWeight: 600 }}>
                   {vendor.business_name}
                 </h3>
-                <p style={{ margin: 2, fontSize: 14, color: "#555" }}>
+                <p style={{ margin: 2, fontSize: 13, color: "#555" }}>
                   {vendor.category}
                 </p>
                 <p style={{ margin: 2, fontSize: 12, color: "#777" }}>
