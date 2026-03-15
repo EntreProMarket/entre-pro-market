@@ -1,11 +1,12 @@
 // components/VendorFeatured.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 
 export default function VendorFeatured() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const loadFeatured = async () => {
@@ -30,12 +31,63 @@ export default function VendorFeatured() {
   if (loading) return <p style={{ padding: 40 }}>Loading featured vendors...</p>;
   if (vendors.length === 0) return <p style={{ padding: 40 }}>No featured vendors yet.</p>;
 
+  // Scroll handlers
+  const scrollLeft = () => {
+    containerRef.current.scrollBy({ left: -220, behavior: "smooth" });
+  };
+  const scrollRight = () => {
+    containerRef.current.scrollBy({ left: 220, behavior: "smooth" });
+  };
+
   return (
-    <div style={{ maxWidth: 1000, margin: "auto", padding: 40 }}>
+    <div style={{ maxWidth: 1000, margin: "auto", padding: 40, position: "relative" }}>
       <h2 style={{ fontSize: 24, marginBottom: 20 }}>Featured Vendors</h2>
+
+      {/* Mobile arrows */}
+      <button
+        onClick={scrollLeft}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: 10,
+          background: "#fff",
+          border: "1px solid #ddd",
+          borderRadius: "50%",
+          width: 30,
+          height: 30,
+          display: "none",
+          cursor: "pointer",
+        }}
+        className="mobile-arrow"
+      >
+        ◀
+      </button>
+      <button
+        onClick={scrollRight}
+        style={{
+          position: "absolute",
+          right: 0,
+          top: "50%",
+          transform: "translateY(-50%)",
+          zIndex: 10,
+          background: "#fff",
+          border: "1px solid #ddd",
+          borderRadius: "50%",
+          width: 30,
+          height: 30,
+          display: "none",
+          cursor: "pointer",
+        }}
+        className="mobile-arrow"
+      >
+        ▶
+      </button>
 
       {/* Container: grid on desktop, horizontal scroll on mobile */}
       <div
+        ref={containerRef}
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
@@ -43,9 +95,10 @@ export default function VendorFeatured() {
           overflowX: "auto",
           scrollSnapType: "x mandatory",
           paddingBottom: 10,
-          paddingLeft: 10,  // padding at start
-          paddingRight: 10, // padding at end
+          paddingLeft: 10,
+          paddingRight: 10,
         }}
+        className="vendor-scroll"
       >
         {vendors.map((vendor) => (
           <Link key={vendor.id} href={`/vendor/${vendor.handle}`}>
@@ -59,7 +112,7 @@ export default function VendorFeatured() {
                 color: "inherit",
                 transition: "transform 0.2s, box-shadow 0.2s",
                 scrollSnapAlign: "start",
-                minWidth: 180, // slightly smaller for mobile spacing
+                minWidth: 180,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "scale(1.03)";
@@ -92,7 +145,6 @@ export default function VendorFeatured() {
                   No Image
                 </div>
               )}
-
               <div style={{ padding: 10 }}>
                 <h3 style={{ margin: 5, fontSize: 15, fontWeight: 600 }}>
                   {vendor.business_name}
@@ -108,6 +160,15 @@ export default function VendorFeatured() {
           </Link>
         ))}
       </div>
+
+      {/* Inline style to show arrows only on small screens */}
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .mobile-arrow {
+            display: block;
+          }
+        }
+      `}</style>
     </div>
   );
 }
