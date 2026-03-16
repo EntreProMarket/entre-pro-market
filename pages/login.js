@@ -1,6 +1,6 @@
 // pages/login.js
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
@@ -12,6 +12,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [bgColor, setBgColor] = useState("#ffffff"); // default to homepage color
+
+  // Match homepage background dynamically
+  useEffect(() => {
+    // If you have a CSS variable for homepage background, we can read it
+    const computedBg = getComputedStyle(document.documentElement)
+      .getPropertyValue("--homepage-bg-color");
+    if (computedBg) {
+      setBgColor(computedBg.trim());
+    }
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -40,18 +51,19 @@ export default function LoginPage() {
       alignItems: "center",
       justifyContent: "center",
       padding: 20,
-      backgroundColor: "#ffffff", // same as homepage for seamless blend
+      backgroundColor: bgColor, // dynamically matched to homepage
     }}>
-      {/* Logo with fully invisible background */}
+      {/* Logo with transparent background */}
       <img
         src="/logo.png.jpg"
         alt="Entre PRO Market Logo"
         style={{
           width: 160,
           height: 160,
-          borderRadius: "50%", // keeps circle shape
+          borderRadius: "50%",
           objectFit: "contain",
-          backgroundColor: "transparent", // forces transparency
+          backgroundColor: "transparent",
+          marginBottom: 40,
         }}
       />
 
