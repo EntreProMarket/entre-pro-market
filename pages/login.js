@@ -42,17 +42,15 @@ export default function LoginPage() {
       padding: 20,
       backgroundColor: "#f9fafb",
     }}>
-      {/* Circular logo */}
+      {/* Transparent circular logo container */}
       <div style={{
         width: 160,
         height: 160,
         borderRadius: "50%",
-        backgroundColor: "#ffffff", // white circle background
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         marginBottom: 40,
-        boxShadow: "0 2px 6px rgba(0,0,0,0.1)", // optional subtle shadow
       }}>
         <img
           src="/logo.png.jpg"
@@ -60,7 +58,7 @@ export default function LoginPage() {
           style={{
             width: 120,
             height: 120,
-            objectFit: "contain", // ensures it fits nicely inside circle
+            objectFit: "contain",
           }}
         />
       </div>
