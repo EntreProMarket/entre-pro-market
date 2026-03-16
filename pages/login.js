@@ -40,28 +40,20 @@ export default function LoginPage() {
       alignItems: "center",
       justifyContent: "center",
       padding: 20,
-      backgroundColor: "#f9fafb",
+      backgroundColor: "#ffffff", // same as homepage for seamless blend
     }}>
-      {/* Transparent circular logo container */}
-      <div style={{
-        width: 160,
-        height: 160,
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 40,
-      }}>
-        <img
-          src="/logo.png.jpg"
-          alt="Entre PRO Market Logo"
-          style={{
-            width: 120,
-            height: 120,
-            objectFit: "contain",
-          }}
-        />
-      </div>
+      {/* Logo with fully invisible background */}
+      <img
+        src="/logo.png.jpg"
+        alt="Entre PRO Market Logo"
+        style={{
+          width: 160,
+          height: 160,
+          borderRadius: "50%", // keeps circle shape
+          objectFit: "contain",
+          backgroundColor: "transparent", // forces transparency
+        }}
+      />
 
       <h1 style={{ marginBottom: 20, color: "#111827" }}>Vendor Login</h1>
 
