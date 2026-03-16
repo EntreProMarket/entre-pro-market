@@ -9,6 +9,7 @@ export default function VendorSignUp() {
   const [password, setPassword] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleFileChange = (e) => {
     if (e.target.files.length > 0) setProfileImage(e.target.files[0]);
@@ -25,15 +26,16 @@ export default function VendorSignUp() {
     try {
       setLoading(true);
 
-      // 1️⃣ Sign up with Supabase Auth
+      // 1️⃣ Sign up user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
       if (authError) throw authError;
+
       const userId = authData.user.id;
 
-      // 2️⃣ Upload profile image if selected
+      // 2️⃣ Upload profile image (optional)
       let profileImageUrl = null;
       if (profileImage) {
         const fileExt = profileImage.name.split(".").pop();
@@ -51,7 +53,7 @@ export default function VendorSignUp() {
         profileImageUrl = publicURL;
       }
 
-      // 3️⃣ Insert vendor record
+      // 3️⃣ Insert vendor row safely under RLS
       const { error: insertError } = await supabase.from("vendors").insert([
         {
           id: userId,
@@ -61,6 +63,7 @@ export default function VendorSignUp() {
           profile_image: profileImageUrl,
         },
       ]);
+
       if (insertError) throw insertError;
 
       alert("Vendor account created successfully!");
@@ -84,6 +87,7 @@ export default function VendorSignUp() {
       }}
     >
       <h1 style={{ textAlign: "center", marginBottom: 20 }}>Vendor Sign-Up</h1>
+
       <form
         onSubmit={handleSignUp}
         style={{ display: "flex", flexDirection: "column", gap: "15px" }}
@@ -125,14 +129,24 @@ export default function VendorSignUp() {
         />
 
         <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{ marginLeft: 8, padding: "4px 8px", cursor: "pointer" }}
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
 
         <label htmlFor="profileImage">Profile Image (optional)</label>
         <input id="profileImage" type="file" onChange={handleFileChange} />
