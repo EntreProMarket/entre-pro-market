@@ -1,137 +1,142 @@
+// pages/login.js
+
 import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
 export default function LoginPage() {
+  const router = useRouter();
 
-const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-const [email,setEmail] = useState("");
-const [password,setPassword] = useState("");
-const [showPassword,setShowPassword] = useState(false);
-const [loading,setLoading] = useState(false);
-const [errorMsg,setErrorMsg] = useState("");
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg("");
 
-const handleLogin = async (e) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-e.preventDefault();
-setLoading(true);
-setErrorMsg("");
+    if (error) {
+      setErrorMsg(error.message);
+      setLoading(false);
+      return;
+    }
 
-const { error } = await supabase.auth.signInWithPassword({
-email,
-password
-});
+    // Redirect to Vendor Dashboard after successful login
+    router.push("/vendor-dashboard");
+  };
 
-if(error){
-setErrorMsg(error.message);
-setLoading(false);
-return;
-}
+  return (
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+      backgroundColor: "#f9fafb", // light gray background like homepage
+    }}>
+      {/* Logo */}
+      <img src="/logo.png" alt="Entre PRO Market Logo" style={{ width: 160, marginBottom: 40 }} />
 
-router.push("/vendor-dashboard");
+      <h1 style={{ marginBottom: 20, color: "#111827" }}>Vendor Login</h1>
 
-};
+      {errorMsg && (
+        <p style={{ color: "red", marginBottom: 20 }}>{errorMsg}</p>
+      )}
 
-return (
+      <form
+        onSubmit={handleLogin}
+        style={{
+          width: "100%",
+          maxWidth: 400,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{
+            display: "block",
+            width: "100%",
+            marginBottom: 15,
+            padding: 12,
+            borderRadius: 6,
+            border: "1px solid #d1d5db",
+            fontSize: 16,
+          }}
+          required
+        />
 
-<div style={{
-maxWidth:"420px",
-margin:"60px auto",
-padding:"25px",
-border:"1px solid #ddd",
-borderRadius:"8px",
-fontFamily:"Arial"
-}}>
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              display: "block",
+              width: "100%",
+              padding: 12,
+              borderRadius: 6,
+              border: "1px solid #d1d5db",
+              fontSize: 16,
+            }}
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              position: "absolute",
+              right: 12,
+              top: 12,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 14,
+              color: "#2563eb",
+            }}
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
 
-<h1 style={{textAlign:"center",marginBottom:"25px"}}>
-Vendor Login
-</h1>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: 14,
+            width: "100%",
+            backgroundColor: "#2563eb", // your homepage primary color
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            fontSize: 16,
+            fontWeight: "bold",
+            cursor: "pointer",
+          }}
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
+      </form>
 
-{errorMsg && (
-<p style={{
-color:"red",
-marginBottom:"20px",
-textAlign:"center"
-}}>
-{errorMsg}
-</p>
-)}
-
-<form onSubmit={handleLogin} style={{
-display:"flex",
-flexDirection:"column",
-gap:"15px"
-}}>
-
-<label>Email</label>
-
-<input
-type="email"
-placeholder="Enter email"
-value={email}
-onChange={(e)=>setEmail(e.target.value)}
-required
-style={{
-padding:"10px",
-borderRadius:"4px",
-border:"1px solid #ccc"
-}}
-/>
-
-<label>Password</label>
-
-<div style={{display:"flex"}}>
-
-<input
-type={showPassword ? "text" : "password"}
-placeholder="Enter password"
-value={password}
-onChange={(e)=>setPassword(e.target.value)}
-required
-style={{
-flex:1,
-padding:"10px",
-borderRadius:"4px",
-border:"1px solid #ccc"
-}}
-/>
-
-<button
-type="button"
-onClick={()=>setShowPassword(!showPassword)}
-style={{
-marginLeft:"8px",
-padding:"10px"
-}}
->
-{showPassword ? "Hide" : "Show"}
-</button>
-
-</div>
-
-<button
-type="submit"
-disabled={loading}
-style={{
-padding:"12px",
-width:"100%",
-background:"#2563eb",
-color:"white",
-border:"none",
-borderRadius:"6px",
-cursor:"pointer"
-}}
->
-
-{loading ? "Logging in..." : "Login"}
-
-</button>
-
-</form>
-
-</div>
-
-);
-
+      <p style={{ marginTop: 20, fontSize: 14, color: "#6b7280" }}>
+        Don’t have an account?{" "}
+        <a href="/vendor-signup" style={{ color: "#2563eb" }}>
+          Sign up
+        </a>
+      </p>
+    </div>
+  );
 }
