@@ -29,7 +29,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Redirect to Vendor Dashboard after successful login
     router.push("/vendor-dashboard");
   };
 
@@ -43,12 +42,28 @@ export default function LoginPage() {
       padding: 20,
       backgroundColor: "#f9fafb",
     }}>
-      {/* Logo */}
-      <img
-        src="/logo.png.jpg"
-        alt="Entre PRO Market Logo"
-        style={{ width: 160, marginBottom: 40 }}
-      />
+      {/* Circular logo */}
+      <div style={{
+        width: 160,
+        height: 160,
+        borderRadius: "50%",
+        backgroundColor: "#ffffff", // white circle background
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 40,
+        boxShadow: "0 2px 6px rgba(0,0,0,0.1)", // optional subtle shadow
+      }}>
+        <img
+          src="/logo.png.jpg"
+          alt="Entre PRO Market Logo"
+          style={{
+            width: 120,
+            height: 120,
+            objectFit: "contain", // ensures it fits nicely inside circle
+          }}
+        />
+      </div>
 
       <h1 style={{ marginBottom: 20, color: "#111827" }}>Vendor Login</h1>
 
