@@ -41,10 +41,14 @@ export default function LoginPage() {
       alignItems: "center",
       justifyContent: "center",
       padding: 20,
-      backgroundColor: "#f9fafb", // light gray background like homepage
+      backgroundColor: "#f9fafb",
     }}>
       {/* Logo */}
-      <img src="/logo.png" alt="Entre PRO Market Logo" style={{ width: 160, marginBottom: 40 }} />
+      <img
+        src="/logo.png.jpg"
+        alt="Entre PRO Market Logo"
+        style={{ width: 160, marginBottom: 40 }}
+      />
 
       <h1 style={{ marginBottom: 20, color: "#111827" }}>Vendor Login</h1>
 
@@ -118,7 +122,7 @@ export default function LoginPage() {
           style={{
             padding: 14,
             width: "100%",
-            backgroundColor: "#2563eb", // your homepage primary color
+            backgroundColor: "#2563eb",
             color: "white",
             border: "none",
             borderRadius: 6,
