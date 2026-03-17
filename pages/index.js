@@ -13,32 +13,20 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    // ✅ FIXED
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+    // Sign up user
+    const { user, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
 
-    const user = data.user;
-
-    if (!user) {
-      setMessage("Signup failed. No user returned.");
-      setLoading(false);
-      return;
-    }
-
-    // Create profile
+    // Create profile row for the new user
     const { error: profileError } = await supabase.from("profiles").insert([
       {
         id: user.id,
         email: user.email,
-        role: null,
+        role: null, // role selected later
       },
     ]);
 
@@ -48,9 +36,8 @@ export default function Home() {
       return;
     }
 
-    setMessage("Account created! Redirecting...");
+    setMessage("Account created! Redirecting to role selection...");
     setLoading(false);
-
     setTimeout(() => {
       router.push("/role");
     }, 1000);
@@ -60,8 +47,7 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    // ✅ FIXED
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { user, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -72,17 +58,10 @@ export default function Home() {
       return;
     }
 
-    const user = data.user;
-
-    if (!user) {
-      setMessage("Login failed.");
-      setLoading(false);
-      return;
-    }
-
     setMessage("Logged in successfully!");
     setLoading(false);
 
+    // Role-based redirect
     try {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -91,7 +70,7 @@ export default function Home() {
         .single();
 
       if (profileError || !profile) {
-        router.push("/dashboard");
+        router.push("/dashboard"); // fallback
         return;
       }
 
@@ -100,25 +79,22 @@ export default function Home() {
       } else if (profile.role === "organizer") {
         router.push("/organizer-dashboard");
       } else {
-        router.push("/role");
+        router.push("/role"); // new users without role
       }
     } catch {
-      router.push("/dashboard");
+      router.push("/dashboard"); // fallback
     }
   };
 
   return (
     <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
-      
-      {/* LOGO */}
+      {/* Logo */}
       <img
         src="/logo.png.jpg"
         alt="Entre PRO Market"
         style={{ width: 180, marginBottom: 20 }}
       />
-
       <div style={{ marginTop: 20 }}>
-        
         <input
           type="email"
           placeholder="Email"
@@ -126,9 +102,7 @@ export default function Home() {
           onChange={(e) => setEmail(e.target.value)}
           style={{ padding: 10, width: 250, marginBottom: 10 }}
         />
-
         <br />
-
         <input
           type="password"
           placeholder="Password"
@@ -136,9 +110,7 @@ export default function Home() {
           onChange={(e) => setPassword(e.target.value)}
           style={{ padding: 10, width: 250, marginBottom: 10 }}
         />
-
         <br />
-
         <button
           onClick={handleSignUp}
           disabled={loading}
@@ -155,7 +127,6 @@ export default function Home() {
         >
           Sign Up
         </button>
-
         <button
           onClick={handleLogin}
           disabled={loading}
@@ -172,7 +143,6 @@ export default function Home() {
           Log In
         </button>
       </div>
-
       {message && (
         <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
           {message}
