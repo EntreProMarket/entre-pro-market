@@ -15,18 +15,19 @@ export default function Home() {
 
     // Sign up user
     const { user, error } = await supabase.auth.signUp({ email, password });
+
     if (error) {
       setMessage(error.message);
       setLoading(false);
       return;
     }
 
-    // Create profile row for the new user
+    // Create a profile row for the new user with role placeholder
     const { error: profileError } = await supabase.from("profiles").insert([
       {
         id: user.id,
         email: user.email,
-        role: null, // role selected later
+        role: null, // role will be selected on /role page
       },
     ]);
 
@@ -38,6 +39,7 @@ export default function Home() {
 
     setMessage("Account created! Redirecting to role selection...");
     setLoading(false);
+
     setTimeout(() => {
       router.push("/role");
     }, 1000);
@@ -47,10 +49,7 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    const { user, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setMessage(error.message);
@@ -79,7 +78,7 @@ export default function Home() {
       } else if (profile.role === "organizer") {
         router.push("/organizer-dashboard");
       } else {
-        router.push("/role"); // new users without role
+        router.push("/role"); // new users without role go to role selection
       }
     } catch {
       router.push("/dashboard"); // fallback
@@ -94,6 +93,7 @@ export default function Home() {
         alt="Entre PRO Market"
         style={{ width: 180, marginBottom: 20 }}
       />
+
       <div style={{ marginTop: 20 }}>
         <input
           type="email"
@@ -143,6 +143,7 @@ export default function Home() {
           Log In
         </button>
       </div>
+
       {message && (
         <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
           {message}
