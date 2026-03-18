@@ -9,12 +9,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Signup - safe, does NOT touch profiles
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    // Sign up user
+    const { user, error } = await supabase.auth.signUp({ email, password });
 
     if (error) {
       setMessage(error.message);
@@ -22,21 +22,34 @@ export default function Home() {
       return;
     }
 
-    setMessage(
-      "Signup successful! Check your email to confirm your account before logging in."
-    );
+    // Create a profile row for the new user with role placeholder
+    const { error: profileError } = await supabase.from("profiles").insert([
+      {
+        id: user.id,
+        email: user.email,
+        role: null, // role will be selected on /role page
+      },
+    ]);
+
+    if (profileError) {
+      setMessage("Error creating profile: " + profileError.message);
+      setLoading(false);
+      return;
+    }
+
+    setMessage("Account created! Redirecting to role selection...");
     setLoading(false);
+
+    setTimeout(() => {
+      router.push("/role");
+    }, 1000);
   };
 
-  // Login
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setMessage(error.message);
@@ -47,20 +60,25 @@ export default function Home() {
     setMessage("Logged in successfully!");
     setLoading(false);
 
-    // Role-based redirect (safe, optional)
+    // Role-based redirect
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
-        .eq("id", data.user.id)
+        .eq("id", user.id)
         .single();
 
-      if (profile?.role === "vendor") {
+      if (profileError || !profile) {
+        router.push("/dashboard"); // fallback
+        return;
+      }
+
+      if (profile.role === "vendor") {
         router.push("/vendor-dashboard");
-      } else if (profile?.role === "organizer") {
+      } else if (profile.role === "organizer") {
         router.push("/organizer-dashboard");
       } else {
-        router.push("/role");
+        router.push("/role"); // new users without role go to role selection
       }
     } catch {
       router.push("/dashboard"); // fallback
@@ -68,18 +86,71 @@ export default function Home() {
   };
 
   return (
-    <div
-      style={{
-        textAlign: "center",
-        padding: 30,
-        fontFamily: "sans-serif",
-        backgroundColor: "#ffffff", // matches homepage background
-      }}
-    >
+    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
       {/* Logo */}
       <img
         src="/logo.png.jpg"
-        alt="Entre PRO Market Logo"
-        style={{
-          width: 180,
-          margin
+        alt="Entre PRO Market"
+        style={{ width: 180, marginBottom: 20 }}
+      />
+
+      <div style={{ marginTop: 20 }}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ padding: 10, width: 250, marginBottom: 10 }}
+        />
+        <br />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ padding: 10, width: 250, marginBottom: 10 }}
+        />
+        <br />
+        <button
+          onClick={handleSignUp}
+          disabled={loading}
+          style={{
+            padding: "10px 20px",
+            marginRight: 10,
+            backgroundColor: "#AABB23",
+            color: "white",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
+        >
+          Sign Up
+        </button>
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          style={{
+            padding: "10px 20px",
+            backgroundColor: "#701890",
+            color: "white",
+            fontWeight: "bold",
+            border: "none",
+            borderRadius: 5,
+            cursor: "pointer",
+          }}
+        >
+          Log In
+        </button>
+      </div>
+
+      {message && (
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+
