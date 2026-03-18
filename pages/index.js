@@ -3,53 +3,50 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
 export default function Home() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
 
-    // Sign up user
-    const { user, error } = await supabase.auth.signUp({ email, password });
+    const { data: userData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-    if (error) {
-      setMessage(error.message);
+    if (signUpError) {
+      setMessage(signUpError.message);
       setLoading(false);
       return;
     }
 
-    // Create a profile row for the new user with role placeholder
     const { error: profileError } = await supabase.from("profiles").insert([
-      {
-        id: user.id,
-        email: user.email,
-        role: null, // role will be selected on /role page
-      },
+      { id: userData.user.id, email: userData.user.email, role: null },
     ]);
 
     if (profileError) {
-      setMessage("Error creating profile: " + profileError.message);
+      setMessage("Profile creation error: " + profileError.message);
       setLoading(false);
       return;
     }
 
-    setMessage("Account created! Redirecting to role selection...");
+    setMessage("Account created! Check your email to confirm before logging in.");
     setLoading(false);
-
-    setTimeout(() => {
-      router.push("/role");
-    }, 1000);
+    setTimeout(() => router.push("/role"), 1500);
   };
 
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
 
-    const { user, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (error) {
       setMessage(error.message);
@@ -60,37 +57,31 @@ export default function Home() {
     setMessage("Logged in successfully!");
     setLoading(false);
 
-    // Role-based redirect
     try {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
-        .eq("id", user.id)
+        .eq("id", data.user.id)
         .single();
 
       if (profileError || !profile) {
-        router.push("/dashboard"); // fallback
+        router.push("/dashboard");
         return;
       }
 
-      if (profile.role === "vendor") {
-        router.push("/vendor-dashboard");
-      } else if (profile.role === "organizer") {
-        router.push("/organizer-dashboard");
-      } else {
-        router.push("/role"); // new users without role go to role selection
-      }
+      if (profile.role === "vendor") router.push("/vendor-dashboard");
+      else if (profile.role === "organizer") router.push("/organizer-dashboard");
+      else router.push("/role");
     } catch {
-      router.push("/dashboard"); // fallback
+      router.push("/dashboard");
     }
   };
 
   return (
     <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
-      {/* Logo */}
       <img
         src="/logo.png.jpg"
-        alt="Entre PRO Market"
+        alt="Entre PRO Market Logo"
         style={{ width: 180, marginBottom: 20 }}
       />
 
@@ -100,7 +91,7 @@ export default function Home() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: 10, width: 250, marginBottom: 10 }}
+          style={{ padding: 10, width: "90%", maxWidth: 300, marginBottom: 10 }}
         />
         <br />
         <input
@@ -108,7 +99,7 @@ export default function Home() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: 10, width: 250, marginBottom: 10 }}
+          style={{ padding: 10, width: "90%", maxWidth: 300, marginBottom: 10 }}
         />
         <br />
         <button
@@ -152,5 +143,3 @@ export default function Home() {
     </div>
   );
 }
-
-
