@@ -50,8 +50,7 @@ export default function Home() {
     setLoading(false);
 
     // TEMP SAFE REDIRECT (no dashboard yet)
-    router.push("/");
-  };
+    router.replace("/dashboard");
 
   return (
     <div
