@@ -32,25 +32,43 @@ export default function Home() {
 
   // LOGIN
   const handleLogin = async () => {
-    setLoading(true);
-    setMessage("");
+  setLoading(true);
+  setMessage("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-    if (error) {
-      setMessage(error.message);
-      setLoading(false);
-      return;
-    }
-
-    setMessage("Logged in successfully!");
+  if (error) {
+    setMessage(error.message);
     setLoading(false);
+    return;
+  }
 
-    router.replace("/dashboard");
-  };
+  const user = data.user;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  setLoading(false);
+
+  setMessage("Logged in successfully!");
+
+  if (!profile?.role) {
+    router.replace("/role");
+    return;
+  }
+
+  if (profile.role === "vendor") {
+    router.replace("/vendor-dashboard");
+  } else {
+    router.replace("/organizer-dashboard");
+  }
+};
 
   return (
     <div
