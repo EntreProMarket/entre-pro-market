@@ -49,8 +49,8 @@ export default function Home() {
     setMessage("Logged in successfully!");
     setLoading(false);
 
-    // TEMP SAFE REDIRECT (no dashboard yet)
     router.replace("/dashboard");
+  };
 
   return (
     <div
