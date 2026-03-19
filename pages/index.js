@@ -4,11 +4,13 @@ import { useRouter } from "next/router";
 
 export default function Home() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // SIGN UP
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
@@ -28,6 +30,7 @@ export default function Home() {
     setLoading(false);
   };
 
+  // LOGIN
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
@@ -46,46 +49,74 @@ export default function Home() {
     setMessage("Logged in successfully!");
     setLoading(false);
 
-    router.push("/dashboard"); // simple for now
+    // TEMP SAFE REDIRECT (no dashboard yet)
+    router.push("/");
   };
 
   return (
-    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
+    <div
+      style={{
+        textAlign: "center",
+        padding: 20,
+        fontFamily: "sans-serif",
+        maxWidth: 500,
+        margin: "0 auto",
+      }}
+    >
+      {/* LOGO */}
       <img
         src="/logo.png.jpg"
         alt="Entre PRO Market Logo"
-        style={{ width: 180, marginBottom: 20 }}
+        style={{
+          width: 160,
+          height: "auto",
+          marginBottom: 20,
+          objectFit: "contain",
+        }}
       />
 
-      <div style={{ marginTop: 20 }}>
+      {/* INPUTS */}
+      <div>
         <input
           type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: 10, width: "90%", maxWidth: 300, marginBottom: 10 }}
+          style={{
+            padding: 12,
+            width: "100%",
+            marginBottom: 10,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+          }}
         />
-        <br />
+
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: 10, width: "90%", maxWidth: 300, marginBottom: 10 }}
+          style={{
+            padding: 12,
+            width: "100%",
+            marginBottom: 15,
+            borderRadius: 6,
+            border: "1px solid #ccc",
+          }}
         />
-        <br />
 
+        {/* BUTTONS */}
         <button
           onClick={handleSignUp}
           disabled={loading}
           style={{
-            padding: "10px 20px",
+            padding: "12px 20px",
             marginRight: 10,
             backgroundColor: "#AABB23",
             color: "white",
-            fontWeight: "bold",
             border: "none",
-            borderRadius: 5,
+            borderRadius: 6,
+            fontWeight: "bold",
             cursor: "pointer",
           }}
         >
@@ -96,12 +127,12 @@ export default function Home() {
           onClick={handleLogin}
           disabled={loading}
           style={{
-            padding: "10px 20px",
+            padding: "12px 20px",
             backgroundColor: "#701890",
             color: "white",
-            fontWeight: "bold",
             border: "none",
-            borderRadius: 5,
+            borderRadius: 6,
+            fontWeight: "bold",
             cursor: "pointer",
           }}
         >
@@ -109,6 +140,7 @@ export default function Home() {
         </button>
       </div>
 
+      {/* MESSAGE */}
       {message && (
         <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
           {message}
