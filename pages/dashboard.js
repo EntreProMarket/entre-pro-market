@@ -1,67 +1,66 @@
-import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase"
-import VendorFeatured from "../components/VendorFeatured"
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useRouter } from "next/router";
 
 export default function Dashboard() {
-  const [vendor, setVendor] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    async function loadVendor() {
-      const user = supabase.auth.user()
-      if (!user) {
-        setLoading(false)
-        return
+    const loadUser = async () => {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        router.replace("/");
+        return;
       }
 
-      const { data, error } = await supabase
-        .from("vendors")
-        .select("*")
-        .eq("email", user.email)
-        .single()
+      setUser(user);
+      setLoading(false);
+    };
 
-      if (error) {
-        console.log(error)
-        setLoading(false)
-        return
-      }
+    loadUser();
+  }, [router]);
 
-      setVendor(data)
-      setLoading(false)
-    }
+  const logout = async () => {
+    await supabase.auth.signOut();
+    router.replace("/");
+  };
 
-    loadVendor()
-  }, [])
-
-  if (loading) return <div style={{padding:20}}>Loading dashboard...</div>
-  if (!vendor) return <div style={{padding:20}}>No vendor profile found.</div>
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", padding: 40 }}>
+        Loading dashboard...
+      </div>
+    );
+  }
 
   return (
-    <div style={{padding:20, maxWidth:600, margin:"0 auto"}}>
-      <h1 style={{fontSize:24, fontWeight:"bold", marginBottom:20}}>
-        Welcome, {vendor.business_name}!
-      </h1>
+    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
+      <h1>Dashboard</h1>
 
-      <div style={{
-        display:"flex",
-        flexDirection:"column",
-        gap:12,
-        marginBottom:20
-      }}>
-        <div><strong>Category:</strong> {vendor.category}</div>
-        <div><strong>City, State:</strong> {vendor.city}, {vendor.state}</div>
-        <div><strong>Bio:</strong> {vendor.bio}</div>
-        <div><strong>Website:</strong> {vendor.website || "N/A"}</div>
-        <div><strong>Instagram:</strong> {vendor.instagram || "N/A"}</div>
-        <div><strong>TikTok:</strong> {vendor.tiktok || "N/A"}</div>
-        <div><strong>YouTube:</strong> {vendor.youtube || "N/A"}</div>
-        <div><strong>Phone:</strong> {vendor.phone || "N/A"}</div>
-        <div><strong>Email:</strong> {vendor.email}</div>
-      </div>
+      <p>
+        Logged in as: <strong>{user?.email}</strong>
+      </p>
 
-      {/* Promote to Featured Button */}
-      <VendorFeatured vendor={vendor} />
-
+      <button
+        onClick={logout}
+        style={{
+          marginTop: 20,
+          padding: "10px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          cursor: "pointer",
+        }}
+      >
+        Log Out
+      </button>
     </div>
-  )
+  );
 }
