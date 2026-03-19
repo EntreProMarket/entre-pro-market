@@ -4,26 +4,23 @@ import { useRouter } from "next/router";
 
 export default function Dashboard() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+    const getUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
 
-      if (error || !user) {
+      if (error || !data?.user) {
         router.replace("/");
         return;
       }
 
-      setUser(user);
+      setUser(data.user);
       setLoading(false);
     };
 
-    loadUser();
+    getUser();
   }, [router]);
 
   const logout = async () => {
@@ -32,11 +29,7 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return (
-      <div style={{ textAlign: "center", padding: 40 }}>
-        Loading dashboard...
-      </div>
-    );
+    return <div style={{ textAlign: "center", padding: 30 }}>Loading...</div>;
   }
 
   return (
