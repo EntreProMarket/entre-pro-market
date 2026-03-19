@@ -13,30 +13,19 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    const { data: userData, error: signUpError } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    if (signUpError) {
-      setMessage(signUpError.message);
+    if (error) {
+      setMessage(error.message);
       setLoading(false);
       return;
     }
 
-    const { error: profileError } = await supabase.from("profiles").insert([
-      { id: userData.user.id, email: userData.user.email, role: null },
-    ]);
-
-    if (profileError) {
-      setMessage("Profile creation error: " + profileError.message);
-      setLoading(false);
-      return;
-    }
-
-    setMessage("Account created! Check your email to confirm before logging in.");
+    setMessage("Account created! Check your email to confirm.");
     setLoading(false);
-    setTimeout(() => router.push("/role"), 1500);
   };
 
   const handleLogin = async () => {
@@ -57,24 +46,7 @@ export default function Home() {
     setMessage("Logged in successfully!");
     setLoading(false);
 
-    try {
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
-      if (profileError || !profile) {
-        router.push("/dashboard");
-        return;
-      }
-
-      if (profile.role === "vendor") router.push("/vendor-dashboard");
-      else if (profile.role === "organizer") router.push("/organizer-dashboard");
-      else router.push("/role");
-    } catch {
-      router.push("/dashboard");
-    }
+    router.push("/dashboard"); // simple for now
   };
 
   return (
@@ -102,6 +74,7 @@ export default function Home() {
           style={{ padding: 10, width: "90%", maxWidth: 300, marginBottom: 10 }}
         />
         <br />
+
         <button
           onClick={handleSignUp}
           disabled={loading}
@@ -118,6 +91,7 @@ export default function Home() {
         >
           Sign Up
         </button>
+
         <button
           onClick={handleLogin}
           disabled={loading}
