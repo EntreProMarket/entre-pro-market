@@ -1,7 +1,9 @@
+import DashboardLayout from "../components/DashboardLayout";
+
 export default function Messages() {
   return (
-    <div style={{ padding: 30 }}>
+    <DashboardLayout>
       <h1>Messages Page</h1>
-    </div>
+    </DashboardLayout>
   );
 }
