@@ -30,7 +30,48 @@ export default function Home() {
     setLoading(false);
   };
 
-  // LOGIN
+  // LOGIN (FIXED + ROLE-BASED)
+  const handleLogin = async () => {
+    setLoading(true);
+    setMessage("");
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const user = data.user;
+
+    // GET ROLE
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      setMessage("Error loading user profile");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+
+    // REDIRECT BASED ON ROLE
+    if (profile?.role === "vendor") {
+      router.replace("/vendor-dashboard");
+    } else if (profile?.role === "organizer") {
+      router.replace("/organizer-dashboard");
+    } else {
+      router.replace("/role");
+    }
+  };
 
   return (
     <div
