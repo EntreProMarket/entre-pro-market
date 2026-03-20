@@ -10,33 +10,71 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div style={{ fontFamily: "sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", fontFamily: "sans-serif" }}>
+      
+      {/* SIDEBAR */}
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "15px 20px",
-          borderBottom: "1px solid #eee",
+          width: 220,
+          backgroundColor: "#111",
+          color: "white",
+          padding: 20,
         }}
       >
-        <div style={{ fontWeight: "bold" }}>Entre PRO Market</div>
+        <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
-        <button
-          onClick={logout}
-          style={{
-            padding: "8px 12px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-          }}
+        <p
+          style={{ cursor: "pointer", marginBottom: 15 }}
+          onClick={() => router.push("/vendor-dashboard")}
         >
-          Log Out
-        </button>
+          Dashboard
+        </p>
+
+        <p style={{ cursor: "pointer", marginBottom: 15 }}>
+          Profile
+        </p>
+
+        <p style={{ cursor: "pointer", marginBottom: 15 }}>
+          Messages
+        </p>
+
+        <p style={{ cursor: "pointer", marginBottom: 15 }}>
+          Settings
+        </p>
       </div>
 
-      <div style={{ padding: 20 }}>{children}</div>
+      {/* MAIN CONTENT */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        
+        {/* TOP BAR */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "15px 20px",
+            borderBottom: "1px solid #eee",
+          }}
+        >
+          <div style={{ fontWeight: "bold" }}>Dashboard</div>
+
+          <button
+            onClick={logout}
+            style={{
+              padding: "8px 12px",
+              backgroundColor: "#701890",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            Log Out
+          </button>
+        </div>
+
+        {/* PAGE CONTENT */}
+        <div style={{ padding: 20 }}>{children}</div>
+      </div>
     </div>
   );
-            }
+}
