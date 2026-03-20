@@ -12,36 +12,44 @@ export default function DashboardLayout({ children }) {
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "sans-serif" }}>
       
-      {/* SIDEBAR */}
       <div
-        style={{
-          width: 220,
-          backgroundColor: "#111",
-          color: "white",
-          padding: 20,
-        }}
-      >
-        <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
+  style={{
+    width: 220,
+    backgroundColor: "#111",
+    color: "white",
+    padding: 20,
+  }}
+>
+  <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
-        <p
-          style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/vendor-dashboard")}
-        >
-          Dashboard
-        </p>
+  <p
+    style={{ cursor: "pointer", marginBottom: 15 }}
+    onClick={() => router.push("/vendor-dashboard")}
+  >
+    Dashboard
+  </p>
 
-        <p style={{ cursor: "pointer", marginBottom: 15 }}>
-          Profile
-        </p>
+  <p
+    style={{ cursor: "pointer", marginBottom: 15 }}
+    onClick={() => router.push("/profile")}
+  >
+    Profile
+  </p>
 
-        <p style={{ cursor: "pointer", marginBottom: 15 }}>
-          Messages
-        </p>
+  <p
+    style={{ cursor: "pointer", marginBottom: 15 }}
+    onClick={() => router.push("/messages")}
+  >
+    Messages
+  </p>
 
-        <p style={{ cursor: "pointer", marginBottom: 15 }}>
-          Settings
-        </p>
-      </div>
+  <p
+    style={{ cursor: "pointer", marginBottom: 15 }}
+    onClick={() => router.push("/settings")}
+  >
+    Settings
+  </p>
+</div>
 
       {/* MAIN CONTENT */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
