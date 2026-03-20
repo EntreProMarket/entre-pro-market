@@ -1,7 +1,9 @@
+import DashboardLayout from "../components/DashboardLayout";
+
 export default function Settings() {
   return (
-    <div style={{ padding: 30 }}>
+    <DashboardLayout>
       <h1>Settings Page</h1>
-    </div>
+    </DashboardLayout>
   );
 }
