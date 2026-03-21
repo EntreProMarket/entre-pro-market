@@ -49,17 +49,25 @@ export default function Home() {
     const user = data.user;
 
     // GET ROLE
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    let { data: profile } = await supabase
+  .from("profiles")
+  .select("role")
+  .eq("id", user.id)
+  .single();
 
-    if (profileError) {
-      setMessage("Error loading user profile");
-      setLoading(false);
-      return;
-    }
+// If profile doesn't exist → create one
+if (!profile) {
+  await supabase.from("profiles").insert([
+    {
+      id: user.id,
+      role: null,
+    },
+  ]);
+
+  setLoading(false);
+  router.replace("/role");
+  return;
+}
 
     setLoading(false);
 
