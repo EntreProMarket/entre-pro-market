@@ -166,7 +166,75 @@ if (!profile) {
         >
           Log In
         </button>
-      </div>
+      {/* ROLE UPGRADE BUTTONS */}
+
+<button
+  onClick={async () => {
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    await supabase
+      .from("profiles")
+      .update({
+        role: "vendor",
+        account_type: "free",
+      })
+      .eq("id", user.id);
+
+    router.push("/vendor-dashboard");
+  }}
+  style={{
+    marginTop: 20,
+    padding: "10px 20px",
+    backgroundColor: "#333",
+    color: "white",
+    border: "none",
+    borderRadius: 6,
+    display: "block",
+    width: "100%",
+  }}
+>
+  Become a Vendor
+</button>
+
+<button
+  onClick={async () => {
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    await supabase
+      .from("profiles")
+      .update({
+        role: "organizer",
+        account_type: "pro",
+      })
+      .eq("id", user.id);
+
+    router.push("/organizer-dashboard");
+  }}
+  style={{
+    marginTop: 10,
+    padding: "10px 20px",
+    backgroundColor: "#701890",
+    color: "white",
+    border: "none",
+    borderRadius: 6,
+    display: "block",
+    width: "100%",
+  }}
+>
+  Become an Organizer
+</button></div>
 
       {/* MESSAGE */}
       {message && (
