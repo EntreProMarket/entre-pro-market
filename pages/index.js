@@ -40,11 +40,13 @@ export default function Home() {
 
     const user = data.user;
 
-    await supabase.from("profiles").insert({
-      id: user.id,
-      role: null,
-      account_type: "public",
-    });
+    await supabase
+  .from("profiles")
+  .upsert({
+    id: user.id,
+    role: null,
+    account_type: "public",
+  });
 
     setMessage("Account created! You can now log in.");
     setLoading(false);
