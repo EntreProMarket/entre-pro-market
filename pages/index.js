@@ -10,51 +10,53 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // =========================
-  // SIGN UP (PUBLIC)
-  // =========================
+  // ✅ SIGN UP (creates PUBLIC user + profile)
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
 
-    if (!email || !password) {
-      setMessage("Enter email and password");
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
-      if (error.message.toLowerCase().includes("already")) {
-        setMessage("Email already registered");
-      } else {
-        setMessage(error.message);
-      }
+      setMessage(error.message);
       setLoading(false);
       return;
     }
 
-    const user = data.user;
+    // Always fetch user after signup
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
 
-    await supabase
-  .from("profiles")
-  .upsert({
-    id: user.id,
-    role: null,
-    account_type: "public",
-  });
+    if (!user) {
+      setMessage("Signup succeeded but user not found");
+      setLoading(false);
+      return;
+    }
+
+    // Create profile
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        role: null,
+        account_type: "public",
+      });
+
+    if (profileError) {
+      console.error(profileError);
+      setMessage("Profile creation failed");
+      setLoading(false);
+      return;
+    }
 
     setMessage("Account created! You can now log in.");
     setLoading(false);
   };
 
-  // =========================
-  // LOGIN
-  // =========================
+  // ✅ LOGIN (routes based on role)
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
@@ -65,117 +67,76 @@ export default function Home() {
     });
 
     if (error) {
-      setMessage("Invalid login credentials");
+      setMessage(error.message);
       setLoading(false);
       return;
     }
 
     const user = data.user;
 
-    const { data: profile } = await supabase
+    // Get profile
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
+    if (profileError) {
+      setMessage("Error loading user profile");
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
 
+    // Route logic
     if (profile?.role === "vendor") {
-      router.push("/vendor-dashboard");
+      router.replace("/vendor-dashboard");
     } else if (profile?.role === "organizer") {
-      router.push("/organizer-dashboard");
+      router.replace("/organizer-dashboard");
     } else {
       setMessage("Welcome! Browse or upgrade your account.");
     }
   };
 
-  // =========================
-  // BECOME VENDOR
-  // =========================
+  // ✅ BECOME VENDOR
   const becomeVendor = async () => {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
 
     if (!user) {
-      setMessage("Please log in first");
+      router.push("/login");
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role === "organizer") {
-      setMessage("Already registered as Organizer");
-      return;
-    }
-
-    if (profile?.role === "vendor") {
-      router.push("/vendor-dashboard");
-      return;
-    }
-
-    const confirmUpgrade = window.confirm("Become a Vendor?");
-    if (!confirmUpgrade) return;
-
-    await supabase
-      .from("profiles")
-      .update({
-        role: "vendor",
-        account_type: "free",
-      })
-      .eq("id", user.id);
+    await supabase.from("profiles").upsert({
+      id: user.id,
+      role: "vendor",
+      account_type: "free",
+    });
 
     router.push("/vendor-dashboard");
   };
 
-  // =========================
-  // BECOME ORGANIZER
-  // =========================
+  // ✅ BECOME ORGANIZER
   const becomeOrganizer = async () => {
     const { data } = await supabase.auth.getUser();
     const user = data.user;
 
     if (!user) {
-      setMessage("Please log in first");
+      router.push("/login");
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role === "vendor") {
-      setMessage("Already registered as Vendor");
-      return;
-    }
-
-    if (profile?.role === "organizer") {
-      router.push("/organizer-dashboard");
-      return;
-    }
-
-    const confirmUpgrade = window.confirm("Become an Organizer?");
-    if (!confirmUpgrade) return;
-
-    await supabase
-      .from("profiles")
-      .update({
-        role: "organizer",
-        account_type: "pro",
-      })
-      .eq("id", user.id);
+    await supabase.from("profiles").upsert({
+      id: user.id,
+      role: "organizer",
+      account_type: "pro",
+    });
 
     router.push("/organizer-dashboard");
   };
 
-  // =========================
-  // UI
-  // =========================
   return (
     <div
       style={{
@@ -225,7 +186,7 @@ export default function Home() {
         }}
       />
 
-      {/* MAIN BUTTONS */}
+      {/* BUTTONS */}
       <button
         onClick={handleSignUp}
         disabled={loading}
@@ -271,7 +232,6 @@ export default function Home() {
           borderRadius: 6,
           display: "block",
           width: "100%",
-          fontWeight: "bold",
         }}
       >
         Become a Vendor
@@ -288,7 +248,6 @@ export default function Home() {
           borderRadius: 6,
           display: "block",
           width: "100%",
-          fontWeight: "bold",
         }}
       >
         Become an Organizer
@@ -296,13 +255,7 @@ export default function Home() {
 
       {/* MESSAGE */}
       {message && (
-        <p
-          style={{
-            marginTop: 20,
-            color: "#701890",
-            fontWeight: "bold",
-          }}
-        >
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
           {message}
         </p>
       )}
