@@ -73,11 +73,12 @@ if (!profile) {
 
     // REDIRECT BASED ON ROLE
     if (profile?.role === "vendor") {
-      router.replace("/vendor-dashboard");
-    } else if (profile?.role === "organizer") {
-      router.replace("/organizer-dashboard");
-    } else {
-      router.replace("/role");
+  router.replace("/vendor-dashboard");
+} else if (profile?.role === "organizer") {
+  router.replace("/organizer-dashboard");
+} else {
+  setMessage("Welcome! You can browse or choose a role below.");
+}
     }
   };
 
