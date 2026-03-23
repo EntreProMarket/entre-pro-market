@@ -180,16 +180,41 @@ export default function Home() {
   // UI
   // =========================
   return (
-    <div style={{ textAlign: "center", padding: 20, maxWidth: 500, margin: "auto" }}>
-      
-      <img src="/logo.png.jpg" style={{ width: 150, marginBottom: 20 }} />
+  <div
+    style={{
+      textAlign: "center",
+      padding: 20,
+      fontFamily: "sans-serif",
+      maxWidth: 500,
+      margin: "0 auto",
+    }}
+  >
+    {/* LOGO */}
+    <img
+      src="/logo.png.jpg"
+      alt="Entre PRO Market Logo"
+      style={{
+        width: 160,
+        height: "auto",
+        marginBottom: 20,
+        objectFit: "contain",
+      }}
+    />
 
+    {/* INPUTS */}
+    <div>
       <input
         type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 10 }}
+        style={{
+          padding: 12,
+          width: "100%",
+          marginBottom: 10,
+          borderRadius: 6,
+          border: "1px solid #ccc",
+        }}
       />
 
       <input
@@ -197,26 +222,98 @@ export default function Home() {
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 15 }}
+        style={{
+          padding: 12,
+          width: "100%",
+          marginBottom: 15,
+          borderRadius: 6,
+          border: "1px solid #ccc",
+        }}
       />
 
-      <button onClick={handleSignUp} disabled={loading}>
+      {/* MAIN BUTTONS */}
+      <button
+        onClick={handleSignUp}
+        disabled={loading}
+        style={{
+          padding: "12px 20px",
+          marginRight: 10,
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
         Sign Up
       </button>
 
-      <button onClick={handleLogin} disabled={loading} style={{ marginLeft: 10 }}>
+      <button
+        onClick={handleLogin}
+        disabled={loading}
+        style={{
+          padding: "12px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
         Log In
       </button>
-
-      <div style={{ marginTop: 20 }}>
-        <button onClick={becomeVendor}>Become a Vendor</button>
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        <button onClick={becomeOrganizer}>Become an Organizer</button>
-      </div>
-
-      {message && <p style={{ marginTop: 20 }}>{message}</p>}
     </div>
+
+    {/* ROLE BUTTONS */}
+    <button
+      onClick={becomeVendor}
+      style={{
+        marginTop: 20,
+        padding: "10px 20px",
+        backgroundColor: "#333",
+        color: "white",
+        border: "none",
+        borderRadius: 6,
+        display: "block",
+        width: "100%",
+        fontWeight: "bold",
+      }}
+    >
+      Become a Vendor
+    </button>
+
+    <button
+      onClick={becomeOrganizer}
+      style={{
+        marginTop: 10,
+        padding: "10px 20px",
+        backgroundColor: "#701890",
+        color: "white",
+        border: "none",
+        borderRadius: 6,
+        display: "block",
+        width: "100%",
+        fontWeight: "bold",
+      }}
+    >
+      Become an Organizer
+    </button>
+
+    {/* MESSAGE */}
+    {message && (
+      <p
+        style={{
+          marginTop: 20,
+          color: "#701890",
+          fontWeight: "bold",
+        }}
+      >
+        {message}
+      </p>
+    )}
+  </div>
+);
   );
 }
