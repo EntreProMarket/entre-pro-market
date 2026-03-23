@@ -1,21 +1,21 @@
 import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Home() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   // SIGN UP
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -26,11 +26,22 @@ export default function Home() {
       return;
     }
 
-    setMessage("Account created! Check your email to confirm.");
+    const user = data?.user;
+
+    if (user) {
+      await supabase.from("profiles").insert([
+        {
+          id: user.id,
+          role: null,
+        },
+      ]);
+    }
+
     setLoading(false);
+    router.replace("/role");
   };
 
-  // LOGIN (FIXED + ROLE-BASED)
+  // LOGIN
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
@@ -46,40 +57,71 @@ export default function Home() {
       return;
     }
 
-    const user = data.user;
+    const user = data?.user;
 
-    // GET ROLE
-    let { data: profile } = await supabase
-  .from("profiles")
-  .select("role")
-  .eq("id", user.id)
-  .single();
+    if (!user) {
+      setLoading(false);
+      setMessage("Login failed.");
+      return;
+    }
 
-// If profile doesn't exist → create one
-if (!profile) {
-  await supabase.from("profiles").insert([
-    {
-      id: user.id,
-      role: null,
-    },
-  ]);
-
-  setLoading(false);
-  router.replace("/role");
-  return;
-}
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
 
     setLoading(false);
 
-    // REDIRECT BASED ON ROLE
     if (profile?.role === "vendor") {
-  router.replace("/vendor-dashboard");
-} else if (profile?.role === "organizer") {
-  router.replace("/organizer-dashboard");
-} else {
-  setMessage("Welcome! You can browse or choose a role below.");
-}
+      router.replace("/vendor-dashboard");
+    } else if (profile?.role === "organizer") {
+      router.replace("/organizer-dashboard");
+    } else {
+      setMessage("Welcome! You can browse or choose a role below.");
     }
+  };
+
+  // ROLE UPGRADE: VENDOR
+  const becomeVendor = async () => {
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user;
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    await supabase
+      .from("profiles")
+      .update({
+        role: "vendor",
+        account_type: "free",
+      })
+      .eq("id", user.id);
+
+    router.push("/vendor-dashboard");
+  };
+
+  // ROLE UPGRADE: ORGANIZER
+  const becomeOrganizer = async () => {
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user;
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    await supabase
+      .from("profiles")
+      .update({
+        role: "organizer",
+        account_type: "pro",
+      })
+      .eq("id", user.id);
+
+    router.push("/organizer-dashboard");
   };
 
   return (
@@ -105,137 +147,100 @@ if (!profile) {
       />
 
       {/* INPUTS */}
-      <div>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            padding: 12,
-            width: "100%",
-            marginBottom: 10,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        />
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{
+          padding: 12,
+          width: "100%",
+          marginBottom: 10,
+          borderRadius: 6,
+          border: "1px solid #ccc",
+        }}
+      />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            padding: 12,
-            width: "100%",
-            marginBottom: 15,
-            borderRadius: 6,
-            border: "1px solid #ccc",
-          }}
-        />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={{
+          padding: 12,
+          width: "100%",
+          marginBottom: 15,
+          borderRadius: 6,
+          border: "1px solid #ccc",
+        }}
+      />
 
-        {/* BUTTONS */}
-        <button
-          onClick={handleSignUp}
-          disabled={loading}
-          style={{
-            padding: "12px 20px",
-            marginRight: 10,
-            backgroundColor: "#AABB23",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          Sign Up
-        </button>
+      {/* AUTH BUTTONS */}
+      <button
+        onClick={handleSignUp}
+        disabled={loading}
+        style={{
+          padding: "12px 20px",
+          marginRight: 10,
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        Sign Up
+      </button>
 
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            padding: "12px 20px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          Log In
-        </button>
-      {/* ROLE UPGRADE BUTTONS */}
+      <button
+        onClick={handleLogin}
+        disabled={loading}
+        style={{
+          padding: "12px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        Log In
+      </button>
 
-<button
-  onClick={async () => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
+      {/* ROLE BUTTONS */}
+      <button
+        onClick={becomeVendor}
+        style={{
+          marginTop: 20,
+          padding: "10px 20px",
+          backgroundColor: "#333",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          display: "block",
+          width: "100%",
+        }}
+      >
+        Become a Vendor
+      </button>
 
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    await supabase
-      .from("profiles")
-      .update({
-        role: "vendor",
-        account_type: "free",
-      })
-      .eq("id", user.id);
-
-    router.push("/vendor-dashboard");
-  }}
-  style={{
-    marginTop: 20,
-    padding: "10px 20px",
-    backgroundColor: "#333",
-    color: "white",
-    border: "none",
-    borderRadius: 6,
-    display: "block",
-    width: "100%",
-  }}
->
-  Become a Vendor
-</button>
-
-<button
-  onClick={async () => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    await supabase
-      .from("profiles")
-      .update({
-        role: "organizer",
-        account_type: "pro",
-      })
-      .eq("id", user.id);
-
-    router.push("/organizer-dashboard");
-  }}
-  style={{
-    marginTop: 10,
-    padding: "10px 20px",
-    backgroundColor: "#701890",
-    color: "white",
-    border: "none",
-    borderRadius: 6,
-    display: "block",
-    width: "100%",
-  }}
->
-  Become an Organizer
-</button></div>
+      <button
+        onClick={becomeOrganizer}
+        style={{
+          marginTop: 10,
+          padding: "10px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          display: "block",
+          width: "100%",
+        }}
+      >
+        Become an Organizer
+      </button>
 
       {/* MESSAGE */}
       {message && (
