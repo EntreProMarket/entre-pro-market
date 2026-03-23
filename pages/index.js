@@ -10,7 +10,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // SIGN UP (PUBLIC ONLY)
+  // SIGN UP (PUBLIC USER)
   const signUp = async () => {
     setLoading(true);
     setMessage("");
@@ -41,7 +41,7 @@ export default function Home() {
     setMessage("Account created. You can now log in.");
   };
 
-  // LOGIN (ROUTE BY ROLE)
+  // LOGIN (ROUTE BASED ON ROLE)
   const login = async () => {
     setLoading(true);
     setMessage("");
@@ -67,19 +67,24 @@ export default function Home() {
 
     setLoading(false);
 
-    if (profile.role === "vendor") {
+    if (profile?.role === "vendor") {
       router.push("/vendor-dashboard");
-    } else if (profile.role === "organizer") {
+    } else if (profile?.role === "organizer") {
       router.push("/organizer-dashboard");
     } else {
       router.push("/vendors");
     }
   };
 
-  // UPGRADE TO VENDOR
+  // BECOME VENDOR
   const becomeVendor = async () => {
     const { data } = await supabase.auth.getUser();
-    const user = data.user;
+    const user = data?.user;
+
+    if (!user) {
+      setMessage("Please log in first.");
+      return;
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -92,6 +97,14 @@ export default function Home() {
       return;
     }
 
+    if (profile.role === "vendor") {
+      router.push("/vendor-dashboard");
+      return;
+    }
+
+    const confirmUpgrade = confirm("Do you want to become a Vendor?");
+    if (!confirmUpgrade) return;
+
     await supabase
       .from("profiles")
       .update({ role: "vendor" })
@@ -100,10 +113,15 @@ export default function Home() {
     router.push("/vendor-dashboard");
   };
 
-  // UPGRADE TO ORGANIZER
+  // BECOME ORGANIZER
   const becomeOrganizer = async () => {
     const { data } = await supabase.auth.getUser();
-    const user = data.user;
+    const user = data?.user;
+
+    if (!user) {
+      setMessage("Please log in first.");
+      return;
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -116,6 +134,14 @@ export default function Home() {
       return;
     }
 
+    if (profile.role === "organizer") {
+      router.push("/organizer-dashboard");
+      return;
+    }
+
+    const confirmUpgrade = confirm("Do you want to become an Organizer?");
+    if (!confirmUpgrade) return;
+
     await supabase
       .from("profiles")
       .update({ role: "organizer" })
@@ -125,38 +151,5 @@ export default function Home() {
   };
 
   return (
-    <div style={{ textAlign: "center", padding: 20 }}>
-      <h2>Marketplace</h2>
-
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-
-      <input
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-
-      <div>
-        <button onClick={signUp} disabled={loading}>
-          Sign Up
-        </button>
-
-        <button onClick={login} disabled={loading}>
-          Login
-        </button>
-      </div>
-
-      <hr />
-
-      <button onClick={becomeVendor}>Become a Vendor</button>
-      <button onClick={becomeOrganizer}>Become an Organizer</button>
-
-      {message && <p>{message}</p>}
-    </div>
-  );
-}
+    <div
+      style={{
