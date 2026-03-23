@@ -11,7 +11,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   // =========================
-  // SIGN UP (PUBLIC USER)
+  // SIGN UP (PUBLIC)
   // =========================
   const handleSignUp = async () => {
     setLoading(true);
@@ -29,7 +29,7 @@ export default function Home() {
     });
 
     if (error) {
-      if (error.message.includes("already")) {
+      if (error.message.toLowerCase().includes("already")) {
         setMessage("Email already registered");
       } else {
         setMessage(error.message);
@@ -40,7 +40,6 @@ export default function Home() {
 
     const user = data.user;
 
-    // create PUBLIC profile
     await supabase.from("profiles").insert({
       id: user.id,
       role: null,
@@ -116,9 +115,7 @@ export default function Home() {
       return;
     }
 
-    // PUBLIC → VENDOR
-    const confirmUpgrade = confirm("Become a Vendor?");
-
+    const confirmUpgrade = window.confirm("Become a Vendor?");
     if (!confirmUpgrade) return;
 
     await supabase
@@ -160,9 +157,7 @@ export default function Home() {
       return;
     }
 
-    // PUBLIC → ORGANIZER
-    const confirmUpgrade = confirm("Become an Organizer?");
-
+    const confirmUpgrade = window.confirm("Become an Organizer?");
     if (!confirmUpgrade) return;
 
     await supabase
@@ -180,29 +175,26 @@ export default function Home() {
   // UI
   // =========================
   return (
-  <div
-    style={{
-      textAlign: "center",
-      padding: 20,
-      fontFamily: "sans-serif",
-      maxWidth: 500,
-      margin: "0 auto",
-    }}
-  >
-    {/* LOGO */}
-    <img
-      src="/logo.png.jpg"
-      alt="Entre PRO Market Logo"
+    <div
       style={{
-        width: 160,
-        height: "auto",
-        marginBottom: 20,
-        objectFit: "contain",
+        textAlign: "center",
+        padding: 20,
+        fontFamily: "sans-serif",
+        maxWidth: 500,
+        margin: "0 auto",
       }}
-    />
+    >
+      {/* LOGO */}
+      <img
+        src="/logo.png.jpg"
+        alt="Entre PRO Market Logo"
+        style={{
+          width: 160,
+          marginBottom: 20,
+        }}
+      />
 
-    {/* INPUTS */}
-    <div>
+      {/* INPUTS */}
       <input
         type="email"
         placeholder="Email"
@@ -264,56 +256,54 @@ export default function Home() {
       >
         Log In
       </button>
-    </div>
 
-    {/* ROLE BUTTONS */}
-    <button
-      onClick={becomeVendor}
-      style={{
-        marginTop: 20,
-        padding: "10px 20px",
-        backgroundColor: "#333",
-        color: "white",
-        border: "none",
-        borderRadius: 6,
-        display: "block",
-        width: "100%",
-        fontWeight: "bold",
-      }}
-    >
-      Become a Vendor
-    </button>
-
-    <button
-      onClick={becomeOrganizer}
-      style={{
-        marginTop: 10,
-        padding: "10px 20px",
-        backgroundColor: "#701890",
-        color: "white",
-        border: "none",
-        borderRadius: 6,
-        display: "block",
-        width: "100%",
-        fontWeight: "bold",
-      }}
-    >
-      Become an Organizer
-    </button>
-
-    {/* MESSAGE */}
-    {message && (
-      <p
+      {/* ROLE BUTTONS */}
+      <button
+        onClick={becomeVendor}
         style={{
           marginTop: 20,
-          color: "#701890",
+          padding: "10px 20px",
+          backgroundColor: "#333",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          display: "block",
+          width: "100%",
           fontWeight: "bold",
         }}
       >
-        {message}
-      </p>
-    )}
-  </div>
-);
+        Become a Vendor
+      </button>
+
+      <button
+        onClick={becomeOrganizer}
+        style={{
+          marginTop: 10,
+          padding: "10px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          display: "block",
+          width: "100%",
+          fontWeight: "bold",
+        }}
+      >
+        Become an Organizer
+      </button>
+
+      {/* MESSAGE */}
+      {message && (
+        <p
+          style={{
+            marginTop: 20,
+            color: "#701890",
+            fontWeight: "bold",
+          }}
+        >
+          {message}
+        </p>
+      )}
+    </div>
   );
 }
