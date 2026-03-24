@@ -10,7 +10,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ SIGN UP (creates PUBLIC user + profile)
+  // SIGN UP (PUBLIC USER)
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
@@ -26,7 +26,6 @@ export default function Home() {
       return;
     }
 
-    // Always fetch user after signup
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
@@ -36,27 +35,17 @@ export default function Home() {
       return;
     }
 
-    // Create profile
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .upsert({
-        id: user.id,
-        role: null,
-        account_type: "public",
-      });
-
-    if (profileError) {
-      console.error(profileError);
-      setMessage("Profile creation failed");
-      setLoading(false);
-      return;
-    }
+    await supabase.from("profiles").upsert({
+      id: user.id,
+      role: null,
+      account_type: "public",
+    });
 
     setMessage("Account created! You can now log in.");
     setLoading(false);
   };
 
-  // ✅ LOGIN (routes based on role)
+  // LOGIN
   const handleLogin = async () => {
     setLoading(true);
     setMessage("");
@@ -74,7 +63,6 @@ export default function Home() {
 
     const user = data.user;
 
-    // Get profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -89,7 +77,6 @@ export default function Home() {
 
     setLoading(false);
 
-    // Route logic
     if (profile?.role === "vendor") {
       router.replace("/vendor-dashboard");
     } else if (profile?.role === "organizer") {
@@ -97,44 +84,6 @@ export default function Home() {
     } else {
       setMessage("Welcome! Browse or upgrade your account.");
     }
-  };
-
-  // ✅ BECOME VENDOR
-  const becomeVendor = async () => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    await supabase.from("profiles").upsert({
-      id: user.id,
-      role: "vendor",
-      account_type: "free",
-    });
-
-    router.push("/vendor-dashboard");
-  };
-
-  // ✅ BECOME ORGANIZER
-  const becomeOrganizer = async () => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    await supabase.from("profiles").upsert({
-      id: user.id,
-      role: "organizer",
-      account_type: "pro",
-    });
-
-    router.push("/organizer-dashboard");
   };
 
   return (
@@ -151,10 +100,7 @@ export default function Home() {
       <img
         src="/logo.png.jpg"
         alt="Entre PRO Market Logo"
-        style={{
-          width: 160,
-          marginBottom: 20,
-        }}
+        style={{ width: 160, marginBottom: 20 }}
       />
 
       {/* INPUTS */}
@@ -186,7 +132,7 @@ export default function Home() {
         }}
       />
 
-      {/* BUTTONS */}
+      {/* AUTH BUTTONS */}
       <button
         onClick={handleSignUp}
         disabled={loading}
@@ -220,9 +166,9 @@ export default function Home() {
         Log In
       </button>
 
-      {/* ROLE BUTTONS */}
+      {/* ROLE NAVIGATION (UPDATED — NO MORE DIRECT UPGRADE) */}
       <button
-        onClick={becomeVendor}
+        onClick={() => router.push("/vendor-info")}
         style={{
           marginTop: 20,
           padding: "10px 20px",
@@ -238,7 +184,7 @@ export default function Home() {
       </button>
 
       <button
-        onClick={becomeOrganizer}
+        onClick={() => router.push("/organizer-info")}
         style={{
           marginTop: 10,
           padding: "10px 20px",
