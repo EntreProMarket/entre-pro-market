@@ -7,11 +7,11 @@ export default function Home() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // 👈 ADDED
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // SIGN UP (PUBLIC USER)
+  // SIGN UP
   const handleSignUp = async () => {
     setLoading(true);
     setMessage("");
@@ -142,3 +142,90 @@ export default function Home() {
             right: 10,
             top: 8,
             background: "none",
+            border: "none",
+            color: "#701890",
+            fontWeight: "bold",
+            cursor: "pointer",
+          }}
+        >
+          {showPassword ? "HIDE" : "SHOW"}
+        </button>
+      </div>
+
+      {/* SIGN UP BUTTON */}
+      <button
+        onClick={handleSignUp}
+        disabled={loading}
+        style={{
+          padding: "12px 20px",
+          marginRight: 10,
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        Sign Up
+      </button>
+
+      {/* LOGIN BUTTON */}
+      <button
+        onClick={handleLogin}
+        disabled={loading}
+        style={{
+          padding: "12px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        Log In
+      </button>
+
+      {/* ROLE BUTTONS */}
+      <button
+        onClick={() => router.push("/vendor-info")}
+        style={{
+          marginTop: 20,
+          padding: "10px 20px",
+          backgroundColor: "#333",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          display: "block",
+          width: "100%",
+        }}
+      >
+        Become a Vendor
+      </button>
+
+      <button
+        onClick={() => router.push("/organizer-info")}
+        style={{
+          marginTop: 10,
+          padding: "10px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          display: "block",
+          width: "100%",
+        }}
+      >
+        Become an Organizer
+      </button>
+
+      {/* MESSAGE */}
+      {message && (
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
