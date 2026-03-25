@@ -27,40 +27,46 @@ export default function VendorProfile() {
   const [handleEdited, setHandleEdited] = useState(false);
 
   const categories = [
-    "DJ",
-    "Catering",
-    "Photography",
-    "Videography",
-    "Florist",
-    "Balloon Artist",
-    "Event Planner",
-    "Bartender",
-    "Venue",
-    "Lighting",
-    "Photo Booth",
-    "Makeup Artist",
-    "Cake Designer",
-    "Decor Rental",
-    "Security",
-    "Entertainment",
-    "Transportation",
-    "Party Rentals",
-    "Audio / Visual",
-    "Event Staffing",
+    "DJ","Catering","Photography","Videography","Florist","Balloon Artist",
+    "Event Planner","Bartender","Venue","Lighting","Photo Booth",
+    "Makeup Artist","Cake Designer","Decor Rental","Security",
+    "Entertainment","Transportation","Party Rentals","Audio / Visual","Event Staffing",
   ];
 
-  // Auto-generate handle
-  useEffect(() => {
-  loadProfile(); // 👈 ADD THIS LINE
+  // ✅ LOAD PROFILE
+  const loadProfile = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
 
-  if (!handleEdited) {
-    const generated = businessName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-    setHandle(generated);
-  }
-}, [businessName]);
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (profile) {
+      setBusinessName(profile.business_name || "");
+      setHandle(profile.handle || "");
+      setCategory(profile.category || "");
+      setTags(profile.tags || []);
+      setCity(profile.city || "");
+      setState(profile.state || "");
+      setDescription(profile.description || "");
+      setWebsite(profile.website || "");
+      setInstagram(profile.instagram || "");
+      setFacebook(profile.facebook || "");
+      setTiktok(profile.tiktok || "");
+      setYoutube(profile.youtube || "");
+    }
+  };
+
+  // ✅ FIXED useEffect (ONLY ONE, CLEAN)
+  useEffect(() => {
+    loadProfile();
+
+    if (!handleEdited) {
       const generated = businessName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
@@ -97,34 +103,6 @@ export default function VendorProfile() {
     return data.publicUrl;
   };
 
-const loadProfile = async () => {
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-
-  if (!user) return;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (profile) {
-    setBusinessName(profile.business_name || "");
-    setHandle(profile.handle || "");
-    setCategory(profile.category || "");
-    setTags(profile.tags || []);
-    setCity(profile.city || "");
-    setState(profile.state || "");
-    setDescription(profile.description || "");
-    setWebsite(profile.website || "");
-    setInstagram(profile.instagram || "");
-    setFacebook(profile.facebook || "");
-    setTiktok(profile.tiktok || "");
-    setYoutube(profile.youtube || "");
-  }
-};
-  
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
@@ -183,15 +161,10 @@ const loadProfile = async () => {
       {message && <p>{message}</p>}
 
       <label>Business Name</label>
-      <input
-        type="text"
-        value={businessName}
-        onChange={(e) => setBusinessName(e.target.value)}
-      />
+      <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
 
       <label>Profile Handle</label>
       <input
-        type="text"
         value={handle}
         onChange={(e) => {
           setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ""));
@@ -208,31 +181,14 @@ const loadProfile = async () => {
         ))}
       </select>
 
-      <label>Tags (press Enter to add)</label>
+      <label>Tags</label>
       <form onSubmit={addTag}>
-        <input
-          type="text"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-        />
+        <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
       </form>
 
       <div>
         {tags.map((t) => (
-          <span
-            key={t}
-            style={{
-              display: "inline-block",
-              margin: "2px",
-              padding: "2px 6px",
-              border: "1px solid #aaa",
-              borderRadius: "12px",
-              cursor: "pointer",
-            }}
-            onClick={() => removeTag(t)}
-          >
-            {t} ×
-          </span>
+          <span key={t} onClick={() => removeTag(t)}>{t} × </span>
         ))}
       </div>
 
@@ -260,15 +216,11 @@ const loadProfile = async () => {
       <label>YouTube</label>
       <input value={youtube} onChange={(e) => setYoutube(e.target.value)} />
 
-      <label>Logo Upload</label>
+      <label>Logo</label>
       <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
 
-      <label>Portfolio Images</label>
-      <input
-        type="file"
-        multiple
-        onChange={(e) => setPortfolioFiles(Array.from(e.target.files))}
-      />
+      <label>Portfolio</label>
+      <input type="file" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
 
       <button onClick={handleSave} disabled={loading}>
         {loading ? "Saving..." : "Save Profile"}
