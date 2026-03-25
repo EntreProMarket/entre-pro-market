@@ -104,7 +104,7 @@ export default function Home() {
         style={{ width: 160, marginBottom: 20 }}
       />
 
-      {/* EMAIL INPUT */}
+      {/* EMAIL */}
       <input
         type="email"
         placeholder="Email"
@@ -119,7 +119,7 @@ export default function Home() {
         }}
       />
 
-      {/* PASSWORD INPUT WITH SHOW/HIDE */}
+      {/* PASSWORD */}
       <div style={{ position: "relative", marginBottom: 15 }}>
         <input
           type={showPassword ? "text" : "password"}
@@ -152,7 +152,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* SIGN UP BUTTON */}
+      {/* AUTH BUTTONS */}
       <button
         onClick={handleSignUp}
         disabled={loading}
@@ -170,7 +170,6 @@ export default function Home() {
         Sign Up
       </button>
 
-      {/* LOGIN BUTTON */}
       <button
         onClick={handleLogin}
         disabled={loading}
@@ -197,7 +196,6 @@ export default function Home() {
           color: "white",
           border: "none",
           borderRadius: 6,
-          display: "block",
           width: "100%",
         }}
       >
@@ -213,25 +211,34 @@ export default function Home() {
           color: "white",
           border: "none",
           borderRadius: 6,
-          display: "block",
           width: "100%",
         }}
       >
         Become an Organizer
       </button>
 
-      {/* ✅ NEW BUTTON ADDED HERE */}
+      {/* MARKETPLACE BUTTON */}
       <button
-  onClick={() => router.push("/marketplace")}
-  style={{
-    marginTop: 20,
-    padding: "10px 20px",
-    backgroundColor: "#AABB23",
-    color: "white",
-    border: "none",
-    borderRadius: 6,
-    width: "100%",
-  }}
->
-  Browse Vendors
-</button>
+        onClick={() => router.push("/marketplace")}
+        style={{
+          marginTop: 20,
+          padding: "10px 20px",
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          width: "100%",
+        }}
+      >
+        Browse Vendors
+      </button>
+
+      {/* MESSAGE */}
+      {message && (
+        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
+    </div>
+  );
+}
