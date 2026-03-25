@@ -222,9 +222,16 @@ export default function Home() {
 
       {/* ✅ NEW BUTTON ADDED HERE */}
       <button
-        onClick={() => router.push("/marketplace")}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          backgroundColor: "#AABB23",
-          color: "white",
+  onClick={() => router.push("/marketplace")}
+  style={{
+    marginTop: 20,
+    padding: "10px 20px",
+    backgroundColor: "#AABB23",
+    color: "white",
+    border: "none",
+    borderRadius: 6,
+    width: "100%",
+  }}
+>
+  Browse Vendors
+</button>
