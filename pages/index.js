@@ -78,13 +78,44 @@ export default function Home() {
 
     setLoading(false);
 
+    // ROLE-BASED REDIRECT (LOCKED)
     if (profile?.role === "vendor") {
       router.replace("/vendor-dashboard");
     } else if (profile?.role === "organizer") {
       router.replace("/organizer-dashboard");
     } else {
-      router.replace("/marketplace"); // ✅ FIXED FLOW
+      router.replace("/marketplace");
     }
+  };
+
+  // CHECK ROLE BEFORE ALLOWING NAVIGATION
+  const checkRoleAndRedirect = async (target) => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) {
+      router.push(target);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    // ROLE LOCK LOGIC
+    if (profile?.role === "vendor" && target === "/organizer-info") {
+      setMessage("You are already registered as a Vendor.");
+      return;
+    }
+
+    if (profile?.role === "organizer" && target === "/vendor-info") {
+      setMessage("You are already registered as an Organizer.");
+      return;
+    }
+
+    router.push(target);
   };
 
   return (
@@ -188,7 +219,7 @@ export default function Home() {
 
       {/* ROLE BUTTONS */}
       <button
-        onClick={() => router.push("/vendor-info")}
+        onClick={() => checkRoleAndRedirect("/vendor-info")}
         style={{
           marginTop: 20,
           padding: "10px 20px",
@@ -203,7 +234,7 @@ export default function Home() {
       </button>
 
       <button
-        onClick={() => router.push("/organizer-info")}
+        onClick={() => checkRoleAndRedirect("/organizer-info")}
         style={{
           marginTop: 10,
           padding: "10px 20px",
