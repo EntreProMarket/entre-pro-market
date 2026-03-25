@@ -7,7 +7,7 @@ export default function Home() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); // 👈 ADDED
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -220,12 +220,11 @@ export default function Home() {
         Become an Organizer
       </button>
 
-      {/* MESSAGE */}
-      {message && (
-        <p style={{ marginTop: 20, color: "#701890", fontWeight: "bold" }}>
-          {message}
-        </p>
-      )}
-    </div>
-  );
-}
+      {/* ✅ NEW BUTTON ADDED HERE */}
+      <button
+        onClick={() => router.push("/marketplace")}
+        style={{
+          marginTop: 20,
+          padding: "10px 20px",
+          backgroundColor: "#AABB23",
+          color: "white",
