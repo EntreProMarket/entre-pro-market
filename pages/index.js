@@ -83,7 +83,7 @@ export default function Home() {
     } else if (profile?.role === "organizer") {
       router.replace("/organizer-dashboard");
     } else {
-      setMessage("Welcome! Browse or upgrade your account.");
+      router.replace("/marketplace"); // ✅ FIXED FLOW
     }
   };
 
@@ -215,22 +215,6 @@ export default function Home() {
         }}
       >
         Become an Organizer
-      </button>
-
-      {/* MARKETPLACE BUTTON */}
-      <button
-        onClick={() => router.push("/marketplace")}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          backgroundColor: "#AABB23",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          width: "100%",
-        }}
-      >
-        Browse Vendors
       </button>
 
       {/* MESSAGE */}
