@@ -51,7 +51,16 @@ export default function VendorProfile() {
 
   // Auto-generate handle
   useEffect(() => {
-    if (!handleEdited) {
+  loadProfile(); // 👈 ADD THIS LINE
+
+  if (!handleEdited) {
+    const generated = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    setHandle(generated);
+  }
+}, [businessName]);
       const generated = businessName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
