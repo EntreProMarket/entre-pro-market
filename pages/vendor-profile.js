@@ -7,7 +7,7 @@ export default function VendorProfile() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  
+
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
@@ -23,6 +23,8 @@ export default function VendorProfile() {
   const [youtube, setYoutube] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
+
+  const [handleEdited, setHandleEdited] = useState(false);
 
   const categories = [
     "DJ",
@@ -47,7 +49,7 @@ export default function VendorProfile() {
     "Event Staffing",
   ];
 
-  // Auto-generate handle from business name
+  // Auto-generate handle
   useEffect(() => {
     if (!handleEdited) {
       const generated = businessName
@@ -57,8 +59,6 @@ export default function VendorProfile() {
       setHandle(generated);
     }
   }, [businessName]);
-
-  const [handleEdited, setHandleEdited] = useState(false);
 
   const addTag = (e) => {
     e.preventDefault();
@@ -77,12 +77,15 @@ export default function VendorProfile() {
     const fileExt = file.name.split(".").pop();
     const fileName = `${Date.now()}.${fileExt}`;
     const filePath = `${folder}/${fileName}`;
+
     const { error } = await supabase.storage
       .from(folder)
       .upload(filePath, file);
+
     if (error) throw error;
-    const { publicURL } = supabase.storage.from(folder).getPublicUrl(filePath);
-    return publicURL;
+
+    const { data } = supabase.storage.from(folder).getPublicUrl(filePath);
+    return data.publicUrl;
   };
 
   const handleSave = async () => {
@@ -90,6 +93,9 @@ export default function VendorProfile() {
     setMessage("");
 
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+
       let logoUrl = null;
       if (logoFile) {
         logoUrl = await uploadFile(logoFile, "vendor-logos");
@@ -101,33 +107,30 @@ export default function VendorProfile() {
         portfolioUrls.push(url);
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("profiles")
-        .insert([
-          {
-            business_name: businessName,
-            handle,
-            category,
-            tags,
-            city,
-            state,
-            description,
-            website,
-            instagram,
-            facebook,
-            tiktok,
-            youtube,
-            logo_url: logoUrl,
-            portfolio_images: portfolioUrls,
-          },
-        ])
-        .select()
-        .single();
+        .update({
+          business_name: businessName,
+          handle,
+          category,
+          tags,
+          city,
+          state,
+          description,
+          website,
+          instagram,
+          facebook,
+          tiktok,
+          youtube,
+          logo_url: logoUrl,
+          portfolio_images: portfolioUrls,
+        })
+        .eq("id", user.id);
 
       if (error) {
         setMessage(error.message);
       } else {
-        setMessage("Profile saved! Social icons will show on your public profile.");
+        setMessage("Profile saved!");
         router.push(`/vendor/${handle}`);
       }
     } catch (err) {
@@ -176,6 +179,7 @@ export default function VendorProfile() {
           onChange={(e) => setTagInput(e.target.value)}
         />
       </form>
+
       <div>
         {tags.map((t) => (
           <span
@@ -196,36 +200,35 @@ export default function VendorProfile() {
       </div>
 
       <label>City</label>
-      <input type="text" value={city} onChange={(e) => setCity(e.target.value)} />
+      <input value={city} onChange={(e) => setCity(e.target.value)} />
 
       <label>State</label>
-      <input type="text" value={state} onChange={(e) => setState(e.target.value)} />
+      <input value={state} onChange={(e) => setState(e.target.value)} />
 
       <label>Description</label>
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
 
       <label>Website</label>
-      <input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      <input value={website} onChange={(e) => setWebsite(e.target.value)} />
 
       <label>Instagram</label>
-      <input type="url" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+      <input value={instagram} onChange={(e) => setInstagram(e.target.value)} />
 
       <label>Facebook</label>
-      <input type="url" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+      <input value={facebook} onChange={(e) => setFacebook(e.target.value)} />
 
       <label>TikTok</label>
-      <input type="url" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+      <input value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
 
       <label>YouTube</label>
-      <input type="url" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+      <input value={youtube} onChange={(e) => setYoutube(e.target.value)} />
 
       <label>Logo Upload</label>
-      <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files[0])} />
+      <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
 
-      <label>Portfolio Images Upload</label>
+      <label>Portfolio Images</label>
       <input
         type="file"
-        accept="image/*"
         multiple
         onChange={(e) => setPortfolioFiles(Array.from(e.target.files))}
       />
