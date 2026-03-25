@@ -88,6 +88,34 @@ export default function VendorProfile() {
     return data.publicUrl;
   };
 
+const loadProfile = async () => {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+
+  if (!user) return;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (profile) {
+    setBusinessName(profile.business_name || "");
+    setHandle(profile.handle || "");
+    setCategory(profile.category || "");
+    setTags(profile.tags || []);
+    setCity(profile.city || "");
+    setState(profile.state || "");
+    setDescription(profile.description || "");
+    setWebsite(profile.website || "");
+    setInstagram(profile.instagram || "");
+    setFacebook(profile.facebook || "");
+    setTiktok(profile.tiktok || "");
+    setYoutube(profile.youtube || "");
+  }
+};
+  
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
