@@ -22,14 +22,14 @@ export default function VendorInfo() {
       return;
     }
 
-    // 🚨 THIS IS THE FIX — role is now saved
+    // ✅ CRITICAL FIX: UPSERT instead of update
     const { error } = await supabase
       .from("profiles")
-      .update({
+      .upsert({
+        id: user.id,
         role: "vendor",
-        account_type: tier, // free, pro, premium (whatever you name them)
-      })
-      .eq("id", user.id);
+        account_type: tier,
+      });
 
     if (error) {
       setMessage(error.message);
@@ -42,12 +42,11 @@ export default function VendorInfo() {
   };
 
   return (
-    <div style={{ padding: 20, textAlign: "center" }}>
+    <div style={{ padding: 20, textAlign: "center", maxWidth: 500, margin: "auto" }}>
       <h1>Become a Vendor</h1>
 
       <p>Select a plan that fits your business.</p>
 
-      {/* FREE TIER */}
       <button
         onClick={() => becomeVendor("free")}
         disabled={loading}
@@ -64,7 +63,6 @@ export default function VendorInfo() {
         Free Vendor
       </button>
 
-      {/* PRO TIER */}
       <button
         onClick={() => becomeVendor("pro")}
         disabled={loading}
@@ -81,7 +79,6 @@ export default function VendorInfo() {
         Pro Vendor
       </button>
 
-      {/* PREMIUM TIER */}
       <button
         onClick={() => becomeVendor("premium")}
         disabled={loading}
@@ -98,7 +95,6 @@ export default function VendorInfo() {
         Premium Vendor
       </button>
 
-      {/* BACK BUTTON */}
       <button
         onClick={() => router.push("/")}
         style={{
@@ -113,7 +109,6 @@ export default function VendorInfo() {
         Back
       </button>
 
-      {/* MESSAGE */}
       {message && (
         <p style={{ marginTop: 20, color: "red", fontWeight: "bold" }}>
           {message}
