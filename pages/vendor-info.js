@@ -12,7 +12,7 @@ export default function VendorInfo() {
     setLoading(true);
     setMessage("");
 
-    // Get logged in user
+    // ✅ GET USER
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
@@ -22,7 +22,32 @@ export default function VendorInfo() {
       return;
     }
 
-    // ✅ CRITICAL FIX: UPSERT instead of update
+    // ✅ GET PROFILE
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      setMessage("Error loading profile.");
+      setLoading(false);
+      return;
+    }
+
+    // 🔒 ROLE LOCK (THIS IS WHAT WE ADDED)
+    if (profile?.role === "organizer") {
+      setMessage("You are already an Organizer.");
+      setLoading(false);
+      return;
+    }
+
+    if (profile?.role === "vendor") {
+      router.replace("/vendor-dashboard");
+      return;
+    }
+
+    // ✅ UPSERT (SAFE CREATE OR UPDATE)
     const { error } = await supabase
       .from("profiles")
       .upsert({
@@ -37,7 +62,7 @@ export default function VendorInfo() {
       return;
     }
 
-    // Redirect to dashboard
+    // ✅ SUCCESS
     router.replace("/vendor-dashboard");
   };
 
@@ -45,19 +70,16 @@ export default function VendorInfo() {
     <div style={{ padding: 20, textAlign: "center", maxWidth: 500, margin: "auto" }}>
       <h1>Become a Vendor</h1>
 
-      <p>Select a plan that fits your business.</p>
-
       <button
         onClick={() => becomeVendor("free")}
-        disabled={loading}
         style={{
           marginTop: 20,
-          padding: "12px 20px",
+          padding: "12px",
+          width: "100%",
           backgroundColor: "#333",
           color: "white",
           border: "none",
           borderRadius: 6,
-          width: "100%",
         }}
       >
         Free Vendor
@@ -65,15 +87,14 @@ export default function VendorInfo() {
 
       <button
         onClick={() => becomeVendor("pro")}
-        disabled={loading}
         style={{
           marginTop: 10,
-          padding: "12px 20px",
-          backgroundColor: "#AABB23",
+          padding: "12px",
+          width: "100%",
+          backgroundColor: "#701890",
           color: "white",
           border: "none",
           borderRadius: 6,
-          width: "100%",
         }}
       >
         Pro Vendor
@@ -81,15 +102,14 @@ export default function VendorInfo() {
 
       <button
         onClick={() => becomeVendor("premium")}
-        disabled={loading}
         style={{
           marginTop: 10,
-          padding: "12px 20px",
-          backgroundColor: "#701890",
+          padding: "12px",
+          width: "100%",
+          backgroundColor: "#AABB23",
           color: "white",
           border: "none",
           borderRadius: 6,
-          width: "100%",
         }}
       >
         Premium Vendor
@@ -99,10 +119,7 @@ export default function VendorInfo() {
         onClick={() => router.push("/")}
         style={{
           marginTop: 20,
-          padding: "10px 20px",
-          backgroundColor: "#ccc",
-          border: "none",
-          borderRadius: 6,
+          padding: "10px",
           width: "100%",
         }}
       >
