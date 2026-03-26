@@ -1,70 +1,124 @@
+// /pages/vendor-info.js
+import { useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 export default function VendorInfo() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const upgradeVendor = async (plan) => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
+  const becomeVendor = async (tier) => {
+    setLoading(true);
+    setMessage("");
+
+    // Get logged in user
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
 
     if (!user) {
-      router.push("/");
+      setMessage("You must be logged in.");
+      setLoading(false);
       return;
     }
 
-    await supabase.from("profiles").upsert({
-      id: user.id,
-      role: "vendor",
-      account_type: plan,
-    });
+    // 🚨 THIS IS THE FIX — role is now saved
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        role: "vendor",
+        account_type: tier, // free, pro, premium (whatever you name them)
+      })
+      .eq("id", user.id);
 
-    router.push("/vendor-dashboard");
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Redirect to dashboard
+    router.replace("/vendor-dashboard");
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20, textAlign: "center" }}>
-      
+    <div style={{ padding: 20, textAlign: "center" }}>
       <h1>Become a Vendor</h1>
-      <p>Sell products & services. Get discovered by customers and event organizers.</p>
 
-      {/* TIERS */}
-      <div style={{ marginTop: 30 }}>
+      <p>Select a plan that fits your business.</p>
 
-        <div style={{ border: "1px solid #ccc", padding: 15, borderRadius: 8, marginBottom: 15 }}>
-          <h3>Free Vendor</h3>
-          <p>Basic listing. Limited exposure.</p>
-          <button onClick={() => upgradeVendor("free")}>Start Free</button>
-        </div>
+      {/* FREE TIER */}
+      <button
+        onClick={() => becomeVendor("free")}
+        disabled={loading}
+        style={{
+          marginTop: 20,
+          padding: "12px 20px",
+          backgroundColor: "#333",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          width: "100%",
+        }}
+      >
+        Free Vendor
+      </button>
 
-        <div style={{ border: "2px solid #AABB23", padding: 15, borderRadius: 8, marginBottom: 15 }}>
-          <h3>Pro Vendor</h3>
-          <p>More visibility. Access to organizers.</p>
-          <button onClick={() => upgradeVendor("pro")}>Go Pro</button>
-        </div>
+      {/* PRO TIER */}
+      <button
+        onClick={() => becomeVendor("pro")}
+        disabled={loading}
+        style={{
+          marginTop: 10,
+          padding: "12px 20px",
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          width: "100%",
+        }}
+      >
+        Pro Vendor
+      </button>
 
-        <div style={{ border: "2px solid #701890", padding: 15, borderRadius: 8 }}>
-          <h3>Premium Vendor</h3>
-          <p>Max exposure. Featured listings + priority placement.</p>
-          <button onClick={() => upgradeVendor("premium")}>Go Premium</button>
-        </div>
+      {/* PREMIUM TIER */}
+      <button
+        onClick={() => becomeVendor("premium")}
+        disabled={loading}
+        style={{
+          marginTop: 10,
+          padding: "12px 20px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          width: "100%",
+        }}
+      >
+        Premium Vendor
+      </button>
 
-      </div>
-
-      {/* BACK */}
+      {/* BACK BUTTON */}
       <button
         onClick={() => router.push("/")}
         style={{
-          marginTop: 30,
+          marginTop: 20,
           padding: "10px 20px",
           backgroundColor: "#ccc",
           border: "none",
           borderRadius: 6,
-          cursor: "pointer",
+          width: "100%",
         }}
       >
-        ← Back
+        Back
       </button>
+
+      {/* MESSAGE */}
+      {message && (
+        <p style={{ marginTop: 20, color: "red", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }
