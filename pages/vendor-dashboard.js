@@ -1,3 +1,4 @@
+// /pages/vendor-dashboard.js
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -5,47 +6,38 @@ import DashboardLayout from "../components/DashboardLayout";
 
 export default function VendorDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    checkAccess();
-  }, []);
+    const protectRoute = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
 
-  const checkAccess = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const currentUser = userData?.user;
+      if (!user) {
+        router.replace("/");
+        return;
+      }
 
-    // ❌ Not logged in
-    if (!currentUser) {
-      router.replace("/");
-      return;
-    }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
 
-    // ✅ Check role
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", currentUser.id)
-      .single();
+      // 🔒 BLOCK NON-VENDORS
+      if (profile?.role !== "vendor") {
+        router.replace("/marketplace");
+        return;
+      }
 
-    if (error) {
-      router.replace("/");
-      return;
-    }
+      setUser(user);
+      setLoading(false);
+    };
 
-    // ❌ Not a vendor → block access
-    if (profile?.role !== "vendor") {
-      router.replace("/");
-      return;
-    }
+    protectRoute();
+  }, [router]);
 
-    // ✅ Authorized
-    setUser(currentUser);
-    setLoading(false);
-  };
-
-  // ⏳ Loading state while checking access
   if (loading) return <div>Loading...</div>;
 
   return (
