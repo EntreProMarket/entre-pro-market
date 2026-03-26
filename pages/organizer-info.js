@@ -1,70 +1,112 @@
+// /pages/organizer-info.js
+import { useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 export default function OrganizerInfo() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const upgradeOrganizer = async (plan) => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
+  const becomeOrganizer = async (tier) => {
+    setLoading(true);
+    setMessage("");
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
 
     if (!user) {
-      router.push("/");
+      setMessage("You must be logged in.");
+      setLoading(false);
       return;
     }
 
-    await supabase.from("profiles").upsert({
-      id: user.id,
-      role: "organizer",
-      account_type: plan,
-    });
+    // 🔒 CHECK EXISTING ROLE FIRST
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
 
-    router.push("/organizer-dashboard");
+    if (profile?.role === "vendor") {
+      setMessage("You are already registered as a Vendor.");
+      setLoading(false);
+      return;
+    }
+
+    if (profile?.role === "organizer") {
+      router.replace("/organizer-dashboard");
+      return;
+    }
+
+    // ✅ UPSERT (safe)
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        role: "organizer",
+        account_type: tier,
+      });
+
+    if (error) {
+      setMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    router.replace("/organizer-dashboard");
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20, textAlign: "center" }}>
-      
+    <div style={{ padding: 20, textAlign: "center", maxWidth: 500, margin: "auto" }}>
       <h1>Become an Organizer</h1>
-      <p>Create events. Connect with vendors. Build experiences.</p>
 
-      {/* TIERS */}
-      <div style={{ marginTop: 30 }}>
+      <button
+        onClick={() => becomeOrganizer("basic")}
+        style={{
+          marginTop: 20,
+          padding: "12px",
+          width: "100%",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+        }}
+      >
+        Basic Organizer
+      </button>
 
-        <div style={{ border: "1px solid #ccc", padding: 15, borderRadius: 8, marginBottom: 15 }}>
-          <h3>Basic Organizer</h3>
-          <p>Limited vendor access.</p>
-          <button onClick={() => upgradeOrganizer("basic")}>Start Basic</button>
-        </div>
+      <button
+        onClick={() => becomeOrganizer("pro")}
+        style={{
+          marginTop: 10,
+          padding: "12px",
+          width: "100%",
+          backgroundColor: "#AABB23",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+        }}
+      >
+        Pro Organizer
+      </button>
 
-        <div style={{ border: "2px solid #AABB23", padding: 15, borderRadius: 8, marginBottom: 15 }}>
-          <h3>Pro Organizer</h3>
-          <p>More vendor connections.</p>
-          <button onClick={() => upgradeOrganizer("pro")}>Go Pro</button>
-        </div>
-
-        <div style={{ border: "2px solid #701890", padding: 15, borderRadius: 8 }}>
-          <h3>Premium Organizer</h3>
-          <p>Unlimited access + create events.</p>
-          <button onClick={() => upgradeOrganizer("premium")}>Go Premium</button>
-        </div>
-
-      </div>
-
-      {/* BACK */}
       <button
         onClick={() => router.push("/")}
         style={{
-          marginTop: 30,
-          padding: "10px 20px",
-          backgroundColor: "#ccc",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
+          marginTop: 20,
+          padding: "10px",
+          width: "100%",
         }}
       >
-        ← Back
+        Back
       </button>
+
+      {message && (
+        <p style={{ marginTop: 20, color: "red", fontWeight: "bold" }}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }
