@@ -51,9 +51,10 @@ export default function DashboardLayout({ children }) {
           Dashboard
         </p>
 
+        {/* ✅ FIXED PROFILE BUTTON */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/profile")}
+          onClick={() => router.push("/vendor-profile")}
         >
           Profile
         </p>
