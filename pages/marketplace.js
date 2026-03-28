@@ -1,4 +1,3 @@
-// /pages/marketplace.js
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -24,46 +23,89 @@ export default function Marketplace() {
       return;
     }
 
-    setVendors(data || []);
+    setVendors(data);
     setLoading(false);
   };
 
+  if (loading) {
+    return <div style={{ padding: 20 }}>Loading vendors...</div>;
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      <h1>Vendor Marketplace</h1>
+      <h1 style={{ marginBottom: 20 }}>Vendor Marketplace</h1>
 
-      {loading && <p>Loading vendors...</p>}
+      {vendors.length === 0 && <p>No vendors yet.</p>}
 
-      {!loading && vendors.length === 0 && <p>No vendors yet.</p>}
-
-      <div style={{ display: "grid", gap: 20 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+          gap: 20,
+        }}
+      >
         {vendors.map((vendor) => (
           <div
             key={vendor.id}
+            onClick={() => router.push(`/vendor/${vendor.handle}`)}
             style={{
-              border: "1px solid #ccc",
-              padding: 15,
-              borderRadius: 8,
+              border: "1px solid #ddd",
+              borderRadius: 12,
+              overflow: "hidden",
+              cursor: "pointer",
+              transition: "0.2s",
+              backgroundColor: "white",
             }}
           >
-            <h3>{vendor.business_name || "Vendor"}</h3>
+            {/* IMAGE */}
+            <div style={{ height: 160, background: "#f4f4f4" }}>
+              {vendor.logo_url ? (
+                <img
+                  src={vendor.logo_url}
+                  alt="logo"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                <div style={{ padding: 20 }}>No Image</div>
+              )}
+            </div>
 
-            <p>Account Type: {vendor.account_type}</p>
+            {/* CONTENT */}
+            <div style={{ padding: 15 }}>
+              <h3 style={{ margin: "0 0 5px 0" }}>
+                {vendor.business_name || "Vendor"}
+              </h3>
 
-            <button
-              onClick={() => router.push(`/vendor/${vendor.handle}`)}
-              style={{
-                marginTop: 10,
-                padding: "8px 15px",
-                backgroundColor: "#701890",
-                color: "white",
-                border: "none",
-                borderRadius: 5,
-                cursor: "pointer",
-              }}
-            >
-              View Profile
-            </button>
+              <p style={{ margin: 0, color: "#777", fontSize: 14 }}>
+                {vendor.category || "No category"}
+              </p>
+
+              <p style={{ margin: "5px 0", fontSize: 13 }}>
+                {vendor.city}, {vendor.state}
+              </p>
+
+              {/* TAGS */}
+              <div style={{ marginTop: 8 }}>
+                {vendor.tags?.slice(0, 3).map((tag) => (
+                  <span
+                    key={tag}
+                    style={{
+                      fontSize: 11,
+                      background: "#eee",
+                      padding: "3px 6px",
+                      borderRadius: 10,
+                      marginRight: 5,
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         ))}
       </div>
