@@ -36,7 +36,7 @@ export default function VendorProfile() {
     }
   }, [businessName, handleEdited]);
 
-  // LOAD EXISTING PROFILE
+  // LOAD PROFILE
   useEffect(() => {
     loadProfile();
   }, []);
@@ -44,7 +44,6 @@ export default function VendorProfile() {
   const loadProfile = async () => {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
-
     if (!user) return;
 
     const { data: profile } = await supabase
@@ -85,19 +84,31 @@ export default function VendorProfile() {
   const uploadFile = async (file, folder) => {
     const fileExt = file.name.split(".").pop();
     const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
 
     const { error } = await supabase.storage
       .from(folder)
-      .upload(filePath, file);
+      .upload(fileName, file);
 
     if (error) throw error;
 
-    const { data } = supabase.storage.from(folder).getPublicUrl(filePath);
+    const { data } = supabase.storage.from(folder).getPublicUrl(fileName);
     return data.publicUrl;
   };
 
-  // ✅ FIXED SAVE FUNCTION
+  // 🔥 URL FORMATTERS
+  const formatWebsite = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return "https://www." + url;
+  };
+
+  const formatSocial = (username, baseUrl) => {
+    if (!username) return "";
+    if (username.startsWith("http")) return username;
+    return baseUrl + username.replace(/^@/, "");
+  };
+
+  // ✅ SAVE
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
@@ -106,7 +117,6 @@ export default function VendorProfile() {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
 
-      // GET EXISTING
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("*")
@@ -140,11 +150,11 @@ export default function VendorProfile() {
           city,
           state,
           description,
-          website,
-          instagram,
-          facebook,
-          tiktok,
-          youtube,
+          website: formatWebsite(website),
+          instagram: formatSocial(instagram, "https://instagram.com/"),
+          facebook: formatSocial(facebook, "https://facebook.com/"),
+          tiktok: formatSocial(tiktok, "https://tiktok.com/@"),
+          youtube: formatSocial(youtube, "https://youtube.com/"),
           logo_url: logoUrl,
           portfolio_images: portfolioUrls,
         })
@@ -188,11 +198,11 @@ export default function VendorProfile() {
       <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
       <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
 
-      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
-      <input placeholder="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-      <input placeholder="Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
-      <input placeholder="TikTok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
-      <input placeholder="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+      <input placeholder="Website (e.g. mysite.com)" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      <input placeholder="Instagram Username" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+      <input placeholder="Facebook Username" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+      <input placeholder="TikTok Username" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+      <input placeholder="YouTube Channel" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
 
       <p>Logo</p>
       <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
@@ -205,4 +215,4 @@ export default function VendorProfile() {
       </button>
     </div>
   );
-}
+        }
