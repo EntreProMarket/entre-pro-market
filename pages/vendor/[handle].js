@@ -58,13 +58,15 @@ export default function VendorPublicProfile() {
         />
       )}
 
-      {/* NAME */}
-      <h1>{vendor.business_name}</h1>
+      {/* NAME + HANDLE */}
+      <h1 style={{ marginBottom: 5 }}>{vendor.business_name}</h1>
+      <p style={{ color: "#777" }}>@{vendor.handle}</p>
 
-      {/* CATEGORY + LOCATION */}
-      <p>
-        {vendor.category} • {vendor.city}, {vendor.state}
-      </p>
+      {/* CATEGORY + LOCATION (IMPROVED) */}
+      <div style={{ marginTop: 10 }}>
+        <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
+        <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
+      </div>
 
       {/* DESCRIPTION */}
       <p style={{ marginTop: 20 }}>{vendor.description}</p>
