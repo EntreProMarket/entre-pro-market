@@ -95,20 +95,29 @@ export default function VendorProfile() {
     return data.publicUrl;
   };
 
-  // 🔥 URL FORMATTERS
+  // ✅ SMART WEBSITE FORMATTER
   const formatWebsite = (url) => {
     if (!url) return "";
-    if (url.startsWith("http")) return url;
-    return "https://www." + url;
+
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+
+    if (!url.includes(".")) {
+      return "https://www." + url + ".com";
+    }
+
+    return "https://" + url;
   };
 
+  // ✅ SOCIAL FORMATTER
   const formatSocial = (username, baseUrl) => {
     if (!username) return "";
     if (username.startsWith("http")) return username;
     return baseUrl + username.replace(/^@/, "");
   };
 
-  // ✅ SAVE
+  // SAVE
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
@@ -198,7 +207,7 @@ export default function VendorProfile() {
       <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
       <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
 
-      <input placeholder="Website (e.g. mysite.com)" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      <input placeholder="Website (e.g. mysite.com or mysite)" value={website} onChange={(e) => setWebsite(e.target.value)} />
       <input placeholder="Instagram Username" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
       <input placeholder="Facebook Username" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
       <input placeholder="TikTok Username" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
@@ -215,4 +224,4 @@ export default function VendorProfile() {
       </button>
     </div>
   );
-        }
+}
