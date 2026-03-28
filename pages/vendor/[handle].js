@@ -62,7 +62,7 @@ export default function VendorPublicProfile() {
       <h1 style={{ marginBottom: 5 }}>{vendor.business_name}</h1>
       <p style={{ color: "#777" }}>@{vendor.handle}</p>
 
-      {/* CATEGORY + LOCATION (IMPROVED) */}
+      {/* CATEGORY + LOCATION */}
       <div style={{ marginTop: 10 }}>
         <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
         <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
@@ -91,35 +91,45 @@ export default function VendorPublicProfile() {
         ))}
       </div>
 
-      {/* SOCIAL LINKS */}
+      {/* SOCIAL LINKS (FIXED) */}
       <div style={{ marginTop: 20 }}>
         {vendor.website && (
           <p>
-            <a href={vendor.website} target="_blank">Website</a>
+            <a href={vendor.website} target="_blank" rel="noopener noreferrer">
+              Website
+            </a>
           </p>
         )}
 
         {vendor.instagram && (
           <p>
-            <a href={vendor.instagram} target="_blank">Instagram</a>
+            <a href={vendor.instagram} target="_blank" rel="noopener noreferrer">
+              Instagram
+            </a>
           </p>
         )}
 
         {vendor.facebook && (
           <p>
-            <a href={vendor.facebook} target="_blank">Facebook</a>
+            <a href={vendor.facebook} target="_blank" rel="noopener noreferrer">
+              Facebook
+            </a>
           </p>
         )}
 
         {vendor.tiktok && (
           <p>
-            <a href={vendor.tiktok} target="_blank">TikTok</a>
+            <a href={vendor.tiktok} target="_blank" rel="noopener noreferrer">
+              TikTok
+            </a>
           </p>
         )}
 
         {vendor.youtube && (
           <p>
-            <a href={vendor.youtube} target="_blank">YouTube</a>
+            <a href={vendor.youtube} target="_blank" rel="noopener noreferrer">
+              YouTube
+            </a>
           </p>
         )}
       </div>
