@@ -5,11 +5,12 @@ import { useRouter } from "next/router";
 export default function VendorProfile() {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
+  const [handleEdited, setHandleEdited] = useState(false);
   const [category, setCategory] = useState("");
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
@@ -24,52 +25,6 @@ export default function VendorProfile() {
   const [logoFile, setLogoFile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
 
-  const [handleEdited, setHandleEdited] = useState(false);
-
-  // 🔒 PROTECT PAGE + LOAD DATA
-  useEffect(() => {
-    const init = async () => {
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
-
-      if (!user) {
-        router.replace("/");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.role !== "vendor") {
-        router.replace("/marketplace");
-        return;
-      }
-
-      // LOAD EXISTING DATA
-      if (profile) {
-        setBusinessName(profile.business_name || "");
-        setHandle(profile.handle || "");
-        setCategory(profile.category || "");
-        setTags(profile.tags || []);
-        setCity(profile.city || "");
-        setState(profile.state || "");
-        setDescription(profile.description || "");
-        setWebsite(profile.website || "");
-        setInstagram(profile.instagram || "");
-        setFacebook(profile.facebook || "");
-        setTiktok(profile.tiktok || "");
-        setYoutube(profile.youtube || "");
-      }
-
-      setLoading(false);
-    };
-
-    init();
-  }, [router]);
-
   // AUTO HANDLE
   useEffect(() => {
     if (!handleEdited) {
@@ -77,10 +32,42 @@ export default function VendorProfile() {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
-
       setHandle(generated);
     }
-  }, [businessName]);
+  }, [businessName, handleEdited]);
+
+  // LOAD EXISTING PROFILE
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (profile) {
+      setBusinessName(profile.business_name || "");
+      setHandle(profile.handle || "");
+      setCategory(profile.category || "");
+      setTags(profile.tags || []);
+      setCity(profile.city || "");
+      setState(profile.state || "");
+      setDescription(profile.description || "");
+      setWebsite(profile.website || "");
+      setInstagram(profile.instagram || "");
+      setFacebook(profile.facebook || "");
+      setTiktok(profile.tiktok || "");
+      setYoutube(profile.youtube || "");
+    }
+  };
 
   const addTag = (e) => {
     e.preventDefault();
@@ -95,36 +82,52 @@ export default function VendorProfile() {
     setTags(tags.filter((t) => t !== tag));
   };
 
-  const uploadFile = async (file, bucket) => {
-    const fileName = `${Date.now()}-${file.name}`;
+  const uploadFile = async (file, folder) => {
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
 
     const { error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file);
+      .from(folder)
+      .upload(filePath, file);
 
     if (error) throw error;
 
-    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    const { data } = supabase.storage.from(folder).getPublicUrl(filePath);
     return data.publicUrl;
   };
 
+  // ✅ FIXED SAVE FUNCTION
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
 
     try {
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
 
-      let logoUrl = null;
+      // GET EXISTING
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      let logoUrl = existingProfile?.logo_url || null;
+
       if (logoFile) {
         logoUrl = await uploadFile(logoFile, "vendor-logos");
       }
 
-      const portfolioUrls = [];
-      for (const file of portfolioFiles) {
-        const url = await uploadFile(file, "vendor-portfolio");
-        portfolioUrls.push(url);
+      let portfolioUrls = existingProfile?.portfolio_images || [];
+
+      if (portfolioFiles.length > 0) {
+        portfolioUrls = [];
+
+        for (const file of portfolioFiles) {
+          const url = await uploadFile(file, "vendor-portfolio");
+          portfolioUrls.push(url);
+        }
       }
 
       const { error } = await supabase
@@ -147,18 +150,18 @@ export default function VendorProfile() {
         })
         .eq("id", user.id);
 
-      if (error) throw error;
-
-      setMessage("Profile saved!");
-      router.push(`/vendor/${handle}`);
+      if (error) {
+        setMessage(error.message);
+      } else {
+        setMessage("Profile updated!");
+        router.push(`/vendor/${handle}`);
+      }
     } catch (err) {
       setMessage(err.message);
     }
 
     setLoading(false);
   };
-
-  if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
@@ -197,8 +200,8 @@ export default function VendorProfile() {
       <p>Portfolio</p>
       <input type="file" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
 
-      <button onClick={handleSave} style={{ marginTop: 20 }}>
-        Save Profile
+      <button onClick={handleSave} disabled={loading} style={{ marginTop: 20 }}>
+        {loading ? "Saving..." : "Save Profile"}
       </button>
     </div>
   );
