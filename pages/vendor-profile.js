@@ -27,7 +27,6 @@ export default function VendorProfile() {
     const loadProfile = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data.user;
-
       if (!user) return;
 
       const { data: profile } = await supabase
@@ -76,10 +75,7 @@ export default function VendorProfile() {
       .from(bucket)
       .upload(fileName, file);
 
-    if (error) {
-      console.log(error);
-      return null;
-    }
+    if (error) return null;
 
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
     return data.publicUrl;
@@ -90,33 +86,31 @@ export default function VendorProfile() {
 
     const { data } = await supabase.auth.getUser();
     const user = data.user;
-
     if (!user) return;
 
-    // Get existing images so they don't get wiped
-    const { data: existingProfile } = await supabase
+    const { data: existing } = await supabase
       .from("profiles")
       .select("logo_url, portfolio_images")
       .eq("id", user.id)
       .single();
 
-    let logoUrl = null;
+    let logoUrl = existing?.logo_url || null;
+
     if (logoFile) {
-      logoUrl = await uploadFile(logoFile, "vendor-logos");
+      const uploaded = await uploadFile(logoFile, "vendor-logos");
+      if (uploaded) logoUrl = uploaded;
     }
 
-    const portfolioUrls = [];
-    for (const file of portfolioFiles) {
-      const url = await uploadFile(file, "vendor-portfolio");
-      if (url) portfolioUrls.push(url);
+    let portfolio = existing?.portfolio_images || [];
+
+    if (portfolioFiles.length > 0) {
+      const newUrls = [];
+      for (const file of portfolioFiles) {
+        const url = await uploadFile(file, "vendor-portfolio");
+        if (url) newUrls.push(url);
+      }
+      if (newUrls.length > 0) portfolio = newUrls;
     }
-
-    const finalLogo = logoUrl || existingProfile?.logo_url || null;
-
-    const finalPortfolio =
-      portfolioUrls.length > 0
-        ? portfolioUrls
-        : existingProfile?.portfolio_images || [];
 
     const { error } = await supabase
       .from("profiles")
@@ -133,10 +127,68 @@ export default function VendorProfile() {
         facebook,
         tiktok,
         youtube,
-        logo_url: finalLogo,
-        portfolio_images: finalPortfolio,
+        logo_url: logoUrl,
+        portfolio_images: portfolio,
       })
       .eq("id", user.id);
 
     if (error) {
-      console.log
+      console.log(error);
+      setMessage("Error saving profile");
+    } else {
+      setMessage("Profile saved!");
+    }
+  };
+
+  if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
+
+  return (
+    <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
+      <h1>Vendor Profile</h1>
+      {message && <p>{message}</p>}
+
+      <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+      <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
+      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
+
+      <form onSubmit={addTag}>
+        <input placeholder="Add tag + Enter" value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
+      </form>
+
+      <div>
+        {tags.map((t) => (
+          <span key={t} onClick={() => removeTag(t)} style={{ marginRight: 5, cursor: "pointer" }}>
+            {t} ×
+          </span>
+        ))}
+      </div>
+
+      <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+      <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+
+      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
+
+      {/* WARNING */}
+      <div style={{ background: "#ffe5e5", color: "#b30000", padding: 10, marginTop: 20 }}>
+        ⚠️ Links must be public or they may not open correctly.
+      </div>
+
+      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      <input placeholder="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+      <input placeholder="Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+      <input placeholder="TikTok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+      <input placeholder="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+
+      <p>Logo</p>
+      <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
+
+      <p>Portfolio</p>
+      <input type="file" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
+
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
+        <button onClick={() => window.history.back()}>← Back</button>
+        <button onClick={handleSave}>Save Profile</button>
+      </div>
+    </div>
+  );
+}
