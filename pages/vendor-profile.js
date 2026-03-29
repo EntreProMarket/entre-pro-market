@@ -111,7 +111,7 @@ export default function VendorProfile() {
       if (url) portfolioUrls.push(url);
     }
 
-    // 🔥 PRESERVE EXISTING IF NO NEW UPLOAD
+    // 🔥 PRESERVE EXISTING IMAGES
     const finalLogo =
       logoUrl || existingProfile?.logo_url || null;
 
@@ -202,58 +202,4 @@ export default function VendorProfile() {
       <input
         placeholder="State"
         value={state}
-        onChange={(e) => setState(e.target.value)}
-      />
-
-      <textarea
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-
-      <input
-        placeholder="Website"
-        value={website}
-        onChange={(e) => setWebsite(e.target.value)}
-      />
-
-      <input
-        placeholder="Instagram"
-        value={instagram}
-        onChange={(e) => setInstagram(e.target.value)}
-      />
-
-      <input
-        placeholder="Facebook"
-        value={facebook}
-        onChange={(e) => setFacebook(e.target.value)}
-      />
-
-      <input
-        placeholder="TikTok"
-        value={tiktok}
-        onChange={(e) => setTiktok(e.target.value)}
-      />
-
-      <input
-        placeholder="YouTube"
-        value={youtube}
-        onChange={(e) => setYoutube(e.target.value)}
-      />
-
-      <p>Logo</p>
-      <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
-
-      <p>Portfolio</p>
-      <input
-        type="file"
-        multiple
-        onChange={(e) => setPortfolioFiles(Array.from(e.target.files))}
-      />
-
-      <button onClick={handleSave} style={{ marginTop: 20 }}>
-        Save Profile
-      </button>
-    </div>
-  );
-}
+        onChange={(e)
