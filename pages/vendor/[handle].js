@@ -32,19 +32,6 @@ export default function VendorPublicProfile() {
     fetchVendor();
   }, [handle]);
 
-  // ✅ LEAVE APP CONFIRMATION
-  const handleExternalLink = (url) => {
-    if (!url) return;
-
-    const confirmLeave = window.confirm(
-      "You are about to leave Entre PRO Market. Continue?"
-    );
-
-    if (confirmLeave) {
-      window.open(url, "_blank");
-    }
-  };
-
   if (loading) {
     return <div style={{ padding: 20 }}>Loading...</div>;
   }
@@ -104,52 +91,97 @@ export default function VendorPublicProfile() {
         ))}
       </div>
 
-      {/* SOCIAL LINKS */}
+      {/* SOCIAL LINKS (FIXED CORRECTLY) */}
       <div style={{ marginTop: 25 }}>
         <h3>Links</h3>
 
         {vendor.website && (
-          <p
-            onClick={() => handleExternalLink(vendor.website)}
-            style={{ cursor: "pointer", color: "blue" }}
-          >
-            Website
+          <p>
+            <a
+              href={vendor.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                const confirmLeave = window.confirm(
+                  "You are about to leave Entre PRO Market. Continue?"
+                );
+                if (!confirmLeave) e.preventDefault();
+              }}
+            >
+              Website
+            </a>
           </p>
         )}
 
         {vendor.instagram && (
-          <p
-            onClick={() => handleExternalLink(vendor.instagram)}
-            style={{ cursor: "pointer", color: "blue" }}
-          >
-            Instagram
+          <p>
+            <a
+              href={vendor.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                const confirmLeave = window.confirm(
+                  "You are about to leave Entre PRO Market. Continue?"
+                );
+                if (!confirmLeave) e.preventDefault();
+              }}
+            >
+              Instagram
+            </a>
           </p>
         )}
 
         {vendor.facebook && (
-          <p
-            onClick={() => handleExternalLink(vendor.facebook)}
-            style={{ cursor: "pointer", color: "blue" }}
-          >
-            Facebook
+          <p>
+            <a
+              href={vendor.facebook}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                const confirmLeave = window.confirm(
+                  "You are about to leave Entre PRO Market. Continue?"
+                );
+                if (!confirmLeave) e.preventDefault();
+              }}
+            >
+              Facebook
+            </a>
           </p>
         )}
 
         {vendor.tiktok && (
-          <p
-            onClick={() => handleExternalLink(vendor.tiktok)}
-            style={{ cursor: "pointer", color: "blue" }}
-          >
-            TikTok
+          <p>
+            <a
+              href={vendor.tiktok}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                const confirmLeave = window.confirm(
+                  "You are about to leave Entre PRO Market. Continue?"
+                );
+                if (!confirmLeave) e.preventDefault();
+              }}
+            >
+              TikTok
+            </a>
           </p>
         )}
 
         {vendor.youtube && (
-          <p
-            onClick={() => handleExternalLink(vendor.youtube)}
-            style={{ cursor: "pointer", color: "blue" }}
-          >
-            YouTube
+          <p>
+            <a
+              href={vendor.youtube}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                const confirmLeave = window.confirm(
+                  "You are about to leave Entre PRO Market. Continue?"
+                );
+                if (!confirmLeave) e.preventDefault();
+              }}
+            >
+              YouTube
+            </a>
           </p>
         )}
       </div>
