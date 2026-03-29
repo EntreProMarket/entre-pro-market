@@ -1,49 +1,63 @@
-// /pages/organizer-dashboard.js
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
-import DashboardLayout from "../components/DashboardLayout";
+import { supabase } from "../lib/supabaseClient";
 
 export default function OrganizerDashboard() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    const protectRoute = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
+    const loadProfile = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
 
       if (!user) {
-        router.replace("/");
+        router.push("/");
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
-        .select("role")
+        .select("*")
         .eq("id", user.id)
         .single();
 
-      // 🔒 BLOCK NON-ORGANIZERS
-      if (profile?.role !== "organizer") {
-        router.replace("/marketplace");
+      if (!profileData) {
+        router.push("/");
         return;
       }
 
-      setUser(user);
-      setLoading(false);
+      setProfile(profileData);
     };
 
-    protectRoute();
+    loadProfile();
   }, [router]);
 
-  if (loading) return <div>Loading...</div>;
+  const goToProfile = () => {
+    router.push(`/organizer/${profile.handle}`);
+  };
+
+  const goToEdit = () => {
+    router.push("/organizer-profile");
+  };
+
+  if (!profile) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
-    <DashboardLayout>
+    <div style={{ padding: 20 }}>
       <h1>Organizer Dashboard</h1>
-      <p>Logged in as: {user.email}</p>
-    </DashboardLayout>
+
+      <p>Welcome, {profile.organizer_name || "Organizer"}</p>
+
+      <div style={{ marginTop: 20 }}>
+        <button onClick={goToProfile} style={{ marginRight: 10 }}>
+          View Profile
+        </button>
+
+        <button onClick={goToEdit}>
+          Edit Profile
+        </button>
+      </div>
+    </div>
   );
 }
