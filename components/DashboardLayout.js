@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
+
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkUser = async () => {
+    const init = async () => {
       const { data } = await supabase.auth.getUser();
 
       if (!data?.user) {
@@ -15,10 +18,21 @@ export default function DashboardLayout({ children }) {
         return;
       }
 
-      setUser(data.user);
+      const user = data.user;
+      setUser(user);
+
+      // 🔥 get profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      setProfile(profileData);
+      setLoading(false);
     };
 
-    checkUser();
+    init();
   }, [router]);
 
   const logout = async () => {
@@ -26,7 +40,18 @@ export default function DashboardLayout({ children }) {
     router.replace("/");
   };
 
-  if (!user) {
+  // 🔒 LOCK: only vendors can access /vendor-profile
+  useEffect(() => {
+    if (!loading && profile) {
+      const path = router.pathname;
+
+      if (path === "/vendor-profile" && profile.role !== "vendor") {
+        router.replace("/"); // or marketplace
+      }
+    }
+  }, [loading, profile, router]);
+
+  if (loading) {
     return <div style={{ padding: 30 }}>Loading...</div>;
   }
 
@@ -44,6 +69,7 @@ export default function DashboardLayout({ children }) {
       >
         <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
+        {/* DASHBOARD */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/vendor-dashboard")}
@@ -51,14 +77,19 @@ export default function DashboardLayout({ children }) {
           Dashboard
         </p>
 
-        {/* ✅ FIXED PROFILE BUTTON */}
+        {/* ✅ PROFILE (FIXED) */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/vendor-profile")}
+          onClick={() => {
+            if (profile?.handle) {
+              router.push(`/vendor/${profile.handle}`);
+            }
+          }}
         >
           Profile
         </p>
 
+        {/* MESSAGES */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/messages")}
@@ -66,6 +97,7 @@ export default function DashboardLayout({ children }) {
           Messages
         </p>
 
+        {/* SETTINGS */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/settings")}
@@ -108,4 +140,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   );
-}
+        }
