@@ -38,7 +38,7 @@ export default function VendorPublicProfile() {
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
 
-      {/* HEADER (TOP RIGHT BUTTON) */}
+      {/* HEADER */}
       <div
         style={{
           display: "flex",
@@ -68,16 +68,16 @@ export default function VendorPublicProfile() {
         </button>
       </div>
 
-      {/* LOGO */}
+      {/* ✅ BIGGER LOGO */}
       {vendor.logo_url && (
         <img
           src={vendor.logo_url}
           alt="logo"
           style={{
-            width: 120,
-            height: 120,
+            width: 160,
+            height: 160,
             objectFit: "cover",
-            borderRadius: 10,
+            borderRadius: 12,
             marginBottom: 20,
           }}
         />
@@ -116,11 +116,45 @@ export default function VendorPublicProfile() {
       <div style={{ marginTop: 25 }}>
         <h3>Links</h3>
 
-        {vendor.website && <p><a href={vendor.website} target="_blank">Website</a></p>}
-        {vendor.instagram && <p><a href={vendor.instagram} target="_blank">Instagram</a></p>}
-        {vendor.facebook && <p><a href={vendor.facebook} target="_blank">Facebook</a></p>}
-        {vendor.tiktok && <p><a href={vendor.tiktok} target="_blank">TikTok</a></p>}
-        {vendor.youtube && <p><a href={vendor.youtube} target="_blank">YouTube</a></p>}
+        {vendor.website && (
+          <p>
+            <a href={vendor.website} target="_blank" rel="noopener noreferrer">
+              Website
+            </a>
+          </p>
+        )}
+
+        {vendor.instagram && (
+          <p>
+            <a href={vendor.instagram} target="_blank" rel="noopener noreferrer">
+              Instagram
+            </a>
+          </p>
+        )}
+
+        {vendor.facebook && (
+          <p>
+            <a href={vendor.facebook} target="_blank" rel="noopener noreferrer">
+              Facebook
+            </a>
+          </p>
+        )}
+
+        {vendor.tiktok && (
+          <p>
+            <a href={vendor.tiktok} target="_blank" rel="noopener noreferrer">
+              TikTok
+            </a>
+          </p>
+        )}
+
+        {vendor.youtube && (
+          <p>
+            <a href={vendor.youtube} target="_blank" rel="noopener noreferrer">
+              YouTube
+            </a>
+          </p>
+        )}
       </div>
 
       {/* PORTFOLIO */}
