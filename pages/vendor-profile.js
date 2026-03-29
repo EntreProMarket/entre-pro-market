@@ -149,46 +149,4 @@ export default function VendorProfile() {
 
       <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
       <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
-      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
-
-      <form onSubmit={addTag}>
-        <input placeholder="Add tag + Enter" value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
-      </form>
-
-      <div>
-        {tags.map((t) => (
-          <span key={t} onClick={() => removeTag(t)} style={{ marginRight: 5, cursor: "pointer" }}>
-            {t} ×
-          </span>
-        ))}
-      </div>
-
-      <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
-      <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
-
-      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-
-      {/* WARNING */}
-      <div style={{ background: "#ffe5e5", color: "#b30000", padding: 10, marginTop: 20 }}>
-        ⚠️ Links must be public or they may not open correctly.
-      </div>
-
-      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
-      <input placeholder="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-      <input placeholder="Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
-      <input placeholder="TikTok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
-      <input placeholder="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
-
-      <p>Logo</p>
-      <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
-
-      <p>Portfolio</p>
-      <input type="file" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
-
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20 }}>
-        <button onClick={() => window.history.back()}>← Back</button>
-        <button onClick={handleSave}>Save Profile</button>
-      </div>
-    </div>
-  );
-}
+      <input placeholder="Category" value={category} onChange={(
