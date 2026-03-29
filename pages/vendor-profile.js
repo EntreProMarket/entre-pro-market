@@ -93,7 +93,6 @@ export default function VendorProfile() {
 
     if (!user) return;
 
-    // 🔥 GET EXISTING IMAGES (CRITICAL FIX)
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("logo_url, portfolio_images")
@@ -111,9 +110,7 @@ export default function VendorProfile() {
       if (url) portfolioUrls.push(url);
     }
 
-    // 🔥 PRESERVE EXISTING IMAGES
-    const finalLogo =
-      logoUrl || existingProfile?.logo_url || null;
+    const finalLogo = logoUrl || existingProfile?.logo_url || null;
 
     const finalPortfolio =
       portfolioUrls.length > 0
@@ -202,4 +199,74 @@ export default function VendorProfile() {
       <input
         placeholder="State"
         value={state}
-        onChange={(e)
+        onChange={(e) => setState(e.target.value)}
+      />
+
+      <textarea
+        placeholder="Description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
+
+      {/* WARNING MESSAGE */}
+      <div
+        style={{
+          backgroundColor: "#ffe5e5",
+          color: "#b30000",
+          padding: 12,
+          borderRadius: 6,
+          marginTop: 20,
+          marginBottom: 10,
+          fontSize: 14,
+        }}
+      >
+        ⚠️ Make sure your website and social media pages are PUBLIC.
+        Private or restricted accounts may not open correctly for users.
+      </div>
+
+      <input
+        placeholder="Website"
+        value={website}
+        onChange={(e) => setWebsite(e.target.value)}
+      />
+
+      <input
+        placeholder="Instagram"
+        value={instagram}
+        onChange={(e) => setInstagram(e.target.value)}
+      />
+
+      <input
+        placeholder="Facebook"
+        value={facebook}
+        onChange={(e) => setFacebook(e.target.value)}
+      />
+
+      <input
+        placeholder="TikTok"
+        value={tiktok}
+        onChange={(e) => setTiktok(e.target.value)}
+      />
+
+      <input
+        placeholder="YouTube"
+        value={youtube}
+        onChange={(e) => setYoutube(e.target.value)}
+      />
+
+      <p>Logo</p>
+      <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
+
+      <p>Portfolio</p>
+      <input
+        type="file"
+        multiple
+        onChange={(e) => setPortfolioFiles(Array.from(e.target.files))}
+      />
+
+      <button onClick={handleSave} style={{ marginTop: 20 }}>
+        Save Profile
+      </button>
+    </div>
+  );
+}
