@@ -1,59 +1,44 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data, error } = await supabase.auth.getUser();
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
 
-      if (error || !data?.user) {
-        router.replace("/");
+      if (!user) {
+        router.push("/");
         return;
       }
 
-      setUser(data.user);
-      setLoading(false);
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", user.id)
+        .single();
+
+      if (error || !profile) {
+        router.push("/");
+        return;
+      }
+
+      // 🔥 ROLE-BASED REDIRECT
+      if (profile.account_type === "vendor") {
+        router.push("/marketplace");
+      } else if (profile.account_type === "organizer") {
+        router.push("/organizer-dashboard");
+      } else {
+        router.push("/");
+      }
     };
 
-    getUser();
+    checkUser();
   }, [router]);
 
-  const logout = async () => {
-    await supabase.auth.signOut();
-    router.replace("/");
-  };
-
-  if (loading) {
-    return <div style={{ textAlign: "center", padding: 30 }}>Loading...</div>;
-  }
-
-  return (
-    <div style={{ textAlign: "center", padding: 30, fontFamily: "sans-serif" }}>
-      <h1>Dashboard</h1>
-
-      <p>
-        Logged in as: <strong>{user?.email}</strong>
-      </p>
-
-      <button
-        onClick={logout}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          backgroundColor: "#701890",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-        }}
-      >
-        Log Out
-      </button>
-    </div>
-  );
+  return <div style={{ padding: 20 }}>Loading dashboard...</div>;
 }
