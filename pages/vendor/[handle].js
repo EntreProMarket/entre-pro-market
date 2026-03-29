@@ -42,7 +42,7 @@ export default function VendorPublicProfile() {
 
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
-      
+
       {/* LOGO */}
       {vendor.logo_url && (
         <img
@@ -58,12 +58,29 @@ export default function VendorPublicProfile() {
         />
       )}
 
-      {/* NAME */}
+      {/* NAME + HANDLE */}
       <h1 style={{ marginBottom: 5 }}>{vendor.business_name}</h1>
       <p style={{ color: "#777" }}>@{vendor.handle}</p>
 
+      {/* ✅ EDIT PROFILE BUTTON (FULLY WORKING) */}
+      <button
+        onClick={() => router.push("/vendor-profile")}
+        style={{
+          marginTop: 15,
+          padding: "10px 14px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          cursor: "pointer",
+          fontWeight: "bold",
+        }}
+      >
+        Edit Profile
+      </button>
+
       {/* CATEGORY + LOCATION */}
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 15 }}>
         <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
         <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
       </div>
@@ -91,23 +108,13 @@ export default function VendorPublicProfile() {
         ))}
       </div>
 
-      {/* SOCIAL LINKS (FIXED CORRECTLY) */}
+      {/* LINKS */}
       <div style={{ marginTop: 25 }}>
         <h3>Links</h3>
 
         {vendor.website && (
           <p>
-            <a
-              href={vendor.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                const confirmLeave = window.confirm(
-                  "You are about to leave Entre PRO Market. Continue?"
-                );
-                if (!confirmLeave) e.preventDefault();
-              }}
-            >
+            <a href={vendor.website} target="_blank" rel="noopener noreferrer">
               Website
             </a>
           </p>
@@ -115,17 +122,7 @@ export default function VendorPublicProfile() {
 
         {vendor.instagram && (
           <p>
-            <a
-              href={vendor.instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                const confirmLeave = window.confirm(
-                  "You are about to leave Entre PRO Market. Continue?"
-                );
-                if (!confirmLeave) e.preventDefault();
-              }}
-            >
+            <a href={vendor.instagram} target="_blank" rel="noopener noreferrer">
               Instagram
             </a>
           </p>
@@ -133,17 +130,7 @@ export default function VendorPublicProfile() {
 
         {vendor.facebook && (
           <p>
-            <a
-              href={vendor.facebook}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                const confirmLeave = window.confirm(
-                  "You are about to leave Entre PRO Market. Continue?"
-                );
-                if (!confirmLeave) e.preventDefault();
-              }}
-            >
+            <a href={vendor.facebook} target="_blank" rel="noopener noreferrer">
               Facebook
             </a>
           </p>
@@ -151,17 +138,7 @@ export default function VendorPublicProfile() {
 
         {vendor.tiktok && (
           <p>
-            <a
-              href={vendor.tiktok}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                const confirmLeave = window.confirm(
-                  "You are about to leave Entre PRO Market. Continue?"
-                );
-                if (!confirmLeave) e.preventDefault();
-              }}
-            >
+            <a href={vendor.tiktok} target="_blank" rel="noopener noreferrer">
               TikTok
             </a>
           </p>
@@ -169,17 +146,7 @@ export default function VendorPublicProfile() {
 
         {vendor.youtube && (
           <p>
-            <a
-              href={vendor.youtube}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                const confirmLeave = window.confirm(
-                  "You are about to leave Entre PRO Market. Continue?"
-                );
-                if (!confirmLeave) e.preventDefault();
-              }}
-            >
+            <a href={vendor.youtube} target="_blank" rel="noopener noreferrer">
               YouTube
             </a>
           </p>
