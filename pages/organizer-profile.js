@@ -107,62 +107,20 @@ export default function OrganizerProfile() {
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
       
-      {/* ✅ TITLE FIXED */}
-      <h1 style={{ marginBottom: 20 }}>Vendor Profile</h1>
+      {/* ✅ CORRECT TITLE */}
+      <h1 style={{ marginBottom: 20 }}>Organizer Profile</h1>
 
-      <input
-        placeholder="Organizer Name"
-        value={organizerName}
-        onChange={(e) => setOrganizerName(e.target.value)}
-      />
+      <input placeholder="Organizer Name" value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} />
+      <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
+      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
+      <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+      <input placeholder="State" value={stateVal} onChange={(e) => setStateVal(e.target.value)} />
 
-      <input
-        placeholder="Handle"
-        value={handle}
-        onChange={(e) => setHandle(e.target.value)}
-      />
+      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
 
-      <input
-        placeholder="Category"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-      />
-
-      <input
-        placeholder="City"
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
-      />
-
-      <input
-        placeholder="State"
-        value={stateVal}
-        onChange={(e) => setStateVal(e.target.value)}
-      />
-
-      <textarea
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-
-      <input
-        placeholder="Website"
-        value={website}
-        onChange={(e) => setWebsite(e.target.value)}
-      />
-
-      <input
-        placeholder="Instagram"
-        value={instagram}
-        onChange={(e) => setInstagram(e.target.value)}
-      />
-
-      <input
-        placeholder="Facebook"
-        value={facebook}
-        onChange={(e) => setFacebook(e.target.value)}
-      />
+      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      <input placeholder="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+      <input placeholder="Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
 
       <input
         placeholder="Tags (comma separated)"
@@ -170,21 +128,12 @@ export default function OrganizerProfile() {
         onChange={(e) => setTags(e.target.value)}
       />
 
-      {/* LOGO UPLOAD */}
-      <input
-        type="file"
-        onChange={(e) => setLogoFile(e.target.files[0])}
-      />
+      <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
 
       {logoUrl && (
-        <img
-          src={logoUrl}
-          alt="logo"
-          style={{ width: 120, marginTop: 10 }}
-        />
+        <img src={logoUrl} alt="logo" style={{ width: 120, marginTop: 10 }} />
       )}
 
-      {/* BUTTONS */}
       <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
         
         <button
