@@ -8,7 +8,27 @@ export default function VendorPublicProfile() {
 
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null); // ✅ NEW
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  // ✅ NEW: Role-based edit navigation
+  const goToEditProfile = async () => {
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
+
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("account_type")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.account_type === "vendor") {
+      router.push("/vendor-profile");
+    } else {
+      router.push("/organizer-profile");
+    }
+  };
 
   useEffect(() => {
     if (!handle) return;
@@ -53,8 +73,9 @@ export default function VendorPublicProfile() {
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
 
+        {/* ✅ FIXED BUTTON */}
         <button
-          onClick={() => router.push("/vendor-profile")}
+          onClick={goToEditProfile}
           style={{
             padding: "10px 14px",
             backgroundColor: "#701890",
@@ -69,15 +90,15 @@ export default function VendorPublicProfile() {
         </button>
       </div>
 
-      {/* LOGO (CLICKABLE) */}
+      {/* LOGO */}
       {vendor.logo_url && (
         <img
           src={vendor.logo_url}
           alt="logo"
           onClick={() => setSelectedImage(vendor.logo_url)}
           style={{
-            width: 160,
-            height: 160,
+            width: 180, // slightly larger (you asked earlier)
+            height: 180,
             objectFit: "cover",
             borderRadius: 12,
             marginBottom: 20,
@@ -193,7 +214,7 @@ export default function VendorPublicProfile() {
         )}
       </div>
 
-      {/* BACK BUTTON */}
+      {/* BACK BUTTON (BOTTOM RIGHT) */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button
           onClick={() => router.back()}
