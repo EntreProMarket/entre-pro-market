@@ -8,7 +8,14 @@ export default function OrganizerPublicProfile() {
 
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null);
+
+  // ✅ EDIT BUTTON (TOP RIGHT)
+  const goToEditProfile = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data?.user) return;
+
+    router.push("/organizer-profile");
+  };
 
   useEffect(() => {
     if (!handle) return;
@@ -40,9 +47,34 @@ export default function OrganizerPublicProfile() {
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
 
       {/* HEADER */}
-      <div style={{ marginBottom: 20 }}>
-        <h1>{organizer.organizer_name || "Organizer"}</h1>
-        <p style={{ color: "#777" }}>@{organizer.handle}</p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <h1>{organizer.organizer_name || "Organizer"}</h1>
+          <p style={{ color: "#777" }}>@{organizer.handle}</p>
+        </div>
+
+        {/* ✅ EDIT BUTTON */}
+        <button
+          onClick={goToEditProfile}
+          style={{
+            padding: "10px 14px",
+            backgroundColor: "#701890",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          Edit Profile
+        </button>
       </div>
 
       {/* CATEGORY + LOCATION */}
@@ -103,7 +135,7 @@ export default function OrganizerPublicProfile() {
         )}
       </div>
 
-      {/* BACK BUTTON (MATCHED STYLE) */}
+      {/* ✅ BACK BUTTON (MATCHED STYLE + RIGHT SIDE) */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button
           onClick={() => router.back()}
