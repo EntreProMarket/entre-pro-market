@@ -9,13 +9,12 @@ export default function OrganizerPublicProfile() {
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ FIX: FORCE VALID URL
+  // ✅ FORCE VALID URLS (handles anything user types)
   const fixUrl = (url, type) => {
     if (!url) return null;
 
     url = url.trim();
 
-    // already valid
     if (url.startsWith("http")) return url;
 
     if (type === "instagram") {
@@ -27,13 +26,8 @@ export default function OrganizerPublicProfile() {
     }
 
     if (type === "website") {
-      // handle cases like www.site.com OR site.com
-      if (url.startsWith("www.")) {
-        return `https://${url}`;
-      }
-      if (url.includes(".")) {
-        return `https://www.${url}`;
-      }
+      if (url.startsWith("www.")) return `https://${url}`;
+      if (url.includes(".")) return `https://www.${url}`;
       return `https://www.${url}.com`;
     }
 
@@ -85,17 +79,15 @@ export default function OrganizerPublicProfile() {
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* ✅ FIXED BUTTON (MATCHES VENDOR) */}
+        {/* ✅ PERFECT MATCH BUTTON (same as vendor) */}
         <button
           onClick={() => router.push("/organizer-profile")}
           style={{
-            padding: "10px 18px",
-            minWidth: 140,
-            textAlign: "center",
+            padding: "10px 14px",
             backgroundColor: "#701890",
             color: "white",
             border: "none",
-            borderRadius: 8,
+            borderRadius: 6,
             cursor: "pointer",
             fontWeight: "bold",
           }}
@@ -104,14 +96,14 @@ export default function OrganizerPublicProfile() {
         </button>
       </div>
 
-      {/* ✅ LOGO (RESTORED) */}
+      {/* ✅ LOGO */}
       {organizer.logo_url && (
         <img
           src={organizer.logo_url}
           alt="logo"
           style={{
-            width: 180,
-            height: 180,
+            width: 160,
+            height: 160,
             objectFit: "cover",
             borderRadius: 12,
             marginBottom: 20,
@@ -122,76 +114,4 @@ export default function OrganizerPublicProfile() {
       {/* INFO */}
       <div>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
-        <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
-      </div>
-
-      <p style={{ marginTop: 20 }}>{organizer.description}</p>
-
-      {/* TAGS */}
-      <div style={{ marginTop: 15 }}>
-        {organizer.tags?.map((tag) => (
-          <span
-            key={tag}
-            style={{
-              display: "inline-block",
-              marginRight: 8,
-              marginBottom: 8,
-              padding: "4px 10px",
-              background: "#eee",
-              borderRadius: 20,
-              fontSize: 12,
-            }}
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      {/* LINKS */}
-      <div style={{ marginTop: 25 }}>
-        <h3>Links</h3>
-
-        {organizer.website && (
-          <p>
-            <a href={fixUrl(organizer.website, "website")} target="_blank">
-              Website
-            </a>
-          </p>
-        )}
-
-        {organizer.instagram && (
-          <p>
-            <a href={fixUrl(organizer.instagram, "instagram")} target="_blank">
-              Instagram
-            </a>
-          </p>
-        )}
-
-        {organizer.facebook && (
-          <p>
-            <a href={fixUrl(organizer.facebook, "facebook")} target="_blank">
-              Facebook
-            </a>
-          </p>
-        )}
-      </div>
-
-      {/* BACK BUTTON */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
-        <button
-          onClick={() => router.back()}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#ccc",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          ← Back
-        </button>
-      </div>
-    </div>
-  );
-}
+        <p><strong
