@@ -64,14 +64,14 @@ export default function OrganizerPublicProfile() {
         <button
           onClick={goToEditProfile}
           style={{
-            padding: "10px 14px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+  padding: "10px 16px",
+  backgroundColor: "#701890",
+  color: "white",
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+  fontWeight: "bold",
+}}
         >
           Edit Profile
         </button>
