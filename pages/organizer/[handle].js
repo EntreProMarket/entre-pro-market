@@ -9,7 +9,7 @@ export default function OrganizerPublicProfile() {
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ FORCE VALID URLS (handles anything user types)
+  // ✅ FIX URLS
   const fixUrl = (url, type) => {
     if (!url) return null;
 
@@ -79,7 +79,7 @@ export default function OrganizerPublicProfile() {
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* ✅ PERFECT MATCH BUTTON (same as vendor) */}
+        {/* ✅ FINAL FIXED BUTTON (MATCHES VENDOR EXACTLY) */}
         <button
           onClick={() => router.push("/organizer-profile")}
           style={{
@@ -96,7 +96,7 @@ export default function OrganizerPublicProfile() {
         </button>
       </div>
 
-      {/* ✅ LOGO */}
+      {/* LOGO */}
       {organizer.logo_url && (
         <img
           src={organizer.logo_url}
@@ -113,5 +113,82 @@ export default function OrganizerPublicProfile() {
 
       {/* INFO */}
       <div>
-        <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
-        <p><strong
+        <p>
+          <strong>Category:</strong> {organizer.category || "N/A"}
+        </p>
+        <p>
+          <strong>Location:</strong> {organizer.city}, {organizer.state}
+        </p>
+      </div>
+
+      {/* DESCRIPTION */}
+      <p style={{ marginTop: 20 }}>{organizer.description}</p>
+
+      {/* TAGS */}
+      <div style={{ marginTop: 15 }}>
+        {organizer.tags?.map((tag) => (
+          <span
+            key={tag}
+            style={{
+              display: "inline-block",
+              marginRight: 8,
+              marginBottom: 8,
+              padding: "4px 10px",
+              background: "#eee",
+              borderRadius: 20,
+              fontSize: 12,
+            }}
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* LINKS */}
+      <div style={{ marginTop: 25 }}>
+        <h3>Links</h3>
+
+        {organizer.website && (
+          <p>
+            <a href={fixUrl(organizer.website, "website")} target="_blank">
+              Website
+            </a>
+          </p>
+        )}
+
+        {organizer.instagram && (
+          <p>
+            <a href={fixUrl(organizer.instagram, "instagram")} target="_blank">
+              Instagram
+            </a>
+          </p>
+        )}
+
+        {organizer.facebook && (
+          <p>
+            <a href={fixUrl(organizer.facebook, "facebook")} target="_blank">
+              Facebook
+            </a>
+          </p>
+        )}
+      </div>
+
+      {/* BACK BUTTON */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
+        <button
+          onClick={() => router.back()}
+          style={{
+            padding: "10px 14px",
+            backgroundColor: "#ccc",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          ← Back
+        </button>
+      </div>
+    </div>
+  );
+}
