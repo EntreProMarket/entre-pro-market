@@ -21,7 +21,6 @@ export default function DashboardLayout({ children }) {
       const user = data.user;
       setUser(user);
 
-      // 🔥 get profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -40,13 +39,39 @@ export default function DashboardLayout({ children }) {
     router.replace("/");
   };
 
-  // 🔒 LOCK: only vendors can access /vendor-profile
+  // ✅ ROLE-BASED DASHBOARD
+  const goToDashboard = () => {
+    if (profile?.role === "vendor") {
+      router.push("/vendor-dashboard");
+    } else if (profile?.role === "organizer") {
+      router.push("/organizer-dashboard");
+    } else {
+      router.push("/marketplace");
+    }
+  };
+
+  // ✅ ROLE-BASED PROFILE
+  const goToProfile = () => {
+    if (!profile?.handle) return;
+
+    if (profile.role === "vendor") {
+      router.push(`/vendor/${profile.handle}`);
+    } else if (profile.role === "organizer") {
+      router.push(`/organizer/${profile.handle}`);
+    }
+  };
+
+  // 🔒 LOCK (kept)
   useEffect(() => {
     if (!loading && profile) {
       const path = router.pathname;
 
       if (path === "/vendor-profile" && profile.role !== "vendor") {
-        router.replace("/"); // or marketplace
+        router.replace("/");
+      }
+
+      if (path === "/organizer-profile" && profile.role !== "organizer") {
+        router.replace("/");
       }
     }
   }, [loading, profile, router]);
@@ -69,22 +94,18 @@ export default function DashboardLayout({ children }) {
       >
         <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
-        {/* DASHBOARD */}
+        {/* ✅ FIXED DASHBOARD */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/vendor-dashboard")}
+          onClick={goToDashboard}
         >
           Dashboard
         </p>
 
-        {/* ✅ PROFILE (FIXED) */}
+        {/* ✅ FIXED PROFILE */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => {
-            if (profile?.handle) {
-              router.push(`/vendor/${profile.handle}`);
-            }
-          }}
+          onClick={goToProfile}
         >
           Profile
         </p>
@@ -140,4 +161,4 @@ export default function DashboardLayout({ children }) {
       </div>
     </div>
   );
-        }
+}
