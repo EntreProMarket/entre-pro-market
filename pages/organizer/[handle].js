@@ -8,6 +8,7 @@ export default function OrganizerPublicProfile() {
 
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     if (!handle) return;
@@ -38,38 +39,86 @@ export default function OrganizerPublicProfile() {
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
 
-      <h1>{organizer.organizer_name}</h1>
-      <p>@{organizer.handle}</p>
+      {/* HEADER */}
+      <div style={{ marginBottom: 20 }}>
+        <h1>{organizer.organizer_name || "Organizer"}</h1>
+        <p style={{ color: "#777" }}>@{organizer.handle}</p>
+      </div>
 
-      {organizer.logo_url && (
-        <img
-          src={organizer.logo_url}
-          alt="logo"
-          style={{ width: 140, borderRadius: 10, marginTop: 10 }}
-        />
-      )}
+      {/* CATEGORY + LOCATION */}
+      <div>
+        <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
+        <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
+      </div>
 
-      <p><strong>Event Type:</strong> {organizer.event_type}</p>
-      <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
-
+      {/* DESCRIPTION */}
       <p style={{ marginTop: 20 }}>{organizer.description}</p>
 
-      <div style={{ marginTop: 20 }}>
+      {/* TAGS */}
+      <div style={{ marginTop: 15 }}>
+        {organizer.tags?.map((tag) => (
+          <span
+            key={tag}
+            style={{
+              display: "inline-block",
+              marginRight: 8,
+              marginBottom: 8,
+              padding: "4px 10px",
+              background: "#eee",
+              borderRadius: 20,
+              fontSize: 12,
+            }}
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* LINKS */}
+      <div style={{ marginTop: 25 }}>
+        <h3>Links</h3>
+
         {organizer.website && (
-          <p><a href={organizer.website} target="_blank">Website</a></p>
+          <p>
+            <a href={organizer.website} target="_blank">
+              Website
+            </a>
+          </p>
         )}
+
         {organizer.instagram && (
-          <p><a href={organizer.instagram} target="_blank">Instagram</a></p>
+          <p>
+            <a href={organizer.instagram} target="_blank">
+              Instagram
+            </a>
+          </p>
         )}
+
         {organizer.facebook && (
-          <p><a href={organizer.facebook} target="_blank">Facebook</a></p>
+          <p>
+            <a href={organizer.facebook} target="_blank">
+              Facebook
+            </a>
+          </p>
         )}
       </div>
 
+      {/* BACK BUTTON (MATCHED STYLE) */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
-        <button onClick={() => router.back()}>← Back</button>
+        <button
+          onClick={() => router.back()}
+          style={{
+            padding: "10px 14px",
+            backgroundColor: "#ccc",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          ← Back
+        </button>
       </div>
-
     </div>
   );
 }
