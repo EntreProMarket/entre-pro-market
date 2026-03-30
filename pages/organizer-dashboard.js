@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import DashboardLayout from "../components/DashboardLayout"; // ✅ IMPORTANT
 
 export default function OrganizerDashboard() {
   const router = useRouter();
@@ -17,13 +18,13 @@ export default function OrganizerDashboard() {
         return;
       }
 
-      const { data: profileData, error } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
-      if (error || !profileData) {
+      if (!profileData) {
         router.push("/");
         return;
       }
@@ -35,25 +36,19 @@ export default function OrganizerDashboard() {
     loadProfile();
   }, [router]);
 
-  // ✅ SAFE PROFILE VIEW
   const goToProfile = () => {
-    if (!profile?.handle) {
-      alert("Profile not set up yet");
-      return;
-    }
-
+    if (!profile?.handle) return;
     router.push(`/organizer/${profile.handle}`);
   };
 
-  // ✅ EDIT PAGE
   const goToEdit = () => {
     router.push("/organizer-profile");
   };
 
-  if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
+  if (loading) return <div>Loading...</div>;
 
   return (
-    <div style={{ padding: 20 }}>
+    <DashboardLayout> {/* ✅ NOW MATCHES VENDOR */}
       <h1>Organizer Dashboard</h1>
 
       <p>Welcome, {profile.organizer_name || "Organizer"}</p>
@@ -89,6 +84,6 @@ export default function OrganizerDashboard() {
           Edit Profile
         </button>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
