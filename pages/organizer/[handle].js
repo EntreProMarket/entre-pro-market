@@ -9,7 +9,7 @@ export default function OrganizerPublicProfile() {
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ FIX URLS
+  // ✅ FIX URLS (handles anything user types)
   const fixUrl = (url, type) => {
     if (!url) return null;
 
@@ -79,7 +79,7 @@ export default function OrganizerPublicProfile() {
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* ✅ FINAL FIXED BUTTON (MATCHES VENDOR EXACTLY) */}
+        {/* ✅ FINAL BUTTON (MATCHES VENDOR EXACTLY) */}
         <button
           onClick={() => router.push("/organizer-profile")}
           style={{
@@ -90,6 +90,7 @@ export default function OrganizerPublicProfile() {
             borderRadius: 6,
             cursor: "pointer",
             fontWeight: "bold",
+            whiteSpace: "nowrap", // ✅ PREVENTS STACKING (fixes square issue)
           }}
         >
           Edit Profile
@@ -150,7 +151,11 @@ export default function OrganizerPublicProfile() {
 
         {organizer.website && (
           <p>
-            <a href={fixUrl(organizer.website, "website")} target="_blank">
+            <a
+              href={fixUrl(organizer.website, "website")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Website
             </a>
           </p>
@@ -158,7 +163,11 @@ export default function OrganizerPublicProfile() {
 
         {organizer.instagram && (
           <p>
-            <a href={fixUrl(organizer.instagram, "instagram")} target="_blank">
+            <a
+              href={fixUrl(organizer.instagram, "instagram")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Instagram
             </a>
           </p>
@@ -166,7 +175,11 @@ export default function OrganizerPublicProfile() {
 
         {organizer.facebook && (
           <p>
-            <a href={fixUrl(organizer.facebook, "facebook")} target="_blank">
+            <a
+              href={fixUrl(organizer.facebook, "facebook")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Facebook
             </a>
           </p>
@@ -174,7 +187,13 @@ export default function OrganizerPublicProfile() {
       </div>
 
       {/* BACK BUTTON */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginTop: 40,
+        }}
+      >
         <button
           onClick={() => router.back()}
           style={{
@@ -182,13 +201,4 @@ export default function OrganizerPublicProfile() {
             backgroundColor: "#ccc",
             border: "none",
             borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          ← Back
-        </button>
-      </div>
-    </div>
-  );
-}
+            cursor:
