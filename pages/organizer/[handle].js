@@ -9,20 +9,27 @@ export default function OrganizerPublicProfile() {
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ FIX: FORCE VALID URL
   const fixUrl = (url, type) => {
     if (!url) return null;
+
     url = url.trim();
 
     if (url.startsWith("http")) return url;
 
-    if (type === "instagram") return `https://instagram.com/${url.replace("@", "")}`;
-    if (type === "facebook") return `https://facebook.com/${url}`;
+    if (type === "instagram") {
+      return `https://instagram.com/${url.replace("@", "")}`;
+    }
+
+    if (type === "facebook") {
+      return `https://facebook.com/${url}`;
+    }
+
     if (type === "website") {
       if (url.startsWith("www.")) return `https://${url}`;
       if (url.includes(".")) return `https://www.${url}`;
       return `https://www.${url}.com`;
     }
+
     return url;
   };
 
@@ -71,19 +78,18 @@ export default function OrganizerPublicProfile() {
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* ✅ RECTANGLE BUTTON (matches Vendor) */}
+        {/* ✅ EXACT MATCH BUTTON (NO GUESSING) */}
         <button
           onClick={() => router.push("/organizer-profile")}
           style={{
-            padding: "10px 18px",
-            minWidth: 140,
-            textAlign: "center",
+            padding: "10px 14px",
             backgroundColor: "#701890",
             color: "white",
             border: "none",
-            borderRadius: 8,
+            borderRadius: 6,
             cursor: "pointer",
             fontWeight: "bold",
+            whiteSpace: "nowrap",
           }}
         >
           Edit Profile
@@ -96,8 +102,8 @@ export default function OrganizerPublicProfile() {
           src={organizer.logo_url}
           alt="logo"
           style={{
-            width: 180,
-            height: 180,
+            width: 160,
+            height: 160,
             objectFit: "cover",
             borderRadius: 12,
             marginBottom: 20,
@@ -136,6 +142,7 @@ export default function OrganizerPublicProfile() {
       {/* LINKS */}
       <div style={{ marginTop: 25 }}>
         <h3>Links</h3>
+
         {organizer.website && (
           <p>
             <a href={fixUrl(organizer.website, "website")} target="_blank" rel="noopener noreferrer">
@@ -143,6 +150,7 @@ export default function OrganizerPublicProfile() {
             </a>
           </p>
         )}
+
         {organizer.instagram && (
           <p>
             <a href={fixUrl(organizer.instagram, "instagram")} target="_blank" rel="noopener noreferrer">
@@ -150,6 +158,7 @@ export default function OrganizerPublicProfile() {
             </a>
           </p>
         )}
+
         {organizer.facebook && (
           <p>
             <a href={fixUrl(organizer.facebook, "facebook")} target="_blank" rel="noopener noreferrer">
@@ -159,16 +168,15 @@ export default function OrganizerPublicProfile() {
         )}
       </div>
 
-      {/* BACK BUTTON (matches Vendor) */}
+      {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button
           onClick={() => router.back()}
           style={{
-            padding: "10px 18px",
-            minWidth: 140,
+            padding: "10px 14px",
             backgroundColor: "#ccc",
             border: "none",
-            borderRadius: 8,
+            borderRadius: 6,
             cursor: "pointer",
             fontWeight: "bold",
           }}
