@@ -9,12 +9,35 @@ export default function OrganizerPublicProfile() {
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ EDIT BUTTON (TOP RIGHT)
-  const goToEditProfile = async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data?.user) return;
+  // ✅ FIX: FORCE VALID URL
+  const fixUrl = (url, type) => {
+    if (!url) return null;
 
-    router.push("/organizer-profile");
+    url = url.trim();
+
+    // already valid
+    if (url.startsWith("http")) return url;
+
+    if (type === "instagram") {
+      return `https://instagram.com/${url.replace("@", "")}`;
+    }
+
+    if (type === "facebook") {
+      return `https://facebook.com/${url}`;
+    }
+
+    if (type === "website") {
+      // handle cases like www.site.com OR site.com
+      if (url.startsWith("www.")) {
+        return `https://${url}`;
+      }
+      if (url.includes(".")) {
+        return `https://www.${url}`;
+      }
+      return `https://www.${url}.com`;
+    }
+
+    return url;
   };
 
   useEffect(() => {
@@ -56,34 +79,52 @@ export default function OrganizerPublicProfile() {
         }}
       >
         <div>
-          <h1>{organizer.organizer_name || "Organizer"}</h1>
+          <h1 style={{ marginBottom: 5 }}>
+            {organizer.organizer_name || "Organizer"}
+          </h1>
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* ✅ EDIT BUTTON */}
+        {/* ✅ FIXED BUTTON (MATCHES VENDOR) */}
         <button
-          onClick={goToEditProfile}
+          onClick={() => router.push("/organizer-profile")}
           style={{
-  padding: "10px 16px",
-  backgroundColor: "#701890",
-  color: "white",
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontWeight: "bold",
-}}
+            padding: "10px 18px",
+            minWidth: 140,
+            textAlign: "center",
+            backgroundColor: "#701890",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
         >
           Edit Profile
         </button>
       </div>
 
-      {/* CATEGORY + LOCATION */}
+      {/* ✅ LOGO (RESTORED) */}
+      {organizer.logo_url && (
+        <img
+          src={organizer.logo_url}
+          alt="logo"
+          style={{
+            width: 180,
+            height: 180,
+            objectFit: "cover",
+            borderRadius: 12,
+            marginBottom: 20,
+          }}
+        />
+      )}
+
+      {/* INFO */}
       <div>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
         <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
       </div>
 
-      {/* DESCRIPTION */}
       <p style={{ marginTop: 20 }}>{organizer.description}</p>
 
       {/* TAGS */}
@@ -112,7 +153,7 @@ export default function OrganizerPublicProfile() {
 
         {organizer.website && (
           <p>
-            <a href={organizer.website} target="_blank">
+            <a href={fixUrl(organizer.website, "website")} target="_blank">
               Website
             </a>
           </p>
@@ -120,7 +161,7 @@ export default function OrganizerPublicProfile() {
 
         {organizer.instagram && (
           <p>
-            <a href={organizer.instagram} target="_blank">
+            <a href={fixUrl(organizer.instagram, "instagram")} target="_blank">
               Instagram
             </a>
           </p>
@@ -128,14 +169,14 @@ export default function OrganizerPublicProfile() {
 
         {organizer.facebook && (
           <p>
-            <a href={organizer.facebook} target="_blank">
+            <a href={fixUrl(organizer.facebook, "facebook")} target="_blank">
               Facebook
             </a>
           </p>
         )}
       </div>
 
-      {/* ✅ BACK BUTTON (MATCHED STYLE + RIGHT SIDE) */}
+      {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button
           onClick={() => router.back()}
