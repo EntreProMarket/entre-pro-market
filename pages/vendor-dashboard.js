@@ -9,7 +9,7 @@ export default function VendorDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
+    const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data?.user;
 
@@ -20,7 +20,7 @@ export default function VendorDashboard() {
 
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("*")
+        .select("business_name")
         .eq("id", user.id)
         .single();
 
@@ -28,36 +28,15 @@ export default function VendorDashboard() {
       setLoading(false);
     };
 
-    load();
+    loadUser();
   }, [router]);
-
-  const goToProfile = () => {
-    if (!profile?.handle) return;
-    router.push(`/vendor/${profile.handle}`);
-  };
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
     <DashboardLayout>
       <h1>Vendor Dashboard</h1>
-      <p>Welcome, {profile.business_name}</p>
-
-      <button
-        onClick={goToProfile}
-        style={{
-          marginTop: 20,
-          padding: "10px 14px",
-          backgroundColor: "#701890",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          fontWeight: "bold",
-          cursor: "pointer",
-        }}
-      >
-        View Profile
-      </button>
+      <p>Welcome, {profile?.business_name || "Vendor"}</p>
     </DashboardLayout>
   );
 }
