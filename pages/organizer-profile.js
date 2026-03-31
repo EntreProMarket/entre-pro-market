@@ -107,8 +107,8 @@ export default function OrganizerProfile() {
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
       
-      {/* ✅ CORRECT TITLE */}
-      <h1 style={{ marginBottom: 20 }}>Organizer Profile</h1>
+      {/* ✅ THIS WILL NOW STAY FIXED */}
+      <h1>Organizer Profile</h1>
 
       <input placeholder="Organizer Name" value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} />
       <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
@@ -136,32 +136,11 @@ export default function OrganizerProfile() {
 
       <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between" }}>
         
-        <button
-          onClick={() => router.back()}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#ccc",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
+        <button onClick={() => router.back()}>
           ← Back
         </button>
 
-        <button
-          onClick={handleSave}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
+        <button onClick={handleSave}>
           Save Profile
         </button>
       </div>
