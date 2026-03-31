@@ -5,7 +5,6 @@ import DashboardLayout from "../components/DashboardLayout";
 
 export default function VendorDashboard() {
   const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
 
@@ -37,14 +36,9 @@ export default function VendorDashboard() {
     loadUser();
   }, [router]);
 
-  // ✅ THIS IS THE FIX
   const goToProfile = () => {
     if (!profile?.handle) return;
     router.push(`/vendor/${profile.handle}`);
-  };
-
-  const goToEdit = () => {
-    router.push("/vendor-profile");
   };
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
@@ -55,24 +49,10 @@ export default function VendorDashboard() {
 
       <p>Welcome, {profile.business_name || "Vendor"}</p>
 
+      {/* ✅ ONLY BUTTON */}
       <div style={{ marginTop: 20 }}>
         <button
           onClick={goToProfile}
-          style={{
-            marginRight: 10,
-            padding: "10px 14px",
-            backgroundColor: "#ccc",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          View Profile
-        </button>
-
-        <button
-          onClick={goToEdit}
           style={{
             padding: "10px 14px",
             backgroundColor: "#701890",
@@ -83,9 +63,9 @@ export default function VendorDashboard() {
             fontWeight: "bold",
           }}
         >
-          Edit Profile
+          View Profile
         </button>
       </div>
     </DashboardLayout>
   );
-      }
+}
