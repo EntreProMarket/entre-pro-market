@@ -5,67 +5,53 @@ import DashboardLayout from "../components/DashboardLayout";
 
 export default function VendorDashboard() {
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      const user = data?.user;
+    checkAccess();
+  }, []);
 
-      if (!user) {
-        router.replace("/");
-        return;
-      }
+  const checkAccess = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData?.user;
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+    // ❌ Not logged in
+    if (!currentUser) {
+      router.replace("/");
+      return;
+    }
 
-      if (!profileData) {
-        router.replace("/");
-        return;
-      }
+    // ✅ Check role
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", currentUser.id)
+      .single();
 
-      setProfile(profileData);
-      setLoading(false);
-    };
+    if (error) {
+      router.replace("/");
+      return;
+    }
 
-    loadUser();
-  }, [router]);
+    // ❌ Not a vendor → block access
+    if (profile?.role !== "vendor") {
+      router.replace("/");
+      return;
+    }
 
-  const goToProfile = () => {
-    if (!profile?.handle) return;
-    router.push(`/vendor/${profile.handle}`);
+    // ✅ Authorized
+    setUser(currentUser);
+    setLoading(false);
   };
 
-  if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
+  // ⏳ Loading state while checking access
+  if (loading) return <div>Loading...</div>;
 
   return (
     <DashboardLayout>
       <h1>Vendor Dashboard</h1>
-
-      <p>Welcome, {profile.business_name || "Vendor"}</p>
-
-      {/* ✅ ONLY BUTTON */}
-      <div style={{ marginTop: 20 }}>
-        <button
-          onClick={goToProfile}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          View Profile
-        </button>
-      </div>
+      <p>Logged in as: {user.email}</p>
     </DashboardLayout>
   );
 }
