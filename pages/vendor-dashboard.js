@@ -5,53 +5,59 @@ import DashboardLayout from "../components/DashboardLayout";
 
 export default function VendorDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAccess();
-  }, []);
+    const load = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
 
-  const checkAccess = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const currentUser = userData?.user;
+      if (!user) {
+        router.replace("/");
+        return;
+      }
 
-    // ❌ Not logged in
-    if (!currentUser) {
-      router.replace("/");
-      return;
-    }
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-    // ✅ Check role
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", currentUser.id)
-      .single();
+      setProfile(profileData);
+      setLoading(false);
+    };
 
-    if (error) {
-      router.replace("/");
-      return;
-    }
+    load();
+  }, [router]);
 
-    // ❌ Not a vendor → block access
-    if (profile?.role !== "vendor") {
-      router.replace("/");
-      return;
-    }
-
-    // ✅ Authorized
-    setUser(currentUser);
-    setLoading(false);
+  const goToProfile = () => {
+    if (!profile?.handle) return;
+    router.push(`/vendor/${profile.handle}`);
   };
 
-  // ⏳ Loading state while checking access
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
     <DashboardLayout>
       <h1>Vendor Dashboard</h1>
-      <p>Logged in as: {user.email}</p>
+      <p>Welcome, {profile.business_name}</p>
+
+      <button
+        onClick={goToProfile}
+        style={{
+          marginTop: 20,
+          padding: "10px 14px",
+          backgroundColor: "#701890",
+          color: "white",
+          border: "none",
+          borderRadius: 6,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        View Profile
+      </button>
     </DashboardLayout>
   );
 }
