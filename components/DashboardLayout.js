@@ -61,7 +61,7 @@ export default function DashboardLayout({ children }) {
     }
   };
 
-  // 🔒 LOCK (kept)
+  // 🔒 LOCK
   useEffect(() => {
     if (!loading && profile) {
       const path = router.pathname;
@@ -75,6 +75,24 @@ export default function DashboardLayout({ children }) {
       }
     }
   }, [loading, profile, router]);
+
+  // ✅ DYNAMIC TITLE (FIXES YOUR ISSUE)
+  const getTitle = () => {
+    switch (router.pathname) {
+      case "/vendor-profile":
+        return "Vendor Profile";
+      case "/organizer-profile":
+        return "Organizer Profile";
+      case "/vendor-dashboard":
+        return "Vendor Dashboard";
+      case "/organizer-dashboard":
+        return "Organizer Dashboard";
+      case "/marketplace":
+        return "Marketplace";
+      default:
+        return "Dashboard";
+    }
+  };
 
   if (loading) {
     return <div style={{ padding: 30 }}>Loading...</div>;
@@ -94,7 +112,6 @@ export default function DashboardLayout({ children }) {
       >
         <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
-        {/* ✅ FIXED DASHBOARD */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={goToDashboard}
@@ -102,7 +119,6 @@ export default function DashboardLayout({ children }) {
           Dashboard
         </p>
 
-        {/* ✅ FIXED PROFILE */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={goToProfile}
@@ -110,7 +126,6 @@ export default function DashboardLayout({ children }) {
           Profile
         </p>
 
-        {/* MESSAGES */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/messages")}
@@ -118,7 +133,6 @@ export default function DashboardLayout({ children }) {
           Messages
         </p>
 
-        {/* SETTINGS */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/settings")}
@@ -139,7 +153,10 @@ export default function DashboardLayout({ children }) {
             borderBottom: "1px solid #eee",
           }}
         >
-          <div style={{ fontWeight: "bold" }}>Dashboard</div>
+          {/* ✅ FIXED TITLE */}
+          <div style={{ fontWeight: "bold" }}>
+            {getTitle()}
+          </div>
 
           <button
             onClick={logout}
