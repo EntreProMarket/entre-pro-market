@@ -4,13 +4,10 @@ import { useEffect, useState } from "react";
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
-
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const init = async () => {
+    const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
 
       if (!data?.user) {
@@ -18,20 +15,10 @@ export default function DashboardLayout({ children }) {
         return;
       }
 
-      const user = data.user;
-      setUser(user);
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      setProfile(profileData);
-      setLoading(false);
+      setUser(data.user);
     };
 
-    init();
+    checkUser();
   }, [router]);
 
   const logout = async () => {
@@ -39,62 +26,7 @@ export default function DashboardLayout({ children }) {
     router.replace("/");
   };
 
-  // ✅ ROLE-BASED DASHBOARD
-  const goToDashboard = () => {
-    if (profile?.role === "vendor") {
-      router.push("/vendor-dashboard");
-    } else if (profile?.role === "organizer") {
-      router.push("/organizer-dashboard");
-    } else {
-      router.push("/marketplace");
-    }
-  };
-
-  // ✅ ROLE-BASED PROFILE
-  const goToProfile = () => {
-    if (!profile?.handle) return;
-
-    if (profile.role === "vendor") {
-      router.push(`/vendor/${profile.handle}`);
-    } else if (profile.role === "organizer") {
-      router.push(`/organizer/${profile.handle}`);
-    }
-  };
-
-  // 🔒 LOCK
-  useEffect(() => {
-    if (!loading && profile) {
-      const path = router.pathname;
-
-      if (path === "/vendor-profile" && profile.role !== "vendor") {
-        router.replace("/");
-      }
-
-      if (path === "/organizer-profile" && profile.role !== "organizer") {
-        router.replace("/");
-      }
-    }
-  }, [loading, profile, router]);
-
-  // ✅ DYNAMIC TITLE (FIXES YOUR ISSUE)
-  const getTitle = () => {
-    switch (router.pathname) {
-      case "/vendor-profile":
-        return "Vendor Profile";
-      case "/organizer-profile":
-        return "Organizer Profile";
-      case "/vendor-dashboard":
-        return "Vendor Dashboard";
-      case "/organizer-dashboard":
-        return "Organizer Dashboard";
-      case "/marketplace":
-        return "Marketplace";
-      default:
-        return "Dashboard";
-    }
-  };
-
-  if (loading) {
+  if (!user) {
     return <div style={{ padding: 30 }}>Loading...</div>;
   }
 
@@ -114,14 +46,15 @@ export default function DashboardLayout({ children }) {
 
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={goToDashboard}
+          onClick={() => router.push("/vendor-dashboard")}
         >
           Dashboard
         </p>
 
+        {/* ✅ FIXED PROFILE BUTTON */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={goToProfile}
+          onClick={() => router.push("/vendor-profile")}
         >
           Profile
         </p>
@@ -153,10 +86,7 @@ export default function DashboardLayout({ children }) {
             borderBottom: "1px solid #eee",
           }}
         >
-          {/* ✅ FIXED TITLE */}
-          <div style={{ fontWeight: "bold" }}>
-            {getTitle()}
-          </div>
+          <div style={{ fontWeight: "bold" }}>Dashboard</div>
 
           <button
             onClick={logout}
