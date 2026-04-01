@@ -8,17 +8,16 @@ export default function VendorPublicProfile() {
 
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState(null); // ✅ restore enlarge
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     if (!handle) return;
 
-    const fetchData = async () => {
-      // 🔹 get logged-in user
+    const fetchVendor = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
 
-      // 🔹 get vendor profile
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -33,7 +32,6 @@ export default function VendorPublicProfile() {
 
       setVendor(data);
 
-      // 🔥 OWNER CHECK
       if (user && data.id === user.id) {
         setIsOwner(true);
       }
@@ -41,7 +39,7 @@ export default function VendorPublicProfile() {
       setLoading(false);
     };
 
-    fetchData();
+    fetchVendor();
   }, [handle]);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
@@ -64,10 +62,10 @@ export default function VendorPublicProfile() {
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
 
-        {/* ✅ ONLY OWNER SEES THIS */}
+        {/* ✅ OWNER ONLY EDIT BUTTON */}
         {isOwner && (
           <button
-            onClick={() => router.push("/vendor-profile")} // ✅ CORRECT EDIT PAGE
+            onClick={() => router.push("/vendor-profile")}
             style={{
               padding: "10px 14px",
               backgroundColor: "#701890",
@@ -83,17 +81,19 @@ export default function VendorPublicProfile() {
         )}
       </div>
 
-      {/* LOGO */}
+      {/* LOGO (CLICKABLE AGAIN) */}
       {vendor.logo_url && (
         <img
           src={vendor.logo_url}
           alt="logo"
+          onClick={() => setSelectedImage(vendor.logo_url)}
           style={{
             width: 160,
             height: 160,
             objectFit: "cover",
             borderRadius: 12,
             marginBottom: 20,
+            cursor: "pointer",
           }}
         />
       )}
@@ -162,7 +162,40 @@ export default function VendorPublicProfile() {
         )}
       </div>
 
-      {/* BACK BUTTON (RIGHT SIDE) */}
+      {/* PORTFOLIO (CLICKABLE AGAIN) */}
+      <div style={{ marginTop: 30 }}>
+        <h3>Portfolio</h3>
+
+        {vendor.portfolio_images && vendor.portfolio_images.length > 0 ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {vendor.portfolio_images.map((img, i) => (
+              <img
+                key={i}
+                src={img}
+                alt="portfolio"
+                onClick={() => setSelectedImage(img)}
+                style={{
+                  width: "100%",
+                  height: 150,
+                  objectFit: "cover",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <p>No portfolio images yet.</p>
+        )}
+      </div>
+
+      {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button
           onClick={() => router.back()}
@@ -178,6 +211,35 @@ export default function VendorPublicProfile() {
           ← Back
         </button>
       </div>
+
+      {/* FULLSCREEN IMAGE VIEW (RESTORED) */}
+      {selectedImage && (
+        <div
+          onClick={() => setSelectedImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.85)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <img
+            src={selectedImage}
+            alt="enlarged"
+            style={{
+              maxWidth: "90%",
+              maxHeight: "90%",
+              borderRadius: 10,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
