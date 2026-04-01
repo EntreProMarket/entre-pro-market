@@ -78,30 +78,28 @@ export default function DashboardLayout({ children }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         
         {/* TOP BAR */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "15px 20px",
-            borderBottom: "1px solid #eee",
-          }}
-        >
-          <div style={{ fontWeight: "bold" }}>Dashboard</div>
-
-          <button
-            onClick={logout}
-            style={{
-              padding: "8px 12px",
-              backgroundColor: "#701890",
-              color: "white",
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
-          >
-            Log Out
-          </button>
-        </div>
+<div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end", // ✅ pushes everything right
+    padding: "15px 20px",
+    borderBottom: "1px solid #eee",
+  }}
+>
+  <button
+    onClick={logout}
+    style={{
+      padding: "8px 12px",
+      backgroundColor: "#701890",
+      color: "white",
+      border: "none",
+      borderRadius: 6,
+      cursor: "pointer",
+    }}
+  >
+    Log Out
+  </button>
+</div>
 
         {/* CONTENT */}
         <div style={{ padding: 20 }}>{children}</div>
