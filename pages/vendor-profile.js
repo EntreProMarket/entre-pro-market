@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useRouter } from "next/router";
 
 export default function VendorProfile() {
-  const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -29,7 +26,7 @@ export default function VendorProfile() {
   useEffect(() => {
     const loadProfile = async () => {
       const { data } = await supabase.auth.getUser();
-      const user = data?.user;
+      const user = data.user;
       if (!user) return;
 
       const { data: profile } = await supabase
@@ -82,7 +79,7 @@ export default function VendorProfile() {
   const handleSave = async () => {
     setMessage("Saving...");
     const { data } = await supabase.auth.getUser();
-    const user = data?.user;
+    const user = data.user;
     if (!user) return;
 
     const { data: existing } = await supabase
@@ -141,39 +138,24 @@ export default function VendorProfile() {
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
-      
-      {/* ✅ HEADER WITH VIEW PROFILE BUTTON */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <h1>Vendor Profile</h1>
-
-        <button
-          onClick={() => router.push(`/vendor/${handle}`)}
-          style={{
-            padding: "10px 18px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          View Profile
-        </button>
-      </div>
-
+      <h1>Vendor Profile</h1>
       {message && <p>{message}</p>}
 
-      <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
-      <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
-      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
+      <input
+        placeholder="Business Name"
+        value={businessName}
+        onChange={(e) => setBusinessName(e.target.value)}
+      />
+      <input
+        placeholder="Handle"
+        value={handle}
+        onChange={(e) => setHandle(e.target.value)}
+      />
+      <input
+        placeholder="Category"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+      />
 
       <form onSubmit={addTag}>
         <input
@@ -185,34 +167,89 @@ export default function VendorProfile() {
 
       <div>
         {tags.map((t) => (
-          <span key={t} onClick={() => removeTag(t)} style={{ marginRight: 5, cursor: "pointer" }}>
+          <span
+            key={t}
+            onClick={() => removeTag(t)}
+            style={{ marginRight: 5, cursor: "pointer" }}
+          >
             {t} ×
           </span>
         ))}
       </div>
 
-      <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
-      <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+      <input
+        placeholder="City"
+        value={city}
+        onChange={(e) => setCity(e.target.value)}
+      />
+      <input
+        placeholder="State"
+        value={state}
+        onChange={(e) => setState(e.target.value)}
+      />
 
-      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
+      <textarea
+        placeholder="Description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+      />
 
-      <div style={{ background: "#ffe5e5", color: "#b30000", padding: 10, marginTop: 20 }}>
+      {/* 🔴 RED WARNING (KEPT) */}
+      <div
+        style={{
+          background: "#ffe5e5",
+          color: "#b30000",
+          padding: 10,
+          marginTop: 20,
+        }}
+      >
         ⚠️ Links must be public or they may not open correctly.
       </div>
 
-      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
-      <input placeholder="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-      <input placeholder="Facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
-      <input placeholder="TikTok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
-      <input placeholder="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+      <input
+        placeholder="Website"
+        value={website}
+        onChange={(e) => setWebsite(e.target.value)}
+      />
+      <input
+        placeholder="Instagram"
+        value={instagram}
+        onChange={(e) => setInstagram(e.target.value)}
+      />
+      <input
+        placeholder="Facebook"
+        value={facebook}
+        onChange={(e) => setFacebook(e.target.value)}
+      />
+      <input
+        placeholder="TikTok"
+        value={tiktok}
+        onChange={(e) => setTiktok(e.target.value)}
+      />
+      <input
+        placeholder="YouTube"
+        value={youtube}
+        onChange={(e) => setYoutube(e.target.value)}
+      />
 
       <p>Logo</p>
       <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
 
       <p>Portfolio</p>
-      <input type="file" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
+      <input
+        type="file"
+        multiple
+        onChange={(e) => setPortfolioFiles(Array.from(e.target.files))}
+      />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+          marginTop: 20,
+        }}
+      >
         <button
           onClick={() => window.history.back()}
           style={{
