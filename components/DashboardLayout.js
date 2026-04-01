@@ -44,6 +44,7 @@ export default function DashboardLayout({ children }) {
       >
         <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
+        {/* DASHBOARD */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/vendor-dashboard")}
@@ -51,14 +52,33 @@ export default function DashboardLayout({ children }) {
           Dashboard
         </p>
 
-        {/* ✅ FIXED PROFILE BUTTON */}
+        {/* ✅ PROFILE → PUBLIC PROFILE */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/vendor-profile")}
+          onClick={async () => {
+            const { data } = await supabase.auth.getUser();
+            const user = data?.user;
+            if (!user) return;
+
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("handle, role")
+              .eq("id", user.id)
+              .single();
+
+            if (!profile?.handle) return;
+
+            if (profile.role === "vendor") {
+              router.push(`/vendor/${profile.handle}`);
+            } else if (profile.role === "organizer") {
+              router.push(`/organizer/${profile.handle}`);
+            }
+          }}
         >
           Profile
         </p>
 
+        {/* MESSAGES */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/messages")}
@@ -66,6 +86,7 @@ export default function DashboardLayout({ children }) {
           Messages
         </p>
 
+        {/* SETTINGS */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
           onClick={() => router.push("/settings")}
@@ -78,28 +99,28 @@ export default function DashboardLayout({ children }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         
         {/* TOP BAR */}
-<div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end", // ✅ pushes everything right
-    padding: "15px 20px",
-    borderBottom: "1px solid #eee",
-  }}
->
-  <button
-    onClick={logout}
-    style={{
-      padding: "8px 12px",
-      backgroundColor: "#701890",
-      color: "white",
-      border: "none",
-      borderRadius: 6,
-      cursor: "pointer",
-    }}
-  >
-    Log Out
-  </button>
-</div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "15px 20px",
+            borderBottom: "1px solid #eee",
+          }}
+        >
+          <button
+            onClick={logout}
+            style={{
+              padding: "8px 12px",
+              backgroundColor: "#701890",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
+          >
+            Log Out
+          </button>
+        </div>
 
         {/* CONTENT */}
         <div style={{ padding: 20 }}>{children}</div>
