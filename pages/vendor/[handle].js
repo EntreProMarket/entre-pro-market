@@ -8,32 +8,17 @@ export default function VendorPublicProfile() {
 
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null);
-
-  // ✅ NEW: Role-based edit navigation
-  const goToEditProfile = async () => {
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-
-    if (!user) return;
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_type")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.account_type === "vendor") {
-      router.push("/vendor-profile");
-    } else {
-      router.push("/organizer-profile");
-    }
-  };
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     if (!handle) return;
 
-    const fetchVendor = async () => {
+    const fetchData = async () => {
+      // 🔹 get logged-in user
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+
+      // 🔹 get vendor profile
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -47,10 +32,16 @@ export default function VendorPublicProfile() {
       }
 
       setVendor(data);
+
+      // 🔥 OWNER CHECK
+      if (user && data.id === user.id) {
+        setIsOwner(true);
+      }
+
       setLoading(false);
     };
 
-    fetchVendor();
+    fetchData();
   }, [handle]);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
@@ -73,21 +64,23 @@ export default function VendorPublicProfile() {
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
 
-        {/* ✅ FIXED BUTTON */}
-        <button
-          onClick={goToEditProfile}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          Edit Profile
-        </button>
+        {/* ✅ ONLY OWNER SEES THIS */}
+        {isOwner && (
+          <button
+            onClick={() => router.push("/vendor-profile")} // ✅ CORRECT EDIT PAGE
+            style={{
+              padding: "10px 14px",
+              backgroundColor: "#701890",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            Edit Profile
+          </button>
+        )}
       </div>
 
       {/* LOGO */}
@@ -95,19 +88,17 @@ export default function VendorPublicProfile() {
         <img
           src={vendor.logo_url}
           alt="logo"
-          onClick={() => setSelectedImage(vendor.logo_url)}
           style={{
-            width: 180, // slightly larger (you asked earlier)
-            height: 180,
+            width: 160,
+            height: 160,
             objectFit: "cover",
             borderRadius: 12,
             marginBottom: 20,
-            cursor: "pointer",
           }}
         />
       )}
 
-      {/* CATEGORY + LOCATION */}
+      {/* INFO */}
       <div>
         <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
         <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
@@ -142,79 +133,36 @@ export default function VendorPublicProfile() {
 
         {vendor.website && (
           <p>
-            <a href={vendor.website} target="_blank" rel="noopener noreferrer">
-              Website
-            </a>
+            <a href={vendor.website} target="_blank">Website</a>
           </p>
         )}
 
         {vendor.instagram && (
           <p>
-            <a href={vendor.instagram} target="_blank" rel="noopener noreferrer">
-              Instagram
-            </a>
+            <a href={vendor.instagram} target="_blank">Instagram</a>
           </p>
         )}
 
         {vendor.facebook && (
           <p>
-            <a href={vendor.facebook} target="_blank" rel="noopener noreferrer">
-              Facebook
-            </a>
+            <a href={vendor.facebook} target="_blank">Facebook</a>
           </p>
         )}
 
         {vendor.tiktok && (
           <p>
-            <a href={vendor.tiktok} target="_blank" rel="noopener noreferrer">
-              TikTok
-            </a>
+            <a href={vendor.tiktok} target="_blank">TikTok</a>
           </p>
         )}
 
         {vendor.youtube && (
           <p>
-            <a href={vendor.youtube} target="_blank" rel="noopener noreferrer">
-              YouTube
-            </a>
+            <a href={vendor.youtube} target="_blank">YouTube</a>
           </p>
         )}
       </div>
 
-      {/* PORTFOLIO */}
-      <div style={{ marginTop: 30 }}>
-        <h3>Portfolio</h3>
-
-        {vendor.portfolio_images && vendor.portfolio_images.length > 0 ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-              gap: 10,
-            }}
-          >
-            {vendor.portfolio_images.map((img, i) => (
-              <img
-                key={i}
-                src={img}
-                alt="portfolio"
-                onClick={() => setSelectedImage(img)}
-                style={{
-                  width: "100%",
-                  height: 150,
-                  objectFit: "cover",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <p>No portfolio images yet.</p>
-        )}
-      </div>
-
-      {/* BACK BUTTON (BOTTOM RIGHT) */}
+      {/* BACK BUTTON (RIGHT SIDE) */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button
           onClick={() => router.back()}
@@ -230,35 +178,6 @@ export default function VendorPublicProfile() {
           ← Back
         </button>
       </div>
-
-      {/* FULLSCREEN IMAGE VIEW */}
-      {selectedImage && (
-        <div
-          onClick={() => setSelectedImage(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.85)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 9999,
-          }}
-        >
-          <img
-            src={selectedImage}
-            alt="enlarged"
-            style={{
-              maxWidth: "90%",
-              maxHeight: "90%",
-              borderRadius: 10,
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
