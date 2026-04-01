@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -16,6 +17,14 @@ export default function DashboardLayout({ children }) {
       }
 
       setUser(data.user);
+
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", data.user.id)
+        .single();
+
+      setProfile(profileData);
     };
 
     checkUser();
@@ -26,7 +35,16 @@ export default function DashboardLayout({ children }) {
     router.replace("/");
   };
 
-  if (!user) {
+  // ✅ FIXED DASHBOARD LINK
+  const goToDashboard = () => {
+    if (profile?.role === "vendor") {
+      router.push("/vendor-dashboard");
+    } else if (profile?.role === "organizer") {
+      router.push("/organizer-dashboard");
+    }
+  };
+
+  if (!user || !profile) {
     return <div style={{ padding: 30 }}>Loading...</div>;
   }
 
@@ -44,34 +62,22 @@ export default function DashboardLayout({ children }) {
       >
         <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
 
-        {/* DASHBOARD */}
+        {/* ✅ FIXED DASHBOARD */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/vendor-dashboard")}
+          onClick={goToDashboard}
         >
           Dashboard
         </p>
 
-        {/* ✅ PROFILE → PUBLIC PROFILE */}
+        {/* PROFILE (UNCHANGED) */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={async () => {
-            const { data } = await supabase.auth.getUser();
-            const user = data?.user;
-            if (!user) return;
-
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("handle, role")
-              .eq("id", user.id)
-              .single();
-
-            if (!profile?.handle) return;
-
-            if (profile.role === "vendor") {
-              router.push(`/vendor/${profile.handle}`);
-            } else if (profile.role === "organizer") {
-              router.push(`/organizer/${profile.handle}`);
+          onClick={() => {
+            if (profile?.role === "vendor") {
+              router.push("/vendor-profile");
+            } else if (profile?.role === "organizer") {
+              router.push("/organizer-profile");
             }
           }}
         >
