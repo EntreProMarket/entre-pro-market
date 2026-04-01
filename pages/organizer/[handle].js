@@ -8,33 +8,56 @@ export default function OrganizerPublicProfile() {
 
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
+
+  const fixUrl = (url, type) => {
+    if (!url) return null;
+
+    url = url.trim();
+
+    if (url.startsWith("http")) return url;
+
+    if (type === "instagram") {
+      return `https://instagram.com/${url.replace("@", "")}`;
+    }
+
+    if (type === "facebook") {
+      return `https://facebook.com/${url}`;
+    }
+
+    if (type === "website") {
+      if (url.startsWith("www.")) return `https://${url}`;
+      if (url.includes(".")) return `https://www.${url}`;
+      return `https://www.${url}.com`;
+    }
+
+    return url;
+  };
 
   useEffect(() => {
-    const init = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      setUser(userData?.user || null);
+    if (!handle) return;
 
-      if (!handle) return;
-
+    const fetchOrganizer = async () => {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("handle", handle)
         .single();
 
-      if (!error) setOrganizer(data);
+      if (error) {
+        console.log(error);
+        setLoading(false);
+        return;
+      }
+
+      setOrganizer(data);
       setLoading(false);
     };
 
-    init();
+    fetchOrganizer();
   }, [handle]);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
   if (!organizer) return <div style={{ padding: 20 }}>Organizer not found</div>;
-
-  const isOwner = user && user.id === organizer.id;
 
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
@@ -49,29 +72,28 @@ export default function OrganizerPublicProfile() {
         }}
       >
         <div>
-          <h1>{organizer.organizer_name || "Organizer"}</h1>
+          <h1 style={{ marginBottom: 5 }}>
+            {organizer.organizer_name || "Organizer"}
+          </h1>
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* ✅ EDIT BUTTON (OWNER ONLY) */}
-        {isOwner && (
-          <button
-            onClick={() => router.push("/organizer-profile")}
-            style={{
-              padding: "10px 18px",
-              minWidth: 140,
-              textAlign: "center",
-              backgroundColor: "#701890",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            Edit Profile
-          </button>
-        )}
+        {/* ✅ EXACT MATCH BUTTON (NO GUESSING) */}
+        <button
+          onClick={() => router.push("/organizer-profile")}
+          style={{
+            padding: "10px 14px",
+            backgroundColor: "#701890",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Edit Profile
+        </button>
       </div>
 
       {/* LOGO */}
@@ -79,14 +101,12 @@ export default function OrganizerPublicProfile() {
         <img
           src={organizer.logo_url}
           alt="logo"
-          onClick={() => setSelectedImage(organizer.logo_url)}
           style={{
-            width: 180,
-            height: 180,
+            width: 160,
+            height: 160,
             objectFit: "cover",
             borderRadius: 12,
             marginBottom: 20,
-            cursor: "pointer",
           }}
         />
       )}
@@ -125,4 +145,45 @@ export default function OrganizerPublicProfile() {
 
         {organizer.website && (
           <p>
-            <a href={
+            <a href={fixUrl(organizer.website, "website")} target="_blank" rel="noopener noreferrer">
+              Website
+            </a>
+          </p>
+        )}
+
+        {organizer.instagram && (
+          <p>
+            <a href={fixUrl(organizer.instagram, "instagram")} target="_blank" rel="noopener noreferrer">
+              Instagram
+            </a>
+          </p>
+        )}
+
+        {organizer.facebook && (
+          <p>
+            <a href={fixUrl(organizer.facebook, "facebook")} target="_blank" rel="noopener noreferrer">
+              Facebook
+            </a>
+          </p>
+        )}
+      </div>
+
+      {/* BACK BUTTON */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
+        <button
+          onClick={() => router.back()}
+          style={{
+            padding: "10px 14px",
+            backgroundColor: "#ccc",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          ← Back
+        </button>
+      </div>
+    </div>
+  );
+}
