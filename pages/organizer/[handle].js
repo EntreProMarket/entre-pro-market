@@ -8,30 +8,7 @@ export default function OrganizerPublicProfile() {
 
   const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const fixUrl = (url, type) => {
-    if (!url) return null;
-
-    url = url.trim();
-
-    if (url.startsWith("http")) return url;
-
-    if (type === "instagram") {
-      return `https://instagram.com/${url.replace("@", "")}`;
-    }
-
-    if (type === "facebook") {
-      return `https://facebook.com/${url}`;
-    }
-
-    if (type === "website") {
-      if (url.startsWith("www.")) return `https://${url}`;
-      if (url.includes(".")) return `https://www.${url}`;
-      return `https://www.${url}.com`;
-    }
-
-    return url;
-  };
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     if (!handle) return;
@@ -43,13 +20,7 @@ export default function OrganizerPublicProfile() {
         .eq("handle", handle)
         .single();
 
-      if (error) {
-        console.log(error);
-        setLoading(false);
-        return;
-      }
-
-      setOrganizer(data);
+      if (!error) setOrganizer(data);
       setLoading(false);
     };
 
@@ -63,110 +34,77 @@ export default function OrganizerPublicProfile() {
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
 
       {/* HEADER */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <div>
-          <h1 style={{ marginBottom: 5 }}>
-            {organizer.organizer_name || "Organizer"}
-          </h1>
-          <p style={{ color: "#777" }}>@{organizer.handle}</p>
-        </div>
-
-        {/* ✅ EXACT MATCH BUTTON (NO GUESSING) */}
-        <button
-          onClick={() => router.push("/organizer-profile")}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Edit Profile
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <h1>{organizer.organizer_name || "Organizer"}</h1>
+        <p style={{ color: "#777" }}>@{organizer.handle}</p>
       </div>
 
-      {/* LOGO */}
+      {/* ✅ LOGO (CLICK TO ENLARGE) */}
       {organizer.logo_url && (
         <img
           src={organizer.logo_url}
           alt="logo"
+          onClick={() => setSelectedImage(organizer.logo_url)}
           style={{
-            width: 160,
-            height: 160,
+            width: 180,
+            height: 180,
             objectFit: "cover",
             borderRadius: 12,
+            cursor: "pointer",
             marginBottom: 20,
           }}
         />
       )}
 
       {/* INFO */}
-      <div>
-        <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
-        <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
-      </div>
+      <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
+      <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
 
       <p style={{ marginTop: 20 }}>{organizer.description}</p>
 
-      {/* TAGS */}
-      <div style={{ marginTop: 15 }}>
-        {organizer.tags?.map((tag) => (
-          <span
-            key={tag}
-            style={{
-              display: "inline-block",
-              marginRight: 8,
-              marginBottom: 8,
-              padding: "4px 10px",
-              background: "#eee",
-              borderRadius: 20,
-              fontSize: 12,
-            }}
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
+      {/* ✅ PORTFOLIO */}
+      {organizer.portfolio_images?.length > 0 && (
+        <div style={{ marginTop: 25 }}>
+          <h3>Portfolio</h3>
 
-      {/* LINKS */}
-      <div style={{ marginTop: 25 }}>
-        <h3>Links</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {organizer.portfolio_images.map((img, i) => (
+              <img
+                key={i}
+                src={img}
+                onClick={() => setSelectedImage(img)}
+                style={{
+                  width: 120,
+                  height: 120,
+                  objectFit: "cover",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
-        {organizer.website && (
-          <p>
-            <a href={fixUrl(organizer.website, "website")} target="_blank" rel="noopener noreferrer">
-              Website
-            </a>
-          </p>
-        )}
-
-        {organizer.instagram && (
-          <p>
-            <a href={fixUrl(organizer.instagram, "instagram")} target="_blank" rel="noopener noreferrer">
-              Instagram
-            </a>
-          </p>
-        )}
-
-        {organizer.facebook && (
-          <p>
-            <a href={fixUrl(organizer.facebook, "facebook")} target="_blank" rel="noopener noreferrer">
-              Facebook
-            </a>
-          </p>
-        )}
-      </div>
+      {/* IMAGE MODAL */}
+      {selectedImage && (
+        <div
+          onClick={() => setSelectedImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <img src={selectedImage} style={{ maxWidth: "90%", maxHeight: "90%" }} />
+        </div>
+      )}
 
       {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
