@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }) {
         {/* DASHBOARD */}
         <p
           style={{ cursor: "pointer", marginBottom: 15 }}
-          onClick={() => router.push("/vendor-dashboard")}
+          onClick={() => router.push(router.pathname)}
         >
           Dashboard
         </p>
