@@ -52,6 +52,8 @@ export default function OrganizerPublicProfile() {
           <p>@{organizer.handle}</p>
         </div>
 
+<pre>{JSON.stringify(organizer, null, 2)}</pre>
+
         {isOwner && (
           <button
             onClick={() => router.push("/organizer-profile")}
