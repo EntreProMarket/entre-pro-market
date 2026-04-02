@@ -18,13 +18,18 @@ export default function OrganizerPublicProfile() {
 
       if (!handle) return;
 
+      // 🔥 FIX: make sure handle is used correctly
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("handle", handle)
-        .single();
+        .maybeSingle();
 
-      if (!error) setOrganizer(data);
+      if (error) {
+        console.log("ERROR LOADING PROFILE:", error);
+      }
+
+      setOrganizer(data);
       setLoading(false);
     };
 
@@ -32,7 +37,7 @@ export default function OrganizerPublicProfile() {
   }, [handle]);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
-  if (!organizer) return <div style={{ padding: 20 }}>Organizer not found</div>;
+  if (!organizer) return <div style={{ padding: 20 }}>Profile not found</div>;
 
   const isOwner = user && user.id === organizer.id;
 
@@ -53,12 +58,15 @@ export default function OrganizerPublicProfile() {
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
 
-        {/* EDIT PROFILE BUTTON */}
+        {/* ✅ FIXED BUTTON (NOT SQUARE) */}
         {isOwner && (
           <button
             onClick={() => router.push("/organizer-profile")}
             style={{
-              padding: "10px 14px",
+              padding: "10px 18px",
+              minWidth: "150px",
+              textAlign: "center",
+              whiteSpace: "nowrap",
               backgroundColor: "#701890",
               color: "white",
               border: "none",
@@ -76,7 +84,6 @@ export default function OrganizerPublicProfile() {
       {organizer.logo_url && (
         <img
           src={organizer.logo_url}
-          alt="logo"
           onClick={() => setSelectedImage(organizer.logo_url)}
           style={{
             width: 180,
@@ -90,65 +97,22 @@ export default function OrganizerPublicProfile() {
       )}
 
       {/* INFO */}
-      <div>
-        <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
-        <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
-      </div>
+      <p><strong>Category:</strong> {organizer.category}</p>
+      <p><strong>Location:</strong> {organizer.city}, {organizer.state}</p>
 
-      {/* DESCRIPTION */}
       <p style={{ marginTop: 20 }}>{organizer.description}</p>
-
-      {/* TAGS */}
-      <div style={{ marginTop: 15 }}>
-        {organizer.tags?.map((tag) => (
-          <span
-            key={tag}
-            style={{
-              display: "inline-block",
-              marginRight: 8,
-              marginBottom: 8,
-              padding: "4px 10px",
-              background: "#eee",
-              borderRadius: 20,
-              fontSize: 12,
-            }}
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
 
       {/* LINKS */}
       <div style={{ marginTop: 25 }}>
         <h3>Links</h3>
 
-        {organizer.website && (
-          <p>
-            <a href={organizer.website} target="_blank">
-              Website
-            </a>
-          </p>
-        )}
-
-        {organizer.instagram && (
-          <p>
-            <a href={organizer.instagram} target="_blank">
-              Instagram
-            </a>
-          </p>
-        )}
-
-        {organizer.facebook && (
-          <p>
-            <a href={organizer.facebook} target="_blank">
-              Facebook
-            </a>
-          </p>
-        )}
+        {organizer.website && <p><a href={organizer.website}>Website</a></p>}
+        {organizer.instagram && <p><a href={organizer.instagram}>Instagram</a></p>}
+        {organizer.facebook && <p><a href={organizer.facebook}>Facebook</a></p>}
       </div>
 
       {/* PORTFOLIO */}
-      {organizer.portfolio_images && organizer.portfolio_images.length > 0 && (
+      {organizer.portfolio_images?.length > 0 && (
         <div style={{ marginTop: 25 }}>
           <h3>Portfolio</h3>
 
@@ -185,17 +149,9 @@ export default function OrganizerPublicProfile() {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 1000,
           }}
         >
-          <img
-            src={selectedImage}
-            style={{
-              maxWidth: "90%",
-              maxHeight: "90%",
-              borderRadius: 10,
-            }}
-          />
+          <img src={selectedImage} style={{ maxWidth: "90%", maxHeight: "90%" }} />
         </div>
       )}
 
