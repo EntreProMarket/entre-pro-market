@@ -186,6 +186,19 @@ export default function OrganizerProfile() {
         rows={4}
         style={{ ...inputStyle, resize: "vertical" }}
       />
+      {/* ⚠️ LINKS WARNING — matches Vendor edit page */}
+      <div style={{
+        backgroundColor: "#fff0f0",
+        border: "1px solid #f5c6c6",
+        borderRadius: 6,
+        padding: "10px 14px",
+        marginBottom: 12,
+        fontSize: 13,
+        color: "#cc0000",
+      }}>
+        ⚠️ Links must be public or they may not open correctly.
+      </div>
+
       <input
         placeholder="Website"
         value={website}
@@ -293,8 +306,8 @@ export default function OrganizerProfile() {
         </p>
       )}
 
-      {/* BACK + SAVE BUTTONS — matches Vendor profile style */}
-      <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between" }}>
+      {/* BACK + SAVE BUTTONS — both on the right */}
+      <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end", gap: 12 }}>
         <button
           onClick={() => router.back()}
           style={{
