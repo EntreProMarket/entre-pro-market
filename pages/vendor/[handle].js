@@ -18,13 +18,13 @@ function formatSocialLink(platform, value) {
   if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
   const handle = cleanHandle(v);
   switch (platform) {
-    case "instagram": return `https://instagram.com/${handle}`;
-    case "facebook":  return `https://facebook.com/${handle}`;
-    case "tiktok":    return `https://tiktok.com/@${handle}`;
-    case "youtube":   return `https://youtube.com/@${handle}`;
-    case "x_twitter": return `https://x.com/${handle}`;
-    case "website":   return `https://${handle}`;
-    default:          return `https://${handle}`;
+    case "instagram":  return `https://instagram.com/${handle}`;
+    case "facebook":   return `https://facebook.com/${handle}`;
+    case "tiktok":     return `https://tiktok.com/@${handle}`;
+    case "youtube":    return `https://youtube.com/@${handle}`;
+    case "x_twitter":  return `https://x.com/${handle}`;
+    case "website":    return `https://${handle}`;
+    default:           return `https://${handle}`;
   }
 }
 
@@ -77,7 +77,6 @@ function YouTubeIcon() {
   );
 }
 
-
 function XIcon() {
   return (
     <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
@@ -120,6 +119,12 @@ export default function VendorPublicProfile() {
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
   if (!vendor) return <div style={{ padding: 20 }}>Vendor not found</div>;
+
+  const iconStyle = {
+    display: "flex",
+    opacity: 1,
+    transition: "opacity 0.2s",
+  };
 
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
@@ -164,28 +169,40 @@ export default function VendorPublicProfile() {
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
           {vendor.website && (
-            <a href={formatSocialLink("website", vendor.website)} target="_blank" rel="noreferrer" title="Website" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+            <a href={formatSocialLink("website", vendor.website)} target="_blank" rel="noreferrer" title="Website"
+              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
               <WebsiteIcon />
             </a>
           )}
           {vendor.instagram && (
-            <a href={formatSocialLink("instagram", vendor.instagram)} target="_blank" rel="noreferrer" title="Instagram" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+            <a href={formatSocialLink("instagram", vendor.instagram)} target="_blank" rel="noreferrer" title="Instagram"
+              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
               <InstagramIcon />
             </a>
           )}
           {vendor.facebook && (
-            <a href={formatSocialLink("facebook", vendor.facebook)} target="_blank" rel="noreferrer" title="Meta" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+            <a href={formatSocialLink("facebook", vendor.facebook)} target="_blank" rel="noreferrer" title="Meta"
+              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
               <MetaIcon />
             </a>
           )}
           {vendor.tiktok && (
-            <a href={formatSocialLink("tiktok", vendor.tiktok)} target="_blank" rel="noreferrer" title="TikTok" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+            <a href={formatSocialLink("tiktok", vendor.tiktok)} target="_blank" rel="noreferrer" title="TikTok"
+              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
               <TikTokIcon />
             </a>
           )}
           {vendor.youtube && (
-            <a href={formatSocialLink("youtube", vendor.youtube)} target="_blank" rel="noreferrer" title="YouTube" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+            <a href={formatSocialLink("youtube", vendor.youtube)} target="_blank" rel="noreferrer" title="YouTube"
+              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
               <YouTubeIcon />
+            </a>
+          )}
+          {/* ✅ X ICON — was missing, now added */}
+          {vendor.x_twitter && (
+            <a href={formatSocialLink("x_twitter", vendor.x_twitter)} target="_blank" rel="noreferrer" title="X (Twitter)"
+              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+              <XIcon />
             </a>
           )}
         </div>
