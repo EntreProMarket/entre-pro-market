@@ -98,9 +98,9 @@ export default function OrganizerProfile() {
         const fileExt = logoFile.name.split(".").pop();
         const fileName = `${user.id}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
-          .from("logos").upload(fileName, logoFile, { upsert: true });
+          .from("organizer-logos").upload(fileName, logoFile, { upsert: true });
         if (!uploadError) {
-          const { data } = supabase.storage.from("logos").getPublicUrl(fileName);
+          const { data } = supabase.storage.from("organizer-logos").getPublicUrl(fileName);
           uploadedLogoUrl = data.publicUrl;
         }
       }
@@ -110,9 +110,9 @@ export default function OrganizerProfile() {
         for (const file of portfolioFiles) {
           const fileName = `${user.id}/${Date.now()}-${file.name}`;
           const { error: uploadError } = await supabase.storage
-            .from("logos").upload(fileName, file, { upsert: true });
+            .from("organizer-portfolio").upload(fileName, file, { upsert: true });
           if (!uploadError) {
-            const { data } = supabase.storage.from("logos").getPublicUrl(fileName);
+            const { data } = supabase.storage.from("organizer-portfolio").getPublicUrl(fileName);
             updatedPortfolio.push(data.publicUrl);
           }
         }
@@ -181,7 +181,6 @@ export default function OrganizerProfile() {
       {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 8 }}>
         <label style={labelStyle}>Logo</label>
-        {logoUrl && <img src={logoUrl} alt="logo" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8 }} />}
         <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files[0])} />
       </div>
 
