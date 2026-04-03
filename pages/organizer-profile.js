@@ -86,41 +86,47 @@ export default function OrganizerProfile() {
     loadUser();
   }, [router]);
 
+  // ── EXACT SAME UPLOAD PATTERN AS VENDOR PROFILE ──
+  const uploadFile = async (file, bucket) => {
+    const fileName = `${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
+    if (error) {
+      setMessage("\u274c Upload error: " + error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    return data.publicUrl;
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
     setMessage("");
 
     try {
-      let uploadedLogoUrl = logoUrl;
+      // Fetch existing data first — same as vendor
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("logo_url, portfolio_images")
+        .eq("id", user.id)
+        .single();
+
+      let uploadedLogoUrl = existing?.logo_url || logoUrl;
 
       if (logoFile) {
-        const fileExt = logoFile.name.split(".").pop();
-        const fileName = `organizer/${user.id}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("vendor-logos").upload(fileName, logoFile, { upsert: true });
-        if (!uploadError) {
-          const { data } = supabase.storage.from("vendor-logos").getPublicUrl(fileName);
-          uploadedLogoUrl = data.publicUrl;
-        }
+        const uploaded = await uploadFile(logoFile, "vendor-logos");
+        if (uploaded) uploadedLogoUrl = uploaded;
       }
 
-      let updatedPortfolio = [...portfolioImages];
+      let updatedPortfolio = existing?.portfolio_images || portfolioImages;
+
       if (portfolioFiles.length > 0) {
+        const newUrls = [];
         for (const file of portfolioFiles) {
-          const fileName = `organizer/${user.id}/${Date.now()}-${file.name}`;
-          const { error: uploadError } = await supabase.storage
-            .from("vendor-portfolio").upload(fileName, file, { upsert: true });
-          if (uploadError) {
-            // Show exact error on screen for debugging
-            setMessage("\u274c Portfolio upload error: " + uploadError.message);
-            setSaving(false);
-            return;
-          } else {
-            const { data } = supabase.storage.from("vendor-portfolio").getPublicUrl(fileName);
-            updatedPortfolio.push(data.publicUrl);
-          }
+          const url = await uploadFile(file, "vendor-portfolio");
+          if (url) newUrls.push(url);
         }
+        if (newUrls.length > 0) updatedPortfolio = newUrls;
       }
 
       const { error } = await supabase.from("profiles").upsert({
