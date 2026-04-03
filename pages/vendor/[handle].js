@@ -1,6 +1,90 @@
+// pages/vendor/[handle].js
+
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+
+// ── LINK FORMATTER ──
+function cleanHandle(value) {
+  return value.trim().replace(/^@/, "").replace(/\s+/g, "");
+}
+function formatSocialLink(platform, value) {
+  if (!value || !value.trim()) return "";
+  const v = value.trim();
+  if (v.startsWith("https://")) return v;
+  if (v.startsWith("http://")) return v.replace("http://", "https://");
+  if (v.startsWith("www.")) return `https://${v}`;
+  const domains = { instagram: "instagram.com", facebook: "facebook.com", tiktok: "tiktok.com", youtube: "youtube.com" };
+  if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
+  const handle = cleanHandle(v);
+  switch (platform) {
+    case "instagram": return `https://instagram.com/${handle}`;
+    case "facebook":  return `https://facebook.com/${handle}`;
+    case "tiktok":    return `https://tiktok.com/@${handle}`;
+    case "youtube":   return `https://youtube.com/@${handle}`;
+    case "x_twitter": return `https://x.com/${handle}`;
+    case "website":   return `https://${handle}`;
+    default:          return `https://${handle}`;
+  }
+}
+
+// ── SOCIAL ICONS (SVG, vendor = purple #701890) ──
+const ICON_COLOR = "#701890";
+const ICON_SIZE = 32;
+
+function WebsiteIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" stroke={ICON_COLOR} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none" stroke={ICON_COLOR} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+    </svg>
+  );
+}
+
+function MetaIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+    </svg>
+  );
+}
+
+function TikTokIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z"/>
+    </svg>
+  );
+}
+
+function YouTubeIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
+      <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
+      <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/>
+    </svg>
+  );
+}
+
+
+function XIcon() {
+  return (
+    <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+  );
+}
 
 export default function VendorPublicProfile() {
   const router = useRouter();
@@ -8,7 +92,7 @@ export default function VendorPublicProfile() {
 
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(null); // ✅ restore enlarge
+  const [selectedImage, setSelectedImage] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
@@ -24,18 +108,10 @@ export default function VendorPublicProfile() {
         .eq("handle", handle)
         .single();
 
-      if (error) {
-        console.log(error);
-        setLoading(false);
-        return;
-      }
+      if (error) { console.log(error); setLoading(false); return; }
 
       setVendor(data);
-
-      if (user && data.id === user.id) {
-        setIsOwner(true);
-      }
-
+      if (user && data.id === user.id) setIsOwner(true);
       setLoading(false);
     };
 
@@ -49,60 +125,27 @@ export default function VendorPublicProfile() {
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
 
       {/* HEADER */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <h1 style={{ marginBottom: 5 }}>{vendor.business_name}</h1>
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
-
-        {/* ✅ OWNER ONLY EDIT BUTTON */}
         {isOwner && (
-          <button
-            onClick={() => router.push("/vendor-profile")}
-            style={{
-              padding: "10px 14px",
-              backgroundColor: "#701890",
-              color: "white",
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
+          <button onClick={() => router.push("/vendor-profile")} style={{ padding: "10px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
             Edit Profile
           </button>
         )}
       </div>
 
-      {/* LOGO (CLICKABLE AGAIN) */}
+      {/* LOGO */}
       {vendor.logo_url && (
-        <img
-          src={vendor.logo_url}
-          alt="logo"
-          onClick={() => setSelectedImage(vendor.logo_url)}
-          style={{
-            width: 160,
-            height: 160,
-            objectFit: "cover",
-            borderRadius: 12,
-            marginBottom: 20,
-            cursor: "pointer",
-          }}
-        />
+        <img src={vendor.logo_url} alt="logo" onClick={() => setSelectedImage(vendor.logo_url)}
+          style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12, marginBottom: 20, cursor: "pointer" }} />
       )}
 
       {/* INFO */}
-      <div>
-        <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
-        <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
-      </div>
+      <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
+      <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
 
       {/* DESCRIPTION */}
       <p style={{ marginTop: 20 }}>{vendor.description}</p>
@@ -110,84 +153,52 @@ export default function VendorPublicProfile() {
       {/* TAGS */}
       <div style={{ marginTop: 15 }}>
         {vendor.tags?.map((tag) => (
-          <span
-            key={tag}
-            style={{
-              display: "inline-block",
-              marginRight: 8,
-              marginBottom: 8,
-              padding: "4px 10px",
-              background: "#eee",
-              borderRadius: 20,
-              fontSize: 12,
-            }}
-          >
+          <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>
             {tag}
           </span>
         ))}
       </div>
 
-      {/* LINKS */}
+      {/* SOCIAL ICONS — purple, no background */}
       <div style={{ marginTop: 25 }}>
-        <h3>Links</h3>
-
-        {vendor.website && (
-          <p>
-            <a href={vendor.website} target="_blank">Website</a>
-          </p>
-        )}
-
-        {vendor.instagram && (
-          <p>
-            <a href={vendor.instagram} target="_blank">Instagram</a>
-          </p>
-        )}
-
-        {vendor.facebook && (
-          <p>
-            <a href={vendor.facebook} target="_blank">Facebook</a>
-          </p>
-        )}
-
-        {vendor.tiktok && (
-          <p>
-            <a href={vendor.tiktok} target="_blank">TikTok</a>
-          </p>
-        )}
-
-        {vendor.youtube && (
-          <p>
-            <a href={vendor.youtube} target="_blank">YouTube</a>
-          </p>
-        )}
+        <h3 style={{ marginBottom: 12 }}>Links</h3>
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+          {vendor.website && (
+            <a href={formatSocialLink("website", vendor.website)} target="_blank" rel="noreferrer" title="Website" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+              <WebsiteIcon />
+            </a>
+          )}
+          {vendor.instagram && (
+            <a href={formatSocialLink("instagram", vendor.instagram)} target="_blank" rel="noreferrer" title="Instagram" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+              <InstagramIcon />
+            </a>
+          )}
+          {vendor.facebook && (
+            <a href={formatSocialLink("facebook", vendor.facebook)} target="_blank" rel="noreferrer" title="Meta" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+              <MetaIcon />
+            </a>
+          )}
+          {vendor.tiktok && (
+            <a href={formatSocialLink("tiktok", vendor.tiktok)} target="_blank" rel="noreferrer" title="TikTok" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+              <TikTokIcon />
+            </a>
+          )}
+          {vendor.youtube && (
+            <a href={formatSocialLink("youtube", vendor.youtube)} target="_blank" rel="noreferrer" title="YouTube" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+              <YouTubeIcon />
+            </a>
+          )}
+        </div>
       </div>
 
-      {/* PORTFOLIO (CLICKABLE AGAIN) */}
+      {/* PORTFOLIO */}
       <div style={{ marginTop: 30 }}>
         <h3>Portfolio</h3>
-
         {vendor.portfolio_images && vendor.portfolio_images.length > 0 ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-              gap: 10,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
             {vendor.portfolio_images.map((img, i) => (
-              <img
-                key={i}
-                src={img}
-                alt="portfolio"
-                onClick={() => setSelectedImage(img)}
-                style={{
-                  width: "100%",
-                  height: 150,
-                  objectFit: "cover",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                }}
-              />
+              <img key={i} src={img} alt="portfolio" onClick={() => setSelectedImage(img)}
+                style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 8, cursor: "pointer" }} />
             ))}
           </div>
         ) : (
@@ -197,47 +208,15 @@ export default function VendorPublicProfile() {
 
       {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
-        <button
-          onClick={() => router.back()}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#ccc",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
+        <button onClick={() => router.back()} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
         </button>
       </div>
 
-      {/* FULLSCREEN IMAGE VIEW (RESTORED) */}
+      {/* FULLSCREEN IMAGE */}
       {selectedImage && (
-        <div
-          onClick={() => setSelectedImage(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.85)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 9999,
-          }}
-        >
-          <img
-            src={selectedImage}
-            alt="enlarged"
-            style={{
-              maxWidth: "90%",
-              maxHeight: "90%",
-              borderRadius: 10,
-            }}
-          />
+        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
+          <img src={selectedImage} alt="enlarged" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 10 }} />
         </div>
       )}
     </div>
