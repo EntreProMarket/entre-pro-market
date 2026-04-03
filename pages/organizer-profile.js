@@ -114,7 +114,7 @@ export default function OrganizerProfile() {
       let uploadedLogoUrl = existing?.logo_url || logoUrl;
 
       if (logoFile) {
-        const uploaded = await uploadFile(logoFile, "vendor-logos");
+        const uploaded = await uploadFile(logoFile, "organizer-logos");
         if (uploaded) uploadedLogoUrl = uploaded;
       }
 
@@ -123,7 +123,7 @@ export default function OrganizerProfile() {
       if (portfolioFiles.length > 0) {
         const newUrls = [];
         for (const file of portfolioFiles) {
-          const url = await uploadFile(file, "vendor-portfolio");
+          const url = await uploadFile(file, "organizer-portfolio");
           if (url) newUrls.push(url);
         }
         if (newUrls.length > 0) updatedPortfolio = newUrls;
