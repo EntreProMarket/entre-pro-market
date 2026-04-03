@@ -111,7 +111,12 @@ export default function OrganizerProfile() {
           const fileName = `${user.id}/${Date.now()}-${file.name}`;
           const { error: uploadError } = await supabase.storage
             .from("organizer-portfolio").upload(fileName, file, { upsert: true });
-          if (!uploadError) {
+          if (uploadError) {
+            // Show exact error on screen for debugging
+            setMessage("\u274c Portfolio upload error: " + uploadError.message);
+            setSaving(false);
+            return;
+          } else {
             const { data } = supabase.storage.from("organizer-portfolio").getPublicUrl(fileName);
             updatedPortfolio.push(data.publicUrl);
           }
