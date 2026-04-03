@@ -96,11 +96,11 @@ export default function OrganizerProfile() {
 
       if (logoFile) {
         const fileExt = logoFile.name.split(".").pop();
-        const fileName = `${user.id}.${fileExt}`;
+        const fileName = `organizer/${user.id}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
-          .from("organizer-logos").upload(fileName, logoFile, { upsert: true });
+          .from("vendor-logos").upload(fileName, logoFile, { upsert: true });
         if (!uploadError) {
-          const { data } = supabase.storage.from("organizer-logos").getPublicUrl(fileName);
+          const { data } = supabase.storage.from("vendor-logos").getPublicUrl(fileName);
           uploadedLogoUrl = data.publicUrl;
         }
       }
@@ -108,16 +108,16 @@ export default function OrganizerProfile() {
       let updatedPortfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
         for (const file of portfolioFiles) {
-          const fileName = `${user.id}/${Date.now()}-${file.name}`;
+          const fileName = `organizer/${user.id}/${Date.now()}-${file.name}`;
           const { error: uploadError } = await supabase.storage
-            .from("organizer-portfolio").upload(fileName, file, { upsert: true });
+            .from("vendor-portfolio").upload(fileName, file, { upsert: true });
           if (uploadError) {
             // Show exact error on screen for debugging
             setMessage("\u274c Portfolio upload error: " + uploadError.message);
             setSaving(false);
             return;
           } else {
-            const { data } = supabase.storage.from("organizer-portfolio").getPublicUrl(fileName);
+            const { data } = supabase.storage.from("vendor-portfolio").getPublicUrl(fileName);
             updatedPortfolio.push(data.publicUrl);
           }
         }
