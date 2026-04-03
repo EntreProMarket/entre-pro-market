@@ -1,5 +1,31 @@
+// pages/vendor-profile.js
+
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+
+// ── LINK FORMATTER ──
+function cleanHandle(value) {
+  return value.trim().replace(/^@/, "").replace(/\s+/g, "");
+}
+function formatSocialLink(platform, value) {
+  if (!value || !value.trim()) return "";
+  const v = value.trim();
+  if (v.startsWith("https://")) return v;
+  if (v.startsWith("http://")) return v.replace("http://", "https://");
+  if (v.startsWith("www.")) return `https://${v}`;
+  const domains = { instagram: "instagram.com", facebook: "facebook.com", tiktok: "tiktok.com", youtube: "youtube.com" };
+  if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
+  const handle = cleanHandle(v);
+  switch (platform) {
+    case "instagram": return `https://instagram.com/${handle}`;
+    case "facebook":  return `https://facebook.com/${handle}`;
+    case "tiktok":    return `https://tiktok.com/@${handle}`;
+    case "youtube":   return `https://youtube.com/@${handle}`;
+    case "x_twitter": return `https://x.com/${handle}`;
+    case "website":   return `https://${handle}`;
+    default:          return `https://${handle}`;
+  }
+}
 
 export default function VendorProfile() {
   const [loading, setLoading] = useState(true);
@@ -19,6 +45,7 @@ export default function VendorProfile() {
   const [facebook, setFacebook] = useState("");
   const [tiktok, setTiktok] = useState("");
   const [youtube, setYoutube] = useState("");
+  const [xTwitter, setXTwitter] = useState("");
 
   const [logoFile, setLogoFile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
@@ -43,12 +70,12 @@ export default function VendorProfile() {
         setCity(profile.city || "");
         setState(profile.state || "");
         setDescription(profile.description || "");
-
         setWebsite(profile.website || "");
         setInstagram(profile.instagram || "");
         setFacebook(profile.facebook || "");
         setTiktok(profile.tiktok || "");
         setYoutube(profile.youtube || "");
+        setXTwitter(profile.x_twitter || "");
       }
 
       setLoading(false);
@@ -116,11 +143,13 @@ export default function VendorProfile() {
         city,
         state,
         description,
-        website,
-        instagram,
-        facebook,
-        tiktok,
-        youtube,
+        // ✅ Format all links before saving to Supabase
+        website:   formatSocialLink("website",   website),
+        instagram: formatSocialLink("instagram", instagram),
+        facebook:  formatSocialLink("facebook",  facebook),
+        tiktok:    formatSocialLink("tiktok",    tiktok),
+        youtube:   formatSocialLink("youtube",   youtube),
+        x_twitter: formatSocialLink("x_twitter", xTwitter),
         logo_url: logoUrl,
         portfolio_images: portfolio,
       })
@@ -141,140 +170,54 @@ export default function VendorProfile() {
       <h1>Vendor Profile</h1>
       {message && <p>{message}</p>}
 
-      <input
-        placeholder="Business Name"
-        value={businessName}
-        onChange={(e) => setBusinessName(e.target.value)}
-      />
-      <input
-        placeholder="Handle"
-        value={handle}
-        onChange={(e) => setHandle(e.target.value)}
-      />
-      <input
-        placeholder="Category"
-        value={category}
-        onChange={(e) => setCategory(e.target.value)}
-      />
+      <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+      <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} />
+      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
 
       <form onSubmit={addTag}>
-        <input
-          placeholder="Add tag + Enter"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-        />
+        <input placeholder="Add tag + Enter" value={tagInput} onChange={(e) => setTagInput(e.target.value)} />
       </form>
 
       <div>
         {tags.map((t) => (
-          <span
-            key={t}
-            onClick={() => removeTag(t)}
-            style={{ marginRight: 5, cursor: "pointer" }}
-          >
+          <span key={t} onClick={() => removeTag(t)} style={{ marginRight: 5, cursor: "pointer" }}>
             {t} ×
           </span>
         ))}
       </div>
 
-      <input
-        placeholder="City"
-        value={city}
-        onChange={(e) => setCity(e.target.value)}
-      />
-      <input
-        placeholder="State"
-        value={state}
-        onChange={(e) => setState(e.target.value)}
-      />
+      <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+      <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
 
-      <textarea
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-
-      {/* 🔴 RED WARNING (KEPT) */}
-      <div
-        style={{
-          background: "#ffe5e5",
-          color: "#b30000",
-          padding: 10,
-          marginTop: 20,
-        }}
-      >
+      {/* ⚠️ WARNING */}
+      <div style={{ background: "#ffe5e5", color: "#b30000", padding: 10, marginTop: 20 }}>
         ⚠️ Links must be public or they may not open correctly.
       </div>
 
-      <input
-        placeholder="Website"
-        value={website}
-        onChange={(e) => setWebsite(e.target.value)}
-      />
-      <input
-        placeholder="Instagram"
-        value={instagram}
-        onChange={(e) => setInstagram(e.target.value)}
-      />
-      <input
-        placeholder="Facebook"
-        value={facebook}
-        onChange={(e) => setFacebook(e.target.value)}
-      />
-      <input
-        placeholder="TikTok"
-        value={tiktok}
-        onChange={(e) => setTiktok(e.target.value)}
-      />
-      <input
-        placeholder="YouTube"
-        value={youtube}
-        onChange={(e) => setYoutube(e.target.value)}
-      />
+      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      <input placeholder="Instagram (e.g. nike or @nike)" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+      <input placeholder="Facebook (e.g. nike or @nike)" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+      <input placeholder="TikTok (e.g. nike or @nike)" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+      <input placeholder="YouTube (e.g. nike or @nike)" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+      <input placeholder="X / Twitter (e.g. nike or @nike)" value={xTwitter} onChange={(e) => setXTwitter(e.target.value)} />
 
       <p>Logo</p>
       <input type="file" onChange={(e) => setLogoFile(e.target.files[0])} />
 
       <p>Portfolio</p>
-      <input
-        type="file"
-        multiple
-        onChange={(e) => setPortfolioFiles(Array.from(e.target.files))}
-      />
+      <input type="file" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 10,
-          marginTop: 20,
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
         <button
           onClick={() => window.history.back()}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#ccc",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}
         >
           ← Back
         </button>
-
         <button
           onClick={handleSave}
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
+          style={{ padding: "10px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}
         >
           Save Profile
         </button>
