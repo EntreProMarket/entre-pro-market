@@ -76,7 +76,7 @@ export default function DashboardLayout({ children }) {
         padding: "8px 10px",
         borderRadius: 6,
         transition: "background 0.15s",
-        fontSize: 15,
+        fontSize: 13,
       }}
       onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
       onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
@@ -90,14 +90,14 @@ export default function DashboardLayout({ children }) {
 
       {/* SIDEBAR */}
       <div style={{
-        width: 220,
+        width: 170,
         backgroundColor: "#111",
         color: "white",
         padding: 20,
         display: "flex",
         flexDirection: "column",
       }}>
-        <h2 style={{ marginBottom: 30 }}>Entre PRO</h2>
+        <h2 style={{ marginBottom: 30, fontSize: 16 }}>Entre PRO</h2>
 
         {/* HOME — back to homepage */}
         {navItem("🏡 Home", () => router.push("/"))}
