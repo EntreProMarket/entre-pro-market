@@ -8,19 +8,14 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
-
-      if (!data?.user) {
-        router.replace("/");
-        return;
-      }
-
+      if (!data?.user) { router.replace("/"); return; }
       setUser(data.user);
 
-      // Get role so Dashboard link goes to correct dashboard
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
@@ -29,7 +24,6 @@ export default function DashboardLayout({ children }) {
 
       setRole(profile?.role || null);
     };
-
     checkUser();
   }, [router]);
 
@@ -39,44 +33,43 @@ export default function DashboardLayout({ children }) {
   };
 
   const goToDashboard = () => {
-    if (role === "vendor") {
-      router.push("/vendor-dashboard");
-    } else if (role === "organizer") {
-      router.push("/organizer-dashboard");
-    }
+    setMenuOpen(false);
+    if (role === "vendor") router.push("/vendor-dashboard");
+    else if (role === "organizer") router.push("/organizer-dashboard");
   };
 
   const goToProfile = async () => {
+    setMenuOpen(false);
     if (!user) return;
     const { data: profile } = await supabase
       .from("profiles")
       .select("handle, role")
       .eq("id", user.id)
       .single();
-
     if (!profile?.handle) return;
-
-    if (profile.role === "vendor") {
-      router.push(`/vendor/${profile.handle}`);
-    } else if (profile.role === "organizer") {
-      router.push(`/organizer/${profile.handle}`);
-    }
+    if (profile.role === "vendor") router.push(`/vendor/${profile.handle}`);
+    else if (profile.role === "organizer") router.push(`/organizer/${profile.handle}`);
   };
 
-  if (!user) {
-    return <div style={{ padding: 30 }}>Loading...</div>;
-  }
+  const navigate = (path) => {
+    setMenuOpen(false);
+    router.push(path);
+  };
+
+  if (!user) return <div style={{ padding: 30 }}>Loading...</div>;
 
   const navItem = (label, onClick) => (
     <p
       onClick={onClick}
       style={{
         cursor: "pointer",
-        marginBottom: 15,
-        padding: "8px 10px",
+        marginBottom: 8,
+        padding: "10px 14px",
         borderRadius: 6,
-        transition: "background 0.15s",
-        fontSize: 13,
+        fontSize: 15,
+        color: "white",
+        margin: 0,
+        marginBottom: 4,
       }}
       onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
       onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
@@ -86,48 +79,117 @@ export default function DashboardLayout({ children }) {
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "sans-serif" }}>
 
-      {/* SIDEBAR */}
+      {/* TOP BAR */}
       <div style={{
-        width: 170,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "12px 16px",
+        backgroundColor: "#111",
+        color: "white",
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+      }}>
+        {/* HAMBURGER */}
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          style={{
+            background: "none",
+            border: "none",
+            color: "white",
+            fontSize: 24,
+            cursor: "pointer",
+            padding: "0 8px",
+            lineHeight: 1,
+          }}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+
+        {/* BRAND */}
+        <span style={{ fontWeight: "bold", fontSize: 16 }}>Entre PRO</span>
+
+        {/* LOG OUT */}
+        <button
+          onClick={logout}
+          style={{
+            padding: "6px 12px",
+            backgroundColor: "#701890",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: "bold",
+          }}
+        >
+          Log Out
+        </button>
+      </div>
+
+      {/* SLIDE-IN MENU OVERLAY */}
+      {menuOpen && (
+        <div
+          onClick={() => setMenuOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0, left: 0,
+            width: "100%", height: "100%",
+            backgroundColor: "rgba(0,0,0,0.5)",
+            zIndex: 200,
+          }}
+        />
+      )}
+
+      {/* SLIDE-IN SIDEBAR */}
+      <div style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: 220,
+        height: "100%",
         backgroundColor: "#111",
         color: "white",
         padding: 20,
+        zIndex: 300,
+        transform: menuOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.25s ease",
         display: "flex",
         flexDirection: "column",
+        boxShadow: menuOpen ? "4px 0 20px rgba(0,0,0,0.4)" : "none",
       }}>
-        <h2 style={{ marginBottom: 30, fontSize: 16 }}>Entre PRO</h2>
+        {/* CLOSE BUTTON */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Entre PRO</h2>
+          <button
+            onClick={() => setMenuOpen(false)}
+            style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer" }}
+          >
+            ✕
+          </button>
+        </div>
 
-        {/* HOME — back to homepage */}
-        {navItem("🏡 Home", () => router.push("/"))}
-
-        {/* ✅ DASHBOARD — now routes correctly by role */}
+        {/* NAV LINKS */}
+        {navItem("🏡 Home", () => navigate("/"))}
         {navItem("🏠 Dashboard", goToDashboard)}
-
-        {/* ✅ PROFILE — goes to public profile */}
         {navItem("👤 Profile", goToProfile)}
+        {navItem("🛒 Marketplace", () => navigate("/marketplace"))}
+        {navItem("✉️ Messages", () => navigate("/messages"))}
+        {navItem("⚙️ Settings", () => navigate("/settings"))}
 
-        {/* ✅ MARKETPLACE — public browse page */}
-        {navItem("🛒 Marketplace", () => router.push("/marketplace"))}
-
-        {/* MESSAGES */}
-        {navItem("✉️ Messages", () => router.push("/messages"))}
-
-
-        {/* SETTINGS */}
-        {navItem("⚙️ Settings", () => router.push("/settings"))}
-
-        {/* LOGOUT at bottom */}
+        {/* LOG OUT AT BOTTOM */}
         <div style={{ marginTop: "auto" }}>
           <p
             onClick={logout}
             style={{
               cursor: "pointer",
               color: "#ff6b6b",
-              padding: "8px 10px",
+              padding: "10px 14px",
               borderRadius: 6,
               fontSize: 15,
+              margin: 0,
             }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(255,107,107,0.1)"}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
@@ -137,34 +199,11 @@ export default function DashboardLayout({ children }) {
         </div>
       </div>
 
-      {/* MAIN */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}>
-
-        {/* TOP BAR */}
-        <div style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          padding: "15px 20px",
-          borderBottom: "1px solid #eee",
-        }}>
-          <button
-            onClick={logout}
-            style={{
-              padding: "8px 12px",
-              backgroundColor: "#701890",
-              color: "white",
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
-          >
-            Log Out
-          </button>
-        </div>
-
-        {/* CONTENT */}
-        <div style={{ padding: 20 }}>{children}</div>
+      {/* MAIN CONTENT — full width on mobile */}
+      <div style={{ flex: 1, padding: 20 }}>
+        {children}
       </div>
+
     </div>
   );
 }
