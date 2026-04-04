@@ -110,7 +110,7 @@ export default function DashboardLayout({ children }) {
         </button>
 
         {/* BRAND */}
-        <span style={{ fontWeight: "bold", fontSize: 16 }}>Entre PRO</span>
+        <span style={{ fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</span>
 
         {/* LOG OUT */}
         <button
@@ -162,7 +162,7 @@ export default function DashboardLayout({ children }) {
       }}>
         {/* CLOSE BUTTON */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Entre PRO</h2>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Entre PRO Market</h2>
           <button
             onClick={() => setMenuOpen(false)}
             style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer" }}
