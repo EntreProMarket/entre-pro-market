@@ -66,7 +66,7 @@ export default function Home() {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_admin")
       .eq("id", user.id)
       .single();
 
@@ -78,8 +78,10 @@ export default function Home() {
 
     setLoading(false);
 
-    // ROLE-BASED REDIRECT (LOCKED)
-    if (profile?.role === "vendor") {
+    // ✅ ADMIN REDIRECT — check first before anything else
+    if (profile?.is_admin) {
+      router.replace("/admin");
+    } else if (profile?.role === "vendor") {
       router.replace("/vendor-dashboard");
     } else if (profile?.role === "organizer") {
       router.replace("/organizer-dashboard");
