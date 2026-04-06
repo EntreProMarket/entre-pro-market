@@ -171,10 +171,23 @@ export default function AdminDashboard() {
         top: 0,
         zIndex: 100,
       }}>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => router.push("/")}
+            style={{
+              background: "none",
+              border: "1px solid #444",
+              color: "white",
+              padding: "6px 12px",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            ← Home
+          </button>
           <span style={{ fontWeight: "bold", fontSize: 18 }}>Entre PRO Market</span>
           <span style={{
-            marginLeft: 12,
             backgroundColor: "#701890",
             color: "white",
             fontSize: 11,
@@ -453,7 +466,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.filter(u => u.business_name || u.organizer_name).map((user, i) => (
+                  {users.filter(u => u.role === "vendor" || u.role === "organizer").map((user, i) => (
                     <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? "#f9f9f9" : "white" }}>
                       <td style={tdStyle}>
                         <strong>{user.business_name || user.organizer_name || "—"}</strong>
@@ -544,7 +557,7 @@ export default function AdminDashboard() {
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "vendor" && u.business_name).map((user, i) => (
+              {users.filter(u => u.role === "vendor").map((user, i) => (
                 <div key={user.id} style={{
                   backgroundColor: "white",
                   border: `1px solid ${user.account_type === "featured" ? "#AABB23" : "#eee"}`,
