@@ -77,10 +77,12 @@ export default function AdminDashboard() {
     setPlans(plansData || []);
 
     // Load all users
-    const { data: usersData } = await supabase
+    const { data: usersData, error: usersError } = await supabase
       .from("profiles")
       .select("*")
+      .in("role", ["vendor", "organizer"])
       .order("created_at", { ascending: false });
+    if (usersError) console.log("Users error:", usersError);
     setUsers(usersData || []);
 
     // Load ads
@@ -171,29 +173,31 @@ export default function AdminDashboard() {
         top: 0,
         zIndex: 100,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             onClick={() => router.push("/")}
             style={{
               background: "none",
-              border: "1px solid #444",
+              border: "1px solid #555",
               color: "white",
               padding: "6px 12px",
-              borderRadius: 6,
+              borderRadius: 20,
               cursor: "pointer",
-              fontSize: 13,
+              fontSize: 12,
+              whiteSpace: "nowrap",
             }}
           >
             ← Home
           </button>
-          <span style={{ fontWeight: "bold", fontSize: 18 }}>Entre PRO Market</span>
+          <span style={{ fontWeight: "bold", fontSize: 16, whiteSpace: "nowrap" }}>Entre PRO Market</span>
           <span style={{
             backgroundColor: "#701890",
             color: "white",
-            fontSize: 11,
+            fontSize: 10,
             padding: "3px 8px",
             borderRadius: 10,
             fontWeight: "bold",
+            whiteSpace: "nowrap",
           }}>
             ADMIN
           </span>
@@ -201,14 +205,15 @@ export default function AdminDashboard() {
         <button
           onClick={logout}
           style={{
-            padding: "6px 14px",
+            padding: "8px 18px",
             backgroundColor: "#ff6b6b",
             color: "white",
             border: "none",
-            borderRadius: 6,
+            borderRadius: 20,
             cursor: "pointer",
             fontWeight: "bold",
             fontSize: 13,
+            whiteSpace: "nowrap",
           }}
         >
           Log Out
