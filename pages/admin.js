@@ -76,12 +76,9 @@ export default function AdminDashboard() {
       .order("sort_order", { ascending: true });
     setPlans(plansData || []);
 
-    // Load all users
+    // Load all users via RPC (bypasses RLS)
     const { data: usersData, error: usersError } = await supabase
-      .from("profiles")
-      .select("*")
-      .in("role", ["vendor", "organizer"])
-      .order("created_at", { ascending: false });
+      .rpc("get_all_profiles");
     if (usersError) console.log("Users error:", usersError);
     setUsers(usersData || []);
 
@@ -331,6 +328,37 @@ export default function AdminDashboard() {
                     {action.label}
                   </button>
                 ))}
+                {/* ✅ PUBLIC VIEW BUTTONS */}
+                <button
+                  onClick={() => window.open("/marketplace", "_blank")}
+                  style={{
+                    padding: "10px 18px",
+                    backgroundColor: "#AABB23",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: 13,
+                  }}
+                >
+                  👁️ Preview Marketplace
+                </button>
+                <button
+                  onClick={() => window.open("/", "_blank")}
+                  style={{
+                    padding: "10px 18px",
+                    backgroundColor: "#333",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: 13,
+                  }}
+                >
+                  🌐 View Homepage
+                </button>
               </div>
             </div>
           </div>
