@@ -18,13 +18,13 @@ function formatSocialLink(platform, value) {
   if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
   const handle = cleanHandle(v);
   switch (platform) {
-    case "instagram":  return `https://instagram.com/${handle}`;
-    case "facebook":   return `https://facebook.com/${handle}`;
-    case "tiktok":     return `https://tiktok.com/@${handle}`;
-    case "youtube":    return `https://youtube.com/@${handle}`;
-    case "x_twitter":  return `https://x.com/${handle}`;
-    case "website":    return `https://${handle}`;
-    default:           return `https://${handle}`;
+    case "instagram": return `https://instagram.com/${handle}`;
+    case "facebook":  return `https://facebook.com/${handle}`;
+    case "tiktok":    return `https://tiktok.com/@${handle}`;
+    case "youtube":   return `https://youtube.com/@${handle}`;
+    case "x_twitter": return `https://x.com/${handle}`;
+    case "website":   return `https://${handle}`;
+    default:          return `https://${handle}`;
   }
 }
 
@@ -77,6 +77,7 @@ function YouTubeIcon() {
   );
 }
 
+
 function XIcon() {
   return (
     <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
@@ -93,6 +94,7 @@ export default function VendorPublicProfile() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [viewerProfile, setViewerProfile] = useState(null);
 
   useEffect(() => {
     if (!handle) return;
@@ -111,6 +113,17 @@ export default function VendorPublicProfile() {
 
       setVendor(data);
       if (user && data.id === user.id) setIsOwner(true);
+
+      // Load viewer profile to check messaging permissions
+      if (user) {
+        const { data: vp } = await supabase
+          .from("profiles")
+          .select("role, account_type, id")
+          .eq("id", user.id)
+          .single();
+        setViewerProfile(vp);
+      }
+
       setLoading(false);
     };
 
@@ -119,12 +132,6 @@ export default function VendorPublicProfile() {
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
   if (!vendor) return <div style={{ padding: 20 }}>Vendor not found</div>;
-
-  const iconStyle = {
-    display: "flex",
-    opacity: 1,
-    transition: "opacity 0.2s",
-  };
 
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
@@ -169,40 +176,28 @@ export default function VendorPublicProfile() {
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
           {vendor.website && (
-            <a href={formatSocialLink("website", vendor.website)} target="_blank" rel="noreferrer" title="Website"
-              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+            <a href={formatSocialLink("website", vendor.website)} target="_blank" rel="noreferrer" title="Website" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
               <WebsiteIcon />
             </a>
           )}
           {vendor.instagram && (
-            <a href={formatSocialLink("instagram", vendor.instagram)} target="_blank" rel="noreferrer" title="Instagram"
-              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+            <a href={formatSocialLink("instagram", vendor.instagram)} target="_blank" rel="noreferrer" title="Instagram" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
               <InstagramIcon />
             </a>
           )}
           {vendor.facebook && (
-            <a href={formatSocialLink("facebook", vendor.facebook)} target="_blank" rel="noreferrer" title="Meta"
-              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+            <a href={formatSocialLink("facebook", vendor.facebook)} target="_blank" rel="noreferrer" title="Meta" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
               <MetaIcon />
             </a>
           )}
           {vendor.tiktok && (
-            <a href={formatSocialLink("tiktok", vendor.tiktok)} target="_blank" rel="noreferrer" title="TikTok"
-              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+            <a href={formatSocialLink("tiktok", vendor.tiktok)} target="_blank" rel="noreferrer" title="TikTok" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
               <TikTokIcon />
             </a>
           )}
           {vendor.youtube && (
-            <a href={formatSocialLink("youtube", vendor.youtube)} target="_blank" rel="noreferrer" title="YouTube"
-              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
+            <a href={formatSocialLink("youtube", vendor.youtube)} target="_blank" rel="noreferrer" title="YouTube" style={{ display: "flex", opacity: 1, transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
               <YouTubeIcon />
-            </a>
-          )}
-          {/* ✅ X ICON — was missing, now added */}
-          {vendor.x_twitter && (
-            <a href={formatSocialLink("x_twitter", vendor.x_twitter)} target="_blank" rel="noreferrer" title="X (Twitter)"
-              style={iconStyle} onMouseEnter={e => e.currentTarget.style.opacity="0.7"} onMouseLeave={e => e.currentTarget.style.opacity="1"}>
-              <XIcon />
             </a>
           )}
         </div>
@@ -222,6 +217,47 @@ export default function VendorPublicProfile() {
           <p>No portfolio images yet.</p>
         )}
       </div>
+
+      {/* MESSAGE BUTTON */}
+      {!isOwner && (() => {
+        const vr = viewerProfile?.role;
+        const vt = viewerProfile?.account_type;
+        const canMessage =
+          (vr === "vendor" && (vt === "premium" || vt === "featured")) ||
+          (vr === "organizer");
+        return canMessage ? (
+          <div style={{ marginTop: 20, marginBottom: 10 }}>
+            <button
+              onClick={() => router.push(`/messages?to=${vendor.id}`)}
+              style={{
+                padding: "12px 24px",
+                backgroundColor: "#AABB23",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontWeight: "bold",
+                fontSize: 15,
+                width: "100%",
+              }}
+            >
+              ✉️ Send Message
+            </button>
+          </div>
+        ) : viewerProfile ? (
+          <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f5f5f5", borderRadius: 8, textAlign: "center" }}>
+            <p style={{ margin: 0, color: "#888", fontSize: 13 }}>
+              Upgrade your plan to contact this vendor directly.
+            </p>
+            <button
+              onClick={() => router.push(vr === "vendor" ? "/vendor-info" : "/organizer-info")}
+              style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
+            >
+              View Plans
+            </button>
+          </div>
+        ) : null;
+      })()}
 
       {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
