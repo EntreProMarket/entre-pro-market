@@ -95,6 +95,7 @@ export default function OrganizerPublicProfile() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [viewerProfile, setViewerProfile] = useState(null);
 
   useEffect(() => {
     if (!handle) return;
@@ -108,6 +109,16 @@ export default function OrganizerPublicProfile() {
         .select("*")
         .eq("handle", handle)
         .single();
+
+      // Load viewer profile
+      if (userData?.user) {
+        const { data: vp } = await supabase
+          .from("profiles")
+          .select("role, account_type, id")
+          .eq("id", userData.user.id)
+          .single();
+        setViewerProfile(vp);
+      }
 
       if (error) { console.log(error); } 
       else {
@@ -270,6 +281,37 @@ export default function OrganizerPublicProfile() {
           )}
         </div>
       )}
+
+      {/* MESSAGE BUTTON */}
+      {!isOwner && (() => {
+        const vt = viewerProfile?.account_type;
+        const vr = viewerProfile?.role;
+        // Only Featured Vendors can initiate contact with organizers
+        const canMessage = vr === "featured" || vt === "featured" ||
+          (vr === "organizer");
+        return canMessage ? (
+          <div style={{ marginTop: 20, marginBottom: 10 }}>
+            <button
+              onClick={() => router.push(`/messages?to=${organizer.id}`)}
+              style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}
+            >
+              ✉️ Send Message
+            </button>
+          </div>
+        ) : viewerProfile ? (
+          <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f5f5f5", borderRadius: 8, textAlign: "center" }}>
+            <p style={{ margin: 0, color: "#888", fontSize: 13 }}>
+              Upgrade to Featured Vendor to contact organizers directly.
+            </p>
+            <button
+              onClick={() => router.push("/vendor-info")}
+              style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
+            >
+              View Plans
+            </button>
+          </div>
+        ) : null;
+      })()}
 
       {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
