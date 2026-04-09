@@ -54,9 +54,10 @@ export default function Messages() {
 
     // Vendors: premium and featured can message
     // Organizers: all tiers can message (limited by plan)
-    if (role === "vendor" && (tier === "premium" || tier === "featured")) {
+    // Also allow if no account_type set yet (fallback)
+    if (role === "vendor" && (tier === "premium" || tier === "featured" || tier === "pro")) {
       setCanMessage(true);
-    } else if (role === "organizer") {
+    } else if (role === "organizer" && (tier === "basic" || tier === "pro" || tier === "elite" || tier === "premium")) {
       setCanMessage(true);
     } else {
       setCanMessage(false);
