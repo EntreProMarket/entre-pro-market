@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-const TABS = ["Overview", "Plans & Pricing", "Users", "Featured", "Ads", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Users", "Featured", "Ads", "Reports", "Settings"];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   const [plans, setPlans] = useState([]);
   const [users, setUsers] = useState([]);
   const [ads, setAds] = useState([]);
+  const [reports, setReports] = useState([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -88,6 +89,13 @@ export default function AdminDashboard() {
       .select("*")
       .order("created_at", { ascending: false });
     setAds(adsData || []);
+
+    // Load reports
+    const { data: reportsData } = await supabase
+      .from("reports")
+      .select("*, reporter:reporter_id(business_name, organizer_name, handle), message:message_id(content, sender_id, recipient_id)")
+      .order("created_at", { ascending: false });
+    setReports(reportsData || []);
   };
 
   const savePlan = async (plan) => {
@@ -713,6 +721,84 @@ export default function AdminDashboard() {
                         }}
                       >
                         {saving ? "Saving..." : "Save Ad"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── REPORTS TAB ── */}
+        {activeTab === "Reports" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>🚩 Reports</h2>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>
+              User-submitted reports about messages. Review and take action.
+            </p>
+
+            {reports.length === 0 ? (
+              <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 30, textAlign: "center", color: "#888" }}>
+                <p>No reports yet. 🎉</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {reports.map((report, i) => (
+                  <div key={report.id} style={{
+                    backgroundColor: "white",
+                    border: `1px solid ${report.status === "pending" ? "#fca5a5" : "#eee"}`,
+                    borderRadius: 10, padding: 16,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <strong style={{ fontSize: 14 }}>
+                          {report.reporter?.business_name || report.reporter?.organizer_name || "Unknown"} reported a message
+                        </strong>
+                        <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+                          {new Date(report.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                      <span style={{
+                        padding: "4px 10px", borderRadius: 10, fontSize: 11, fontWeight: "bold",
+                        backgroundColor: report.status === "pending" ? "#fef2f2" : report.status === "resolved" ? "#f0fdf4" : "#f9ffe8",
+                        color: report.status === "pending" ? "#991b1b" : report.status === "resolved" ? "#166534" : "#888B00",
+                      }}>
+                        {report.status?.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div style={{ backgroundColor: "#f9f9f9", borderRadius: 6, padding: "10px 14px", marginBottom: 12 }}>
+                      <p style={{ margin: 0, fontSize: 12, color: "#666" }}>
+                        <strong>Reason:</strong> {report.reason}
+                      </p>
+                      {report.message?.content && (
+                        <p style={{ margin: "8px 0 0", fontSize: 12, color: "#444", fontStyle: "italic" }}>
+                          Message: "{report.message.content}"
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button
+                        onClick={async () => {
+                          await supabase.from("reports").update({ status: "reviewed" }).eq("id", report.id);
+                          setReports(reports.map(r => r.id === report.id ? { ...r, status: "reviewed" } : r));
+                          setMessage("✅ Marked as reviewed");
+                        }}
+                        style={{ padding: "7px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
+                      >
+                        Mark Reviewed
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await supabase.from("reports").update({ status: "resolved" }).eq("id", report.id);
+                          setReports(reports.map(r => r.id === report.id ? { ...r, status: "resolved" } : r));
+                          setMessage("✅ Marked as resolved");
+                        }}
+                        style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
+                      >
+                        Resolve
                       </button>
                     </div>
                   </div>
