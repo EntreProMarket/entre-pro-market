@@ -272,13 +272,17 @@ export default function Messages() {
         </div>
 
         <div style={{
-          display: "grid",
-          gridTemplateColumns: activeConvo ? "280px 1fr" : "1fr",
-          gap: 16, minHeight: 500,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          minHeight: 500,
         }}>
 
-          {/* CONVERSATIONS LIST */}
-          <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, overflow: "hidden" }}>
+          {/* CONVERSATIONS LIST — hide when convo open on mobile */}
+          <div style={{
+            backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, overflow: "hidden",
+            display: activeConvo ? "none" : "block",
+          }}>
             <div style={{ padding: "14px 16px", borderBottom: "1px solid #eee", fontWeight: "bold", fontSize: 14 }}>
               Conversations
             </div>
@@ -326,6 +330,12 @@ export default function Messages() {
 
               {/* THREAD HEADER */}
               <div style={{ padding: "12px 16px", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={() => { setActiveConvo(null); setActivePartner(null); setMessages([]); }}
+                  style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#701890", padding: "0 4px" }}
+                >
+                  ←
+                </button>
                 {activePartner?.logo_url && (
                   <img src={activePartner.logo_url} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
                 )}
