@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-const TABS = ["Overview", "Plans & Pricing", "Users", "Featured", "Ads", "Reports", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Users", "Featured Vendors", "Premium Vendors", "Ads", "Reports", "Settings"];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -590,11 +590,11 @@ export default function AdminDashboard() {
         )}
 
         {/* ── FEATURED TAB ── */}
-        {activeTab === "Featured" && (
+        {activeTab === "Featured Vendors" && (
           <div>
-            <h2 style={{ marginBottom: 6 }}>👑 Featured Vendors</h2>
+            <h2 style={{ marginBottom: 6 }}>🔥 Featured Vendors</h2>
             <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>
-              Vendors with "featured" account type appear at the top of the marketplace with a highlighted card.
+              Featured vendors appear at the very top of the marketplace with a highlighted card and 🔥 badge.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -627,12 +627,70 @@ export default function AdminDashboard() {
                     }}>
                       {user.account_type === "featured" ? "👑 Featured" : user.account_type}
                     </span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => updateUserTier(user.id, user.account_type === "featured" ? "free" : "featured")}
+                        style={{
+                          padding: "8px 14px",
+                          backgroundColor: user.account_type === "featured" ? "#ccc" : "#AABB23",
+                          color: user.account_type === "featured" ? "#333" : "white",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          fontSize: 12,
+                        }}
+                      >
+                        {user.account_type === "featured" ? "Remove Featured" : "🔥 Make Featured"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── PREMIUM VENDORS TAB ── */}
+        {activeTab === "Premium Vendors" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>💜 Premium Vendors</h2>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>
+              Premium vendors appear with a 💜 badge in the marketplace. Manage upgrades and downgrades here.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {users.filter(u => u.role === "vendor").map((user, i) => (
+                <div key={user.id} style={{
+                  backgroundColor: "white",
+                  border: `1px solid ${user.account_type === "premium" ? "#701890" : "#eee"}`,
+                  borderRadius: 10,
+                  padding: "14px 18px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {user.logo_url && (
+                      <img src={user.logo_url} alt="logo" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover" }} />
+                    )}
+                    <div>
+                      <strong>{user.business_name || "—"}</strong>
+                      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 12, color: user.account_type === "premium" ? "#701890" : "#888", fontWeight: "bold" }}>
+                      {user.account_type === "premium" ? "💜 Premium" : user.account_type}
+                    </span>
                     <button
-                      onClick={() => updateUserTier(user.id, user.account_type === "featured" ? "premium" : "featured")}
+                      onClick={() => updateUserTier(user.id, user.account_type === "premium" ? "free" : "premium")}
                       style={{
                         padding: "8px 14px",
-                        backgroundColor: user.account_type === "featured" ? "#ccc" : "#AABB23",
-                        color: "white",
+                        backgroundColor: user.account_type === "premium" ? "#ccc" : "#701890",
+                        color: user.account_type === "premium" ? "#333" : "white",
                         border: "none",
                         borderRadius: 6,
                         cursor: "pointer",
@@ -640,7 +698,7 @@ export default function AdminDashboard() {
                         fontSize: 12,
                       }}
                     >
-                      {user.account_type === "featured" ? "Remove Featured" : "Make Featured"}
+                      {user.account_type === "premium" ? "Remove Premium" : "💜 Make Premium"}
                     </button>
                   </div>
                 </div>
