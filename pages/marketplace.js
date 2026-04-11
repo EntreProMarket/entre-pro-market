@@ -201,19 +201,37 @@ export default function Marketplace() {
         </div>
       )}
 
-      {/* BOTTOM BANNER */}
-      <div style={{
-        marginTop: 40, backgroundColor: "#f9ffe8", border: "1px solid #AABB23",
-        borderRadius: 10, padding: "14px 20px",
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
-      }}>
-        <div>
-          <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>🛒 Are you a Vendor?</p>
-          <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Join EntreProMarket and get discovered by event organizers</p>
+      {/* BOTTOM BANNERS */}
+      <div style={{ marginTop: 40, display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Become a Vendor */}
+        <div style={{
+          backgroundColor: "#f9ffe8", border: "1px solid #AABB23",
+          borderRadius: 10, padding: "14px 20px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+        }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>🛒 Are you a Vendor?</p>
+            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Join EntreProMarket and get discovered by event organizers</p>
+          </div>
+          <button onClick={() => router.push("/vendor-info")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+            Become a Vendor
+          </button>
         </div>
-        <button onClick={() => router.push("/vendor-info")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-          Become a Vendor
-        </button>
+
+        {/* Become an Organizer */}
+        <div style={{
+          backgroundColor: "#f3e8ff", border: "1px solid #701890",
+          borderRadius: 10, padding: "14px 20px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+        }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>🎪 Are you an Event Organizer?</p>
+            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Find and connect with the best vendors for your events</p>
+          </div>
+          <button onClick={() => router.push("/organizer-info")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+            Become an Organizer
+          </button>
+        </div>
       </div>
     </div>
   );
