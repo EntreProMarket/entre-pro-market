@@ -298,7 +298,8 @@ export default function OrganizerPublicProfile() {
               ✉️ Send Message
             </button>
           </div>
-        ) : viewerProfile ? (
+        ) : viewerProfile?.role === "vendor" ? (
+          // Vendor viewing organizer — show vendor upgrade prompt only
           <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f5f5f5", borderRadius: 8, textAlign: "center" }}>
             <p style={{ margin: 0, color: "#888", fontSize: 13 }}>
               Upgrade to Featured Vendor to contact organizers directly.
@@ -307,7 +308,7 @@ export default function OrganizerPublicProfile() {
               onClick={() => router.push("/vendor-info")}
               style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
             >
-              View Plans
+              Upgrade Plan
             </button>
           </div>
         ) : null;
