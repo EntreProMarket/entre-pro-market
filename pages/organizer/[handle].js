@@ -299,16 +299,19 @@ export default function OrganizerPublicProfile() {
             </button>
           </div>
         ) : viewerProfile?.role === "vendor" ? (
-          // Vendor viewing organizer — show vendor upgrade prompt only
-          <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f5f5f5", borderRadius: 8, textAlign: "center" }}>
-            <p style={{ margin: 0, color: "#888", fontSize: 13 }}>
+          // Non-featured vendor viewing organizer
+          <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, textAlign: "center" }}>
+            <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 13 }}>
+              Want to work with organizers like this?
+            </p>
+            <p style={{ margin: "4px 0 8px", color: "#888", fontSize: 12 }}>
               Upgrade to Featured Vendor to contact organizers directly.
             </p>
             <button
               onClick={() => router.push("/vendor-info")}
-              style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
+              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
             >
-              Upgrade Plan
+              Upgrade to Featured
             </button>
           </div>
         ) : null;
