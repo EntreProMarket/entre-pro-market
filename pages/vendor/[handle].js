@@ -250,13 +250,26 @@ export default function VendorPublicProfile() {
               Upgrade your plan to contact this vendor directly.
             </p>
             <button
-              onClick={() => router.push(vr === "vendor" ? "/vendor-info" : "/organizer-info")}
+              onClick={() => router.push("/vendor-info")}
               style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
             >
-              View Plans
+              Upgrade Plan
             </button>
           </div>
-        ) : null;
+        ) : (
+          // Public user — no account at all
+          <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, textAlign: "center" }}>
+            <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 13 }}>
+              Want to connect with vendors like this?
+            </p>
+            <button
+              onClick={() => router.push("/vendor-info")}
+              style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
+            >
+              Become a Vendor
+            </button>
+          </div>
+        );
       })()}
 
       {/* BACK BUTTON */}
