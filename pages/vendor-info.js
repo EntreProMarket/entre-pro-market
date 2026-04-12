@@ -37,7 +37,7 @@ export default function VendorInfo() {
     load();
   }, []);
 
-  const handleChoosePlan = (tier) => {
+  const handleChoosePlan = async (tier) => {
     if (userRole === "organizer") {
       alert("You are already registered as an Organizer and cannot become a Vendor.");
       return;
@@ -46,8 +46,29 @@ export default function VendorInfo() {
       router.push("/vendor-dashboard");
       return;
     }
-    // Store selected tier and redirect to signup
-    router.push(`/?plan=vendor&tier=${tier}`);
+
+    // Check if already logged in as public user
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (user) {
+      // Already logged in — set their role to vendor with chosen tier
+      const { error } = await supabase.from("profiles").update({
+        role: "vendor",
+        account_type: tier === "free" ? "free" : tier,
+      }).eq("id", user.id);
+
+      if (!error) {
+        router.push("/vendor-profile");
+      }
+      return;
+    }
+
+    // Not logged in — send to login/signup page with plan info stored
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pendingVendorTier", tier);
+    }
+    router.push("/?mode=signup&plan=vendor&tier=" + tier);
   };
 
   const tierStyles = {
