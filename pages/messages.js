@@ -256,8 +256,16 @@ export default function Messages() {
       <div style={{ maxWidth: 900, fontFamily: "sans-serif" }}>
 
         {/* HEADER */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h1 style={{ margin: 0 }}>✉️ Messages</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={() => router.push(profile?.role === "organizer" ? "/organizer-dashboard" : "/vendor-dashboard")}
+              style={{ padding: "8px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}
+            >
+              ← Dashboard
+            </button>
+            <h1 style={{ margin: 0 }}>✉️ Messages</h1>
+          </div>
           {/* Contact limit badge for organizers */}
           {rules.vendorLimit && (
             <div style={{
