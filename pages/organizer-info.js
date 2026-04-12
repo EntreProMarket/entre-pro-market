@@ -35,7 +35,7 @@ export default function OrganizerInfo() {
     load();
   }, []);
 
-  const handleChoosePlan = (tier) => {
+  const handleChoosePlan = async (tier) => {
     if (userRole === "vendor") {
       alert("You are already registered as a Vendor and cannot become an Organizer.");
       return;
@@ -44,7 +44,24 @@ export default function OrganizerInfo() {
       router.push("/organizer-dashboard");
       return;
     }
-    router.push(`/?plan=organizer&tier=${tier}`);
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (user) {
+      const { error } = await supabase.from("profiles").update({
+        role: "organizer",
+        account_type: tier,
+      }).eq("id", user.id);
+
+      if (!error) router.push("/organizer-profile");
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pendingOrganizerTier", tier);
+    }
+    router.push("/?mode=signup&plan=organizer&tier=" + tier);
   };
 
   const tierStyles = {
