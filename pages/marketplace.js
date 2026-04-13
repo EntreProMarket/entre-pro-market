@@ -191,13 +191,7 @@ export default function Marketplace() {
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-        <button onClick={() => router.push("/home")}
-          style={{ padding: "8px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13, whiteSpace: "nowrap" }}>
-          ← Home
-        </button>
-        <h1 style={{ margin: 0 }}>Vendor Marketplace</h1>
-      </div>
+      <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
       <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
         Browse and connect with vendors for your next event
       </p>
@@ -306,6 +300,14 @@ export default function Marketplace() {
             Become an Organizer
           </button>
         </div>
+      </div>
+
+      {/* BACK BUTTON — bottom right */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
+        <button onClick={() => router.back()}
+          style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
+          ← Back
+        </button>
       </div>
     </div>
   );
