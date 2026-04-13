@@ -180,7 +180,7 @@ export default function AdminDashboard() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/home")}
             style={{
               background: "none",
               border: "1px solid #555",
@@ -210,14 +210,14 @@ export default function AdminDashboard() {
         <button
           onClick={logout}
           style={{
-            padding: "8px 18px",
+            padding: "6px 14px",
             backgroundColor: "#ff6b6b",
             color: "white",
-            border: "none",
+            border: "1px solid #ff6b6b",
             borderRadius: 20,
             cursor: "pointer",
             fontWeight: "bold",
-            fontSize: 13,
+            fontSize: 12,
             whiteSpace: "nowrap",
           }}
         >
@@ -883,7 +883,7 @@ export default function AdminDashboard() {
             }}>
               <h3 style={{ marginTop: 0 }}>App Links</h3>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => router.push("/")} style={smallBtnStyle}>Homepage</button>
+                <button onClick={() => router.push("/home")} style={smallBtnStyle}>Homepage</button>
                 <button onClick={() => router.push("/marketplace")} style={smallBtnStyle}>Marketplace</button>
                 <button onClick={() => router.push("/vendor-info")} style={smallBtnStyle}>Vendor Info Page</button>
                 <button onClick={() => router.push("/organizer-info")} style={smallBtnStyle}>Organizer Info Page</button>
