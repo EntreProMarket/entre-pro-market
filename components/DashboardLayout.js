@@ -172,7 +172,7 @@ export default function DashboardLayout({ children }) {
         </div>
 
         {/* NAV LINKS */}
-        {navItem("🏡 Home", () => { window.location.href = "/home"; })}
+        {navItem("🏡 Home", () => { window.location.assign("/home"); })}
         {navItem("🏠 Dashboard", goToDashboard)}
         {navItem("👤 Profile", goToProfile)}
         {navItem("🛒 Marketplace", () => navigate("/marketplace"))}
