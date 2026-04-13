@@ -172,11 +172,12 @@ export default function DashboardLayout({ children }) {
         </div>
 
         {/* NAV LINKS */}
-        {navItem("🏡 Home", () => navigate("/"))}
+        {navItem("🏡 Home", () => navigate("/home"))}
         {navItem("🏠 Dashboard", goToDashboard)}
         {navItem("👤 Profile", goToProfile)}
         {navItem("🛒 Marketplace", () => navigate("/marketplace"))}
         {navItem("✉️ Messages", () => navigate("/messages"))}
+        {navItem("💾 Saved Contacts", () => navigate("/saved-contacts"))}
         {navItem("⚙️ Settings", () => navigate("/settings"))}
 
         {/* LOG OUT AT BOTTOM */}
