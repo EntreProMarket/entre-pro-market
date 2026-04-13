@@ -364,8 +364,12 @@ export default function Messages() {
                     <button
                       onClick={async () => {
                         const { data: userData } = await supabase.auth.getUser();
-                        await supabase.from("saved_contacts").upsert({ user_id: userData?.user?.id, contact_id: activeConvo });
-                        alert("✅ Contact saved!");
+                        const { error } = await supabase.from("saved_contacts").upsert({ 
+                          user_id: userData?.user?.id, 
+                          contact_id: activeConvo 
+                        });
+                        if (!error) alert("✅ Contact saved!");
+                        else alert("❌ Could not save: " + error.message);
                       }}
                       style={{ padding: "6px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}
                     >
