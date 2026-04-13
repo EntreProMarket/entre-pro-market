@@ -53,7 +53,7 @@ export default function HomePage() {
         padding: "14px 20px", borderBottom: "1px solid #eee", backgroundColor: "white",
         position: "sticky", top: 0, zIndex: 10,
       }}>
-        <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 60 }} />
+        <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", objectFit: "contain" }} />
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={() => router.push("/marketplace")}
             style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
@@ -74,8 +74,8 @@ export default function HomePage() {
           borderRadius: 16, padding: "32px 24px", marginBottom: 28,
           textAlign: "center", color: "white",
         }}>
-          <h1 style={{ margin: "0 0 8px", fontSize: 26 }}>
-            Welcome to Entre PRO Market
+          <h1 style={{ margin: "0 0 8px", fontSize: 22, whiteSpace: "nowrap" }}>
+            Welcome to <span style={{ whiteSpace: "nowrap" }}>Entre PRO Market</span>
           </h1>
           <p style={{ margin: "0 0 20px", opacity: 0.9, fontSize: 15 }}>
             Connecting vendors with event organizers
