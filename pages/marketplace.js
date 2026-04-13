@@ -157,7 +157,7 @@ export default function Marketplace() {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fafafa", fontFamily: "sans-serif", padding: 20 }}>
         <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 16, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-          <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", marginBottom: 16 }} />
+          <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", marginBottom: 16 }} />
           <h2 style={{ marginBottom: 8 }}>Browse Our Vendors</h2>
           <p style={{ color: "#666", fontSize: 14, marginBottom: 24 }}>
             Enter your email to browse thousands of vendors — free, no account needed.
@@ -304,7 +304,7 @@ export default function Marketplace() {
 
       {/* BACK BUTTON — bottom right */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
-        <button onClick={() => router.back()}
+        <button onClick={() => { window.location.assign('/home'); }}
           style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
         </button>
