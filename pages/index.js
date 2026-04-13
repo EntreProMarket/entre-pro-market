@@ -122,7 +122,9 @@ export default function LoginPage() {
       backgroundColor: "#fafafa",
     }}>
       {/* LOGO */}
-      <img src="/logo.png.jpg" alt="Entre PRO Market" style={{ width: 140, marginBottom: 24 }} />
+      <div style={{ width: 160, height: 160, borderRadius: "50%", overflow: "hidden", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
+        <img src="/logo.png.jpg" alt="Entre PRO Market" style={{ width: 160, height: 160, objectFit: "contain", backgroundColor: "transparent" }} />
+      </div>
 
       {/* TITLE */}
       <h1 style={{ marginBottom: 4, textAlign: "center", fontSize: 22 }}>
@@ -214,6 +216,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-
-
