@@ -16,8 +16,39 @@ export default function Marketplace() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
+  const [gateEmail, setGateEmail] = useState("");
+  const [showGate, setShowGate] = useState(false);
+  const [gateLoading, setGateLoading] = useState(false);
 
-  useEffect(() => { fetchVendors(); }, []);
+  useEffect(() => {
+    // Check if visitor has already provided email or is logged in
+    const checkAccess = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        // Logged in — no gate needed
+        setShowGate(false);
+      } else {
+        // Check localStorage for returning visitors
+        const hasEmail = typeof window !== "undefined" && localStorage.getItem("epm_visitor_email");
+        setShowGate(!hasEmail);
+      }
+    };
+    checkAccess();
+    fetchVendors();
+  }, []);
+
+  const handleGateSubmit = async () => {
+    if (!gateEmail || !gateEmail.includes("@")) return;
+    setGateLoading(true);
+    // Save visitor email to Supabase
+    await supabase.from("visitor_emails").insert([{ email: gateEmail }]).select();
+    // Store in localStorage so they don't see gate again
+    if (typeof window !== "undefined") {
+      localStorage.setItem("epm_visitor_email", gateEmail);
+    }
+    setShowGate(false);
+    setGateLoading(false);
+  };
 
   useEffect(() => {
     let results = [...vendors];
@@ -121,9 +152,52 @@ export default function Marketplace() {
     );
   };
 
+  // EMAIL GATE OVERLAY
+  if (showGate) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fafafa", fontFamily: "sans-serif", padding: 20 }}>
+        <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 16, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+          <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", marginBottom: 16 }} />
+          <h2 style={{ marginBottom: 8 }}>Browse Our Vendors</h2>
+          <p style={{ color: "#666", fontSize: 14, marginBottom: 24 }}>
+            Enter your email to browse thousands of vendors — free, no account needed.
+          </p>
+          <input
+            type="email"
+            placeholder="your@email.com"
+            value={gateEmail}
+            onChange={e => setGateEmail(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleGateSubmit()}
+            style={{ display: "block", width: "100%", padding: "12px 14px", marginBottom: 12, borderRadius: 6, border: "1px solid #ddd", fontSize: 15, boxSizing: "border-box" }}
+          />
+          <button onClick={handleGateSubmit} disabled={gateLoading || !gateEmail.includes("@")}
+            style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 16, opacity: !gateEmail.includes("@") ? 0.6 : 1 }}>
+            {gateLoading ? "Please wait..." : "Browse Vendors →"}
+          </button>
+          <p style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>
+            No spam. We respect your privacy.
+          </p>
+          <div style={{ borderTop: "1px solid #eee", paddingTop: 16 }}>
+            <p style={{ fontSize: 13, color: "#666", marginBottom: 10 }}>Already have an account?</p>
+            <button onClick={() => router.push("/")}
+              style={{ padding: "10px 20px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 13, cursor: "pointer" }}>
+              Log In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
-      <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <button onClick={() => router.push("/home")}
+          style={{ padding: "8px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13, whiteSpace: "nowrap" }}>
+          ← Home
+        </button>
+        <h1 style={{ margin: 0 }}>Vendor Marketplace</h1>
+      </div>
       <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
         Browse and connect with vendors for your next event
       </p>
