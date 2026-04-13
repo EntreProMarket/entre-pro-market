@@ -180,7 +180,7 @@ export default function AdminDashboard() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
-            onClick={() => router.push("/home")}
+            onClick={() => { window.location.href = "/home"; }}
             style={{
               background: "none",
               border: "1px solid #555",
@@ -883,7 +883,7 @@ export default function AdminDashboard() {
             }}>
               <h3 style={{ marginTop: 0 }}>App Links</h3>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => router.push("/home")} style={smallBtnStyle}>Homepage</button>
+                <button onClick={() => { window.location.href = "/home"; }} style={smallBtnStyle}>Homepage</button>
                 <button onClick={() => router.push("/marketplace")} style={smallBtnStyle}>Marketplace</button>
                 <button onClick={() => router.push("/vendor-info")} style={smallBtnStyle}>Vendor Info Page</button>
                 <button onClick={() => router.push("/organizer-info")} style={smallBtnStyle}>Organizer Info Page</button>
