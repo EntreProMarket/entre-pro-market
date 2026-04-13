@@ -46,7 +46,12 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setMessage(error.message);
+      // Fix Supabase's unhelpful error messages
+      let msg = error.message;
+      if (msg.includes("missing email or phone")) msg = "Please enter your email address.";
+      if (msg.includes("Invalid login")) msg = "Incorrect email or password. Please try again.";
+      if (msg.includes("Email not confirmed")) msg = "Please confirm your email before logging in.";
+      setMessage(msg);
       setAuthLoading(false);
       return;
     }
@@ -122,19 +127,9 @@ export default function LoginPage() {
       backgroundColor: "#fafafa",
     }}>
       {/* LOGO */}
-      <div style={{ width: 160, height: 160, borderRadius: "50%", overflow: "hidden", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "transparent" }}>
-        <img src="/logo.png.jpg" alt="Entre PRO Market" style={{ width: 160, height: 160, objectFit: "contain", backgroundColor: "transparent" }} />
-      </div>
+      <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 200, marginBottom: 24 }} />
 
-      {/* TITLE */}
-      <h1 style={{ marginBottom: 4, textAlign: "center", fontSize: 22 }}>
-        <span style={{ color: "#701890" }}>ENTRE </span>
-        <span style={{ color: "#AABB23" }}>PRO </span>
-        <span style={{ color: "#111" }}>MARKET</span>
-      </h1>
-      <p style={{ color: "#888", fontSize: 13, marginBottom: 28, textAlign: "center" }}>
-        The marketplace for vendors and event organizers
-      </p>
+<p style={{ color: "#888", fontSize: 13, marginBottom: 28, textAlign: "center" }}>The marketplace for vendors and event organizers</p>
 
       {/* AUTH TABS */}
       <div style={{ display: "flex", marginBottom: 20, borderRadius: 8, overflow: "hidden", border: "1px solid #ddd" }}>
