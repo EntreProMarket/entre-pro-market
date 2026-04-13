@@ -180,7 +180,7 @@ export default function AdminDashboard() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
-            onClick={() => window.location.href = "/home"}
+            onClick={() => { window.location.assign('/home'); }}
             style={{
               background: "none",
               border: "1px solid #555",
@@ -338,7 +338,7 @@ export default function AdminDashboard() {
                 ))}
                 {/* ✅ PUBLIC VIEW BUTTONS */}
                 <button
-                  onClick={() => window.open("/marketplace", "_blank")}
+                  onClick={() => { window.open('/marketplace', '_blank'); }}
                   style={{
                     padding: "10px 18px",
                     backgroundColor: "#AABB23",
@@ -565,7 +565,7 @@ export default function AdminDashboard() {
                       </td>
                       <td style={tdStyle}>
                         <button
-                          onClick={() => router.push(`/${user.role}/${user.handle}`)}
+                          onClick={() => { window.location.assign(`/${user.role}/${user.handle}`); }}
                           style={smallBtnStyle}
                         >
                           View
@@ -883,10 +883,10 @@ export default function AdminDashboard() {
             }}>
               <h3 style={{ marginTop: 0 }}>App Links</h3>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => window.location.href = "/home"} style={smallBtnStyle}>Homepage</button>
-                <button onClick={() => router.push("/marketplace")} style={smallBtnStyle}>Marketplace</button>
-                <button onClick={() => router.push("/vendor-info")} style={smallBtnStyle}>Vendor Info Page</button>
-                <button onClick={() => router.push("/organizer-info")} style={smallBtnStyle}>Organizer Info Page</button>
+                <button onClick={() => { window.location.assign('/home'); }} style={smallBtnStyle}>Homepage</button>
+                <button onClick={() => { window.location.assign('/marketplace'); }} style={smallBtnStyle}>Marketplace</button>
+                <button onClick={() => { window.location.assign('/vendor-info'); }} style={smallBtnStyle}>Vendor Info Page</button>
+                <button onClick={() => { window.location.assign('/organizer-info'); }} style={smallBtnStyle}>Organizer Info Page</button>
               </div>
             </div>
 
