@@ -121,18 +121,19 @@ export default function LoginPage() {
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
-      justifyContent: "center",
-      padding: 20,
+      justifyContent: "flex-start",
+      padding: "24px 20px 40px",
       fontFamily: "sans-serif",
       backgroundColor: "#fafafa",
+      overflowY: "auto",
     }}>
       {/* LOGO */}
-      <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 200, marginBottom: 24 }} />
+      <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 140, marginBottom: 12 }} />
 
-<p style={{ color: "#888", fontSize: 13, marginBottom: 28, textAlign: "center" }}>The marketplace for vendors and event organizers</p>
+<p style={{ color: "#888", fontSize: 13, marginBottom: 16, textAlign: "center" }}>The marketplace for vendors and event organizers</p>
 
       {/* AUTH TABS */}
-      <div style={{ display: "flex", marginBottom: 20, borderRadius: 8, overflow: "hidden", border: "1px solid #ddd" }}>
+      <div style={{ display: "flex", marginBottom: 14, borderRadius: 8, overflow: "hidden", border: "1px solid #ddd" }}>
         <button onClick={() => setMode("login")} style={{
           padding: "10px 28px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: 14,
           backgroundColor: mode === "login" ? "#701890" : "white",
@@ -187,7 +188,7 @@ export default function LoginPage() {
       </div>
 
       {/* DIVIDER */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0", width: "100%", maxWidth: 400 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 0", width: "100%", maxWidth: 400 }}>
         <div style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
         <span style={{ color: "#aaa", fontSize: 12 }}>or</span>
         <div style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
