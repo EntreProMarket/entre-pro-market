@@ -11,6 +11,16 @@ export default function DashboardLayout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
+    // ✅ FREEZE BACKSPACING across entire app
+    const freezeBack = () => {
+      window.history.pushState(null, document.title, window.location.href);
+    };
+    freezeBack();
+    window.addEventListener("popstate", freezeBack);
+    return () => window.removeEventListener("popstate", freezeBack);
+  }, []);
+
+  useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
       if (!data?.user) { router.replace("/"); return; }
