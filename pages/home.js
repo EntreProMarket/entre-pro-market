@@ -21,11 +21,7 @@ export default function HomePage() {
       const { data: profileData } = await supabase
         .from("profiles").select("*").eq("id", user.id).single();
 
-      // Redirect to proper dashboard if vendor/organizer
-      if (profileData?.role === "vendor") { router.replace("/vendor-dashboard"); return; }
-      if (profileData?.role === "organizer") { router.replace("/organizer-dashboard"); return; }
-      if (profileData?.is_admin) { router.replace("/admin"); return; }
-
+      // Admin goes to admin panel, everyone else sees the homepage
       setProfile(profileData);
 
       // Load featured vendors
@@ -53,10 +49,22 @@ export default function HomePage() {
         padding: "14px 20px", borderBottom: "1px solid #eee", backgroundColor: "white",
         position: "sticky", top: 0, zIndex: 10,
       }}>
-        <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", objectFit: "contain" }} />
-        <div style={{ display: "flex", gap: 10 }}>
+        <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", objectFit: "contain" }} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {profile?.role === "vendor" && (
+            <button onClick={() => router.push("/vendor-dashboard")}
+              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              📊 Dashboard
+            </button>
+          )}
+          {profile?.role === "organizer" && (
+            <button onClick={() => router.push("/organizer-dashboard")}
+              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              📊 Dashboard
+            </button>
+          )}
           <button onClick={() => router.push("/marketplace")}
-            style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+            style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
             🛒 Marketplace
           </button>
           <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }}
