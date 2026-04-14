@@ -128,7 +128,7 @@ export default function LoginPage() {
       overflowY: "auto",
     }}>
       {/* LOGO */}
-      <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 140, marginBottom: 12 }} />
+      <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 180, marginBottom: 12 }} />
 
 <p style={{ color: "#888", fontSize: 13, marginBottom: 16, textAlign: "center" }}>The marketplace for vendors and event organizers</p>
 
