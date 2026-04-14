@@ -346,7 +346,7 @@ export default function AdminDashboard() {
                 ))}
                 {/* ✅ PUBLIC VIEW BUTTONS */}
                 <button
-                  onClick={() => { window.open('/marketplace', '_blank'); }}
+                  onClick={() => window.open("/marketplace", "_blank")}
                   style={{
                     padding: "10px 18px",
                     backgroundColor: "#AABB23",
@@ -359,21 +359,6 @@ export default function AdminDashboard() {
                   }}
                 >
                   👁️ Preview Marketplace
-                </button>
-                <button
-                  onClick={() => window.open("/", "_blank")}
-                  style={{
-                    padding: "10px 18px",
-                    backgroundColor: "#333",
-                    color: "white",
-                    border: "none",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    fontSize: 13,
-                  }}
-                >
-                  🌐 View Homepage
                 </button>
               </div>
             </div>
