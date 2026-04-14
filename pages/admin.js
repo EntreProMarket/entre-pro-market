@@ -22,14 +22,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     checkAdmin();
 
-    // ✅ FREEZE BACKSPACING — admin panel is a dead end
-    // Push a dummy state so back button has nowhere to go
-    window.history.pushState(null, "", window.location.href);
-    const handlePop = () => {
-      window.history.pushState(null, "", window.location.href);
+    // ✅ FREEZE BACKSPACING — admin panel stays put
+    const freezeBack = () => {
+      window.history.pushState(null, document.title, window.location.href);
     };
-    window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
+    freezeBack();
+    window.addEventListener("popstate", freezeBack);
+    return () => window.removeEventListener("popstate", freezeBack);
   }, []);
 
   const checkAdmin = async () => {
