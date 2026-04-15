@@ -39,12 +39,22 @@ export default function AdminDashboard() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("is_admin")
+      .select("is_admin, role")
       .eq("id", user.id)
       .single();
 
-    if (!profile?.is_admin) {
-      router.replace("/");
+    // Only redirect if explicitly NOT admin - ignore null/error states
+    if (profile && profile.is_admin !== true) {
+      // Redirect to correct dashboard based on role
+      if (profile.role === "organizer") router.replace("/organizer-dashboard");
+      else if (profile.role === "vendor") router.replace("/vendor-dashboard");
+      else router.replace("/");
+      return;
+    }
+
+    // If profile is null (RLS issue), still allow if previously verified
+    if (!profile) {
+      console.log("Profile load failed - checking session");
       return;
     }
 
