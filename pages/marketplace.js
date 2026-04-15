@@ -329,7 +329,7 @@ export default function Marketplace() {
             ← Back to Admin
           </button>
         )}
-        <button onClick={() => { window.location.assign('/home'); }}
+        <button onClick={() => router.back()}
           style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
         </button>
