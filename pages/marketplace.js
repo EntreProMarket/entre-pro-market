@@ -19,6 +19,7 @@ export default function Marketplace() {
   const [gateEmail, setGateEmail] = useState("");
   const [showGate, setShowGate] = useState(false);
   const [gateLoading, setGateLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     // Check if visitor has already provided email or is logged in
@@ -27,6 +28,13 @@ export default function Marketplace() {
       if (userData?.user) {
         // Logged in — no gate needed
         setShowGate(false);
+        // Check if admin
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", userData.user.id)
+          .single();
+        setIsAdmin(profile?.is_admin === true);
       } else {
         // Check localStorage for returning visitors
         const hasEmail = typeof window !== "undefined" && localStorage.getItem("epm_visitor_email");
@@ -303,7 +311,24 @@ export default function Marketplace() {
       </div>
 
       {/* BACK BUTTON — bottom right */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 32 }}>
+        {isAdmin && (
+          <button
+            onClick={() => window.location.replace("/admin")}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "#cc0000",
+              color: "white",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: "bold",
+              fontSize: 13,
+            }}
+          >
+            ← Back to Admin
+          </button>
+        )}
         <button onClick={() => { window.location.assign('/home'); }}
           style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
