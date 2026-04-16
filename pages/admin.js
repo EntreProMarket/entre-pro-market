@@ -323,55 +323,7 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            <div style={{
-              backgroundColor: "white",
-              border: "1px solid #eee",
-              borderRadius: 10,
-              padding: 20,
-            }}>
-              <h3 style={{ marginTop: 0 }}>Quick Actions</h3>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {[
-                  { label: "Manage Users", tab: "Users" },
-                  { label: "Edit Prices", tab: "Plans & Pricing" },
-                  { label: "Manage Ads", tab: "Ads" },
-                  { label: "🔥 Featured Vendors", tab: "Featured Vendors" },
-                ].map(action => (
-                  <button
-                    key={action.label}
-                    onClick={() => setActiveTab(action.tab)}
-                    style={{
-                      padding: "10px 18px",
-                      backgroundColor: "#701890",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontWeight: "bold",
-                      fontSize: 13,
-                    }}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-                {/* ✅ PUBLIC VIEW BUTTONS */}
-                <button
-                  onClick={() => window.location.assign("/marketplace")}
-                  style={{
-                    padding: "10px 18px",
-                    backgroundColor: "#AABB23",
-                    color: "white",
-                    border: "none",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    fontSize: 13,
-                  }}
-                >
-                  👁️ Preview Marketplace
-                </button>
-              </div>
-            </div>
+
           </div>
         )}
 
