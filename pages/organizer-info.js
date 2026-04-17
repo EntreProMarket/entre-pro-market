@@ -49,19 +49,17 @@ export default function OrganizerInfo() {
     const user = userData?.user;
 
     if (user) {
-      const { error } = await supabase.from("profiles").update({
+      // Already logged in — set role and go to profile
+      await supabase.from("profiles").update({
         role: "organizer",
         account_type: tier,
       }).eq("id", user.id);
-
-      if (!error) router.push("/organizer-profile");
+      router.push("/organizer-profile");
       return;
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.setItem("pendingOrganizerTier", tier);
-    }
-    router.push("/?mode=signup&plan=organizer&tier=" + tier);
+    // Not logged in — send to signup with plan context in URL
+    router.push(`/?mode=signup&plan=organizer&tier=${tier}`);
   };
 
   const tierStyles = {
@@ -75,7 +73,7 @@ export default function OrganizerInfo() {
 
       {/* HEADER */}
       <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
+        <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
         <h1 style={{ marginBottom: 8 }}>Become an Organizer</h1>
         <p style={{ color: "#666", fontSize: 15, maxWidth: 600, margin: "0 auto" }}>
           Find and connect with the best vendors for your events. 
