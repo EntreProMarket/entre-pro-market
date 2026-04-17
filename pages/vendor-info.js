@@ -47,28 +47,21 @@ export default function VendorInfo() {
       return;
     }
 
-    // Check if already logged in as public user
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
     if (user) {
-      // Already logged in — set their role to vendor with chosen tier
-      const { error } = await supabase.from("profiles").update({
+      // Already logged in — set role and go to profile
+      await supabase.from("profiles").update({
         role: "vendor",
-        account_type: tier === "free" ? "free" : tier,
+        account_type: tier,
       }).eq("id", user.id);
-
-      if (!error) {
-        router.push("/vendor-profile");
-      }
+      router.push("/vendor-profile");
       return;
     }
 
-    // Not logged in — send to login/signup page with plan info stored
-    if (typeof window !== "undefined") {
-      localStorage.setItem("pendingVendorTier", tier);
-    }
-    router.push("/?mode=signup&plan=vendor&tier=" + tier);
+    // Not logged in — send to signup with plan context in URL
+    router.push(`/?mode=signup&plan=vendor&tier=${tier}`);
   };
 
   const tierStyles = {
@@ -82,7 +75,7 @@ export default function VendorInfo() {
 
       {/* HEADER */}
       <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <img src="/logo.png.jpg" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
+        <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
         <h1 style={{ marginBottom: 8 }}>Become a Vendor</h1>
         <p style={{ color: "#666", fontSize: 15, maxWidth: 600, margin: "0 auto" }}>
           Join EntreProMarket and get discovered by event organizers and shoppers. 
