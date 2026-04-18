@@ -5,8 +5,10 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
 const CATEGORIES = [
-  "All", "DJ", "Photographer", "Caterer", "Decorator",
-  "Venue", "Florist", "Hair & Makeup", "Music", "Other"
+  "All", "DJ", "Photographer", "Videographer", "Caterer", "Decorator",
+  "Venue", "Florist", "Hair & Makeup", "Music", "Bakery",
+  "Clothing & Apparel", "Jewelry", "Crafts & Art", "Food & Beverage",
+  "Health & Wellness", "Entertainment", "Security", "Transportation", "Other"
 ];
 
 export default function Marketplace() {
