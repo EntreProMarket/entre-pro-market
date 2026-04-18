@@ -38,8 +38,7 @@ export default function VendorProfile() {
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
-  const [tags, setTags] = useState([]);
-  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [description, setDescription] = useState("");
@@ -71,7 +70,7 @@ export default function VendorProfile() {
         setBusinessName(profile.business_name || "");
         setHandle(profile.handle || "");
         setCategory(profile.category || "");
-        setTags(profile.tags || []);
+        setTags(profile.tags ? profile.tags.join(", ") : "");
         setCity(profile.city || "");
         setState(profile.state || "");
         setDescription(profile.description || "");
@@ -102,19 +101,7 @@ export default function VendorProfile() {
     return data.publicUrl;
   };
 
-  const addTag = (e) => {
-    if (e.key === "Enter" && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
-      }
-      setTagInput("");
-    }
-  };
 
-  const removeTag = (tagToRemove) => {
-    setTags(tags.filter((t) => t !== tagToRemove));
-  };
 
   const removePortfolioImage = (url) => {
     setPortfolioImages(portfolioImages.filter((img) => img !== url));
@@ -159,7 +146,7 @@ export default function VendorProfile() {
           business_name: businessName,
           handle,
           category,
-          tags,
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           city,
           state,
           description,
@@ -194,25 +181,41 @@ export default function VendorProfile() {
 
       <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} />
       <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} style={inputStyle} />
-      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle} />
+      <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+        <option value="">Select a Category...</option>
+        <option value="DJ">DJ</option>
+        <option value="Photographer">Photographer</option>
+        <option value="Videographer">Videographer</option>
+        <option value="Caterer">Caterer</option>
+        <option value="Decorator">Decorator</option>
+        <option value="Venue">Venue</option>
+        <option value="Florist">Florist</option>
+        <option value="Hair & Makeup">Hair & Makeup</option>
+        <option value="Music">Music</option>
+        <option value="Bakery">Bakery</option>
+        <option value="Clothing & Apparel">Clothing & Apparel</option>
+        <option value="Jewelry">Jewelry</option>
+        <option value="Crafts & Art">Crafts & Art</option>
+        <option value="Food & Beverage">Food & Beverage</option>
+        <option value="Health & Wellness">Health & Wellness</option>
+        <option value="Entertainment">Entertainment</option>
+        <option value="Security">Security</option>
+        <option value="Transportation">Transportation</option>
+        <option value="Other">Other</option>
+      </select>
       <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
       <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} style={inputStyle} />
       <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} />
 
       {/* TAGS */}
       <input
-        placeholder="Add tag + Enter"
-        value={tagInput}
-        onChange={(e) => setTagInput(e.target.value)}
-        onKeyDown={addTag}
+        placeholder="Tags (comma separated, e.g. weddings, corporate, outdoor)"
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
         style={inputStyle}
       />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-        {tags.map((t) => (
-          <span key={t} onClick={() => removeTag(t)} style={{ padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12, cursor: "pointer" }}>
-            {t} ×
-          </span>
-        ))}
+
       </div>
 
       {/* ⚠️ WARNING */}
