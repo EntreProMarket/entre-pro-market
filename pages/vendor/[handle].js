@@ -95,6 +95,7 @@ export default function VendorPublicProfile() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
   const [viewerProfile, setViewerProfile] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!handle) return;
@@ -134,7 +135,52 @@ export default function VendorPublicProfile() {
   if (!vendor) return <div style={{ padding: 20 }}>Vendor not found</div>;
 
   return (
-    <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
+    <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
+
+      {/* OWNER NAV MENU — only visible to the vendor who owns this profile */}
+      {isOwner && (
+        <div style={{ position: "relative", marginBottom: 12 }}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{
+              padding: "8px 14px", backgroundColor: "#111", color: "white",
+              border: "none", borderRadius: 6, cursor: "pointer",
+              fontWeight: "bold", fontSize: 13,
+            }}
+          >
+            ☰ Menu
+          </button>
+          {menuOpen && (
+            <div style={{
+              position: "absolute", top: 40, left: 0,
+              backgroundColor: "white", border: "1px solid #ddd",
+              borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+              zIndex: 100, minWidth: 180, overflow: "hidden",
+            }}>
+              {[
+                { label: "🏡 Home", path: "/home" },
+                { label: "📊 Dashboard", path: "/vendor-dashboard" },
+                { label: "✏️ Edit Profile", path: "/vendor-profile" },
+                { label: "🛒 Marketplace", path: "/marketplace" },
+                { label: "✉️ Messages", path: "/messages" },
+              ].map(item => (
+                <button
+                  key={item.path}
+                  onClick={() => { setMenuOpen(false); router.push(item.path); }}
+                  style={{
+                    display: "block", width: "100%", padding: "12px 16px",
+                    backgroundColor: "white", border: "none",
+                    borderBottom: "1px solid #f0f0f0", cursor: "pointer",
+                    textAlign: "left", fontSize: 14, fontWeight: "bold", color: "#333",
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
