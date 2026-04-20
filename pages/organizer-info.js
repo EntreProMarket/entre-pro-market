@@ -35,6 +35,19 @@ export default function OrganizerInfo() {
     load();
   }, []);
 
+  // Price IDs from Stripe (set after running /api/stripe-setup)
+  const PRICE_IDS = {
+    basic: process.env.NEXT_PUBLIC_STRIPE_ORG_BASIC_PRICE_ID,
+    pro: process.env.NEXT_PUBLIC_STRIPE_ORG_PRO_PRICE_ID,
+    elite: process.env.NEXT_PUBLIC_STRIPE_ORG_ELITE_PRICE_ID,
+  };
+
+  const PRICE_MODES = {
+    basic: "payment",       // one-time
+    pro: "subscription",    // monthly
+    elite: "subscription",  // monthly
+  };
+
   const handleChoosePlan = async (tier) => {
     if (userRole === "vendor") {
       alert("You are already registered as a Vendor and cannot become an Organizer.");
@@ -48,18 +61,41 @@ export default function OrganizerInfo() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
-    if (user) {
-      // Already logged in — set role and go to profile
-      await supabase.from("profiles").update({
-        role: "organizer",
-        account_type: tier,
-      }).eq("id", user.id);
-      router.push("/organizer-profile");
+    // Not logged in — send to signup first
+    if (!user) {
+      router.push(`/?mode=signup&plan=organizer&tier=${tier}`);
       return;
     }
 
-    // Not logged in — send to signup with plan context in URL
-    router.push(`/?mode=signup&plan=organizer&tier=${tier}`);
+    // Go to Stripe checkout
+    const priceId = PRICE_IDS[tier];
+    if (!priceId) {
+      alert("Payment not configured yet. Please contact support.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id,
+          role: "organizer",
+          tier,
+          mode: PRICE_MODES[tier],
+        }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Error starting checkout: " + data.error);
+      }
+    } catch (err) {
+      alert("Checkout error: " + err.message);
+    }
   };
 
   const tierStyles = {
