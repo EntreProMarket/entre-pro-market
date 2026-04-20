@@ -37,6 +37,12 @@ export default function VendorInfo() {
     load();
   }, []);
 
+  // Price IDs from Stripe (set after running /api/stripe-setup)
+  const PRICE_IDS = {
+    premium: process.env.NEXT_PUBLIC_STRIPE_VENDOR_PREMIUM_PRICE_ID,
+    featured: process.env.NEXT_PUBLIC_STRIPE_VENDOR_FEATURED_PRICE_ID,
+  };
+
   const handleChoosePlan = async (tier) => {
     if (userRole === "organizer") {
       alert("You are already registered as an Organizer and cannot become a Vendor.");
@@ -50,18 +56,51 @@ export default function VendorInfo() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
-    if (user) {
-      // Already logged in — set role and go to profile
+    // Not logged in — send to signup first
+    if (!user) {
+      router.push(`/?mode=signup&plan=vendor&tier=${tier}`);
+      return;
+    }
+
+    // Free tier — no payment needed
+    if (tier === "free") {
       await supabase.from("profiles").update({
         role: "vendor",
-        account_type: tier,
+        account_type: "free",
       }).eq("id", user.id);
       router.push("/vendor-profile");
       return;
     }
 
-    // Not logged in — send to signup with plan context in URL
-    router.push(`/?mode=signup&plan=vendor&tier=${tier}`);
+    // Paid tier — go to Stripe checkout
+    const priceId = PRICE_IDS[tier];
+    if (!priceId) {
+      alert("Payment not configured yet. Please contact support.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id,
+          role: "vendor",
+          tier,
+          mode: "subscription",
+        }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Error starting checkout: " + data.error);
+      }
+    } catch (err) {
+      alert("Checkout error: " + err.message);
+    }
   };
 
   const tierStyles = {
