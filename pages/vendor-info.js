@@ -37,10 +37,9 @@ export default function VendorInfo() {
     load();
   }, []);
 
-  // Price IDs from Stripe (set after running /api/stripe-setup)
   const PRICE_IDS = {
-    premium: process.env.NEXT_PUBLIC_STRIPE_VENDOR_PREMIUM_PRICE_ID,
-    featured: process.env.NEXT_PUBLIC_STRIPE_VENDOR_FEATURED_PRICE_ID,
+    premium: "price_1TORKAIofgLPwGzFG8dd6YQg",
+    featured: "price_1TORKAIofgLPwGzFRhbQup5T",
   };
 
   const handleChoosePlan = async (tier) => {
