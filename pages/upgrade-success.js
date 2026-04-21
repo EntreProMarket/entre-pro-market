@@ -13,19 +13,40 @@ export default function UpgradeSuccess() {
   useEffect(() => {
     if (!role) return;
 
-    // Countdown then redirect to dashboard
-    const timer = setInterval(() => {
-      setCountdown(c => {
-        if (c <= 1) {
-          clearInterval(timer);
-          const dest = role === "vendor" ? "/vendor-dashboard" : "/organizer-dashboard";
-          router.replace(dest);
-        }
-        return c - 1;
-      });
-    }, 1000);
+    const checkProfile = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) { router.replace("/"); return; }
 
-    return () => clearInterval(timer);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("business_name, organizer_name, account_type")
+        .eq("id", user.id)
+        .single();
+
+      // Determine where to send user after countdown
+      let dest;
+      if (role === "vendor") {
+        // New vendor with no profile yet → go to profile setup
+        dest = profile?.business_name ? "/vendor-dashboard" : "/vendor-profile";
+      } else {
+        dest = profile?.organizer_name ? "/organizer-dashboard" : "/organizer-profile";
+      }
+
+      const timer = setInterval(() => {
+        setCountdown(c => {
+          if (c <= 1) {
+            clearInterval(timer);
+            router.replace(dest);
+          }
+          return c - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    };
+
+    checkProfile();
   }, [role]);
 
   const tierLabels = {
@@ -92,7 +113,17 @@ export default function UpgradeSuccess() {
         </p>
 
         <button
-          onClick={() => router.replace(role === "vendor" ? "/vendor-dashboard" : "/organizer-dashboard")}
+          onClick={async () => {
+            const { data: userData } = await supabase.auth.getUser();
+            const user = userData?.user;
+            if (!user) { router.replace("/"); return; }
+            const { data: profile } = await supabase.from("profiles").select("business_name, organizer_name").eq("id", user.id).single();
+            if (role === "vendor") {
+              router.replace(profile?.business_name ? "/vendor-dashboard" : "/vendor-profile");
+            } else {
+              router.replace(profile?.organizer_name ? "/organizer-dashboard" : "/organizer-profile");
+            }
+          }}
           style={{
             width: "100%",
             padding: "13px",
