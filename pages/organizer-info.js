@@ -35,11 +35,10 @@ export default function OrganizerInfo() {
     load();
   }, []);
 
-  // Price IDs from Stripe (set after running /api/stripe-setup)
   const PRICE_IDS = {
-    basic: process.env.NEXT_PUBLIC_STRIPE_ORG_BASIC_PRICE_ID,
-    pro: process.env.NEXT_PUBLIC_STRIPE_ORG_PRO_PRICE_ID,
-    elite: process.env.NEXT_PUBLIC_STRIPE_ORG_ELITE_PRICE_ID,
+    basic: "price_1TORKAIofgLPwGzFMjSv35Pk",
+    pro: "price_1TORKBIofgLPwGzF0qle4iMc",
+    elite: "price_1TORKBIofgLPwGzFzJoejEE7",
   };
 
   const PRICE_MODES = {
