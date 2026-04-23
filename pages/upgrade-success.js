@@ -1,67 +1,82 @@
 // pages/upgrade-success.js
-// Landing page after successful Stripe payment
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 export default function UpgradeSuccess() {
   const router = useRouter();
-  const [countdown, setCountdown] = useState(5);
-  const [destPath, setDestPath] = useState(null);
-
-  // Wait for router to be ready before reading query params
-  const role = router.isReady ? router.query.role : null;
-  const tier = router.isReady ? router.query.tier : null;
+  const [status, setStatus] = useState("loading");
+  const [tierLabel, setTierLabel] = useState("");
+  const [tierIcon, setTierIcon] = useState("🎉");
+  const [tierColor, setTierColor] = useState("#701890");
 
   useEffect(() => {
-    if (!router.isReady || !role) return;
+    // Wait for router to be ready
+    if (!router.isReady) return;
 
-    const checkProfile = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) { window.location.href = "/"; return; }
+    const { role, tier } = router.query;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("business_name, organizer_name, account_type")
-        .eq("id", user.id)
-        .single();
-
-      // Determine where to send user after countdown
-      let dest;
-      if (role === "vendor") {
-        // New vendor with no profile yet → go to profile setup
-        dest = profile?.business_name ? "/vendor-dashboard" : "/vendor-profile";
-      } else {
-        dest = profile?.organizer_name ? "/organizer-dashboard" : "/organizer-profile";
-      }
-
-      const timer = setInterval(() => {
-        setCountdown(c => {
-          if (c <= 1) {
-            clearInterval(timer);
-            window.location.href = dest;
-          }
-          return c - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
+    const labels = {
+      premium:  { label: "Premium Vendor",   icon: "💜", color: "#701890" },
+      featured: { label: "Featured Vendor",  icon: "🔥", color: "#AABB23" },
+      basic:    { label: "Basic Organizer",  icon: "💼", color: "#555"    },
+      pro:      { label: "Pro Organizer",    icon: "🚀", color: "#701890" },
+      elite:    { label: "Elite Organizer",  icon: "👑", color: "#AABB23" },
     };
 
-    checkProfile();
-  }, [role]);
+    const config = labels[tier] || { label: tier, icon: "✅", color: "#701890" };
+    setTierLabel(config.label);
+    setTierIcon(config.icon);
+    setTierColor(config.color);
+    setStatus("success");
 
-  const tierLabels = {
-    premium: { label: "Premium Vendor", icon: "💜", color: "#701890" },
-    featured: { label: "Featured Vendor", icon: "🔥", color: "#AABB23" },
-    basic: { label: "Basic Organizer", icon: "💼", color: "#555" },
-    pro: { label: "Pro Organizer", icon: "🚀", color: "#701890" },
-    elite: { label: "Elite Organizer", icon: "👑", color: "#AABB23" },
+    // Auto redirect after 4 seconds
+    const timer = setTimeout(async () => {
+      await goToDashboard(role);
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [router.isReady, router.query]);
+
+  const goToDashboard = async (role) => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) {
+      window.location.href = "/";
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("business_name, organizer_name")
+      .eq("id", user.id)
+      .single();
+
+    if (role === "vendor") {
+      // New vendor — no business name yet → go set up profile
+      if (!profile?.business_name) {
+        window.location.href = "/vendor-profile";
+      } else {
+        window.location.href = "/vendor-dashboard";
+      }
+    } else {
+      // New organizer — no name yet → go set up profile
+      if (!profile?.organizer_name) {
+        window.location.href = "/organizer-profile";
+      } else {
+        window.location.href = "/organizer-dashboard";
+      }
+    }
   };
 
-  const config = tierLabels[tier] || { label: tier, icon: "✅", color: "#701890" };
+  if (status === "loading") {
+    return (
+      <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -83,7 +98,7 @@ export default function UpgradeSuccess() {
 
       <div style={{
         backgroundColor: "white",
-        border: `2px solid ${config.color}`,
+        border: `2px solid ${tierColor}`,
         borderRadius: 16,
         padding: "32px 24px",
         maxWidth: 400,
@@ -91,47 +106,36 @@ export default function UpgradeSuccess() {
         boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
       }}>
         <p style={{ fontSize: 60, margin: "0 0 12px" }}>🎉</p>
-        <h1 style={{ margin: "0 0 8px", color: config.color, fontSize: 22 }}>
+        <h1 style={{ margin: "0 0 8px", color: tierColor, fontSize: 22 }}>
           Payment Successful!
         </h1>
         <p style={{ margin: "0 0 20px", color: "#666", fontSize: 15 }}>
-          Welcome to {config.icon} {config.label}
+          Welcome to {tierIcon} {tierLabel}
         </p>
 
         <div style={{
-          backgroundColor: config.color + "15",
-          border: `1px solid ${config.color}`,
+          backgroundColor: tierColor + "15",
+          border: `1px solid ${tierColor}`,
           borderRadius: 8,
           padding: "12px 16px",
           marginBottom: 24,
           fontSize: 13,
-          color: config.color,
+          color: tierColor,
           fontWeight: "bold",
         }}>
-          Your account has been upgraded successfully.
-          All features are now active!
+          Your account is now active! Let's set up your profile.
         </div>
 
         <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>
-          Redirecting to your dashboard in {countdown} seconds...
+          Redirecting you in a moment...
         </p>
 
         <button
-          onClick={async () => {
-            const { data: userData } = await supabase.auth.getUser();
-            const user = userData?.user;
-            if (!user) { window.location.href = "/"; return; }
-            const { data: profile } = await supabase.from("profiles").select("business_name, organizer_name").eq("id", user.id).single();
-            if (role === "vendor") {
-              router.replace(profile?.business_name ? "/vendor-dashboard" : "/vendor-profile");
-            } else {
-              router.replace(profile?.organizer_name ? "/organizer-dashboard" : "/organizer-profile");
-            }
-          }}
+          onClick={() => goToDashboard(router.query.role)}
           style={{
             width: "100%",
             padding: "13px",
-            backgroundColor: config.color,
+            backgroundColor: tierColor,
             color: "white",
             border: "none",
             borderRadius: 8,
@@ -140,7 +144,7 @@ export default function UpgradeSuccess() {
             cursor: "pointer",
           }}
         >
-          Go to Dashboard Now →
+          Set Up My Profile →
         </button>
       </div>
     </div>
