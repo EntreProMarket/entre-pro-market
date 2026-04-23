@@ -39,14 +39,11 @@ export default function UpgradeSuccess() {
   }, [router.isReady, router.query]);
 
   const goToDashboard = async (roleParam) => {
-    // Use URL param or fall back to reading from current URL
     const currentRole = roleParam || new URLSearchParams(window.location.search).get("role");
-    
     if (currentRole === "organizer") {
-      window.location.href = "/organizer-profile";
+      window.location.href = "/organizer-dashboard";
     } else {
-      // Default: always send to vendor profile setup after payment
-      window.location.href = "/vendor-profile";
+      window.location.href = "/vendor-dashboard";
     }
   };
 
