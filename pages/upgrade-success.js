@@ -32,41 +32,21 @@ export default function UpgradeSuccess() {
 
     // Auto redirect after 4 seconds
     const timer = setTimeout(async () => {
-      await goToDashboard(role);
-    }, 4000);
+      await goToDashboard(role || new URLSearchParams(window.location.search).get("role"));
+    }, 10000);
 
     return () => clearTimeout(timer);
   }, [router.isReady, router.query]);
 
-  const goToDashboard = async (role) => {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-
-    if (!user) {
-      window.location.href = "/";
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("business_name, organizer_name")
-      .eq("id", user.id)
-      .single();
-
-    if (role === "vendor") {
-      // New vendor — no business name yet → go set up profile
-      if (!profile?.business_name) {
-        window.location.href = "/vendor-profile";
-      } else {
-        window.location.href = "/vendor-dashboard";
-      }
+  const goToDashboard = async (roleParam) => {
+    // Use URL param or fall back to reading from current URL
+    const currentRole = roleParam || new URLSearchParams(window.location.search).get("role");
+    
+    if (currentRole === "organizer") {
+      window.location.href = "/organizer-profile";
     } else {
-      // New organizer — no name yet → go set up profile
-      if (!profile?.organizer_name) {
-        window.location.href = "/organizer-profile";
-      } else {
-        window.location.href = "/organizer-dashboard";
-      }
+      // Default: always send to vendor profile setup after payment
+      window.location.href = "/vendor-profile";
     }
   };
 
@@ -131,7 +111,7 @@ export default function UpgradeSuccess() {
         </p>
 
         <button
-          onClick={() => goToDashboard(router.query.role)}
+          onClick={() => goToDashboard(router.query.role || new URLSearchParams(window.location.search).get('role'))}
           style={{
             width: "100%",
             padding: "13px",
