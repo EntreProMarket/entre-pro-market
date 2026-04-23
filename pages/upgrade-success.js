@@ -7,16 +7,20 @@ import { supabase } from "../lib/supabaseClient";
 
 export default function UpgradeSuccess() {
   const router = useRouter();
-  const { role, tier } = router.query;
   const [countdown, setCountdown] = useState(5);
+  const [destPath, setDestPath] = useState(null);
+
+  // Wait for router to be ready before reading query params
+  const role = router.isReady ? router.query.role : null;
+  const tier = router.isReady ? router.query.tier : null;
 
   useEffect(() => {
-    if (!role) return;
+    if (!router.isReady || !role) return;
 
     const checkProfile = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
-      if (!user) { router.replace("/"); return; }
+      if (!user) { window.location.href = "/"; return; }
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -37,7 +41,7 @@ export default function UpgradeSuccess() {
         setCountdown(c => {
           if (c <= 1) {
             clearInterval(timer);
-            router.replace(dest);
+            window.location.href = dest;
           }
           return c - 1;
         });
@@ -116,7 +120,7 @@ export default function UpgradeSuccess() {
           onClick={async () => {
             const { data: userData } = await supabase.auth.getUser();
             const user = userData?.user;
-            if (!user) { router.replace("/"); return; }
+            if (!user) { window.location.href = "/"; return; }
             const { data: profile } = await supabase.from("profiles").select("business_name, organizer_name").eq("id", user.id).single();
             if (role === "vendor") {
               router.replace(profile?.business_name ? "/vendor-dashboard" : "/vendor-profile");
