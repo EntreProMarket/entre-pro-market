@@ -21,6 +21,7 @@ export default function Marketplace() {
   const [gateEmail, setGateEmail] = useState("");
   const [showGate, setShowGate] = useState(false);
   const [gateLoading, setGateLoading] = useState(false);
+  const [loggedInProfile, setLoggedInProfile] = useState(null);
 
   useEffect(() => {
     // Check if visitor has already provided email or is logged in
@@ -29,6 +30,12 @@ export default function Marketplace() {
       if (userData?.user) {
         // Logged in — no gate needed
         setShowGate(false);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, account_type, is_admin")
+          .eq("id", userData.user.id)
+          .single();
+        setLoggedInProfile(profile);
       } else {
         // Check localStorage for returning visitors
         const hasEmail = typeof window !== "undefined" && localStorage.getItem("epm_visitor_email");
@@ -193,6 +200,36 @@ export default function Marketplace() {
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
+      {/* TOP NAV FOR LOGGED IN USERS */}
+      {loggedInProfile && (
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "10px 0", marginBottom: 16, borderBottom: "1px solid #eee",
+          flexWrap: "wrap", gap: 8,
+        }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => window.location.href = "/home"}
+              style={{ padding: "7px 14px", backgroundColor: "#f0f0f0", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              🏡 Home
+            </button>
+            <button onClick={() => window.location.href = loggedInProfile.role === "organizer" ? "/organizer-dashboard" : "/vendor-dashboard"}
+              style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              📊 Dashboard
+            </button>
+            {loggedInProfile.role === "vendor" && (
+              <button onClick={() => window.location.href = "/messages"}
+                style={{ padding: "7px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+                ✉️ Messages
+              </button>
+            )}
+          </div>
+          <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
+            style={{ padding: "7px 14px", backgroundColor: "white", color: "#888", border: "1px solid #ddd", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
+            Log Out
+          </button>
+        </div>
+      )}
+
       <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
       <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
         Browse and connect with vendors for your next event
