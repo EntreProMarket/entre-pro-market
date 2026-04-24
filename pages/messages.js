@@ -401,16 +401,29 @@ export default function Messages() {
                             {new Date(msg.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </p>
                         </div>
-                        {/* REPORT BUTTON */}
-                        {!isMine && (
+                        {/* REPORT + DELETE BUTTONS */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          {!isMine && (
+                            <button
+                              onClick={() => { setReportMsgId(msg.id); setReportModal(true); }}
+                              title="Report message"
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, padding: 2 }}
+                            >
+                              🚩
+                            </button>
+                          )}
                           <button
-                            onClick={() => { setReportMsgId(msg.id); setReportModal(true); }}
-                            title="Report message"
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, padding: 2 }}
+                            onClick={async () => {
+                              if (!confirm("Delete this message?")) return;
+                              await supabase.from("messages").delete().eq("id", msg.id);
+                              setMessages(messages.filter(m => m.id !== msg.id));
+                            }}
+                            title="Delete message"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 12, padding: 2 }}
                           >
-                            🚩
+                            🗑️
                           </button>
-                        )}
+                        </div>
                       </div>
                     );
                   })
