@@ -21,14 +21,22 @@ export default function Marketplace() {
   const [gateEmail, setGateEmail] = useState("");
   const [showGate, setShowGate] = useState(false);
   const [gateLoading, setGateLoading] = useState(false);
+  const [loggedInProfile, setLoggedInProfile] = useState(null);
+  const [viewMode, setViewMode] = useState("card"); // "card" or "grid"
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     // Check if visitor has already provided email or is logged in
     const checkAccess = async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
-        // Logged in — no gate needed
         setShowGate(false);
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("role, account_type, is_admin")
+          .eq("id", userData.user.id)
+          .single();
+        setLoggedInProfile(prof);
       } else {
         // Check localStorage for returning visitors
         const hasEmail = typeof window !== "undefined" && localStorage.getItem("epm_visitor_email");
@@ -76,8 +84,21 @@ export default function Marketplace() {
       .eq("role", "vendor")
       .not("business_name", "is", null);
     if (error) { console.log(error); setLoading(false); return; }
-    setVendors(data || []);
-    setFiltered(data || []);
+    // Shuffle within each tier for dynamic ordering
+    const shuffle = (arr) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const featured = shuffle((data || []).filter(v => v.account_type === "featured"));
+    const premium = shuffle((data || []).filter(v => v.account_type === "premium"));
+    const free = shuffle((data || []).filter(v => v.account_type !== "featured" && v.account_type !== "premium"));
+    const sorted = [...featured, ...premium, ...free];
+    setVendors(sorted);
+    setFiltered(sorted);
     setLoading(false);
   };
 
@@ -89,6 +110,32 @@ export default function Marketplace() {
   const VendorCard = ({ vendor }) => {
     const isFeatured = vendor.account_type === "featured";
     const isPremium = vendor.account_type === "premium";
+
+    // Small grid mode
+    if (viewMode === "grid") {
+      return (
+        <div onClick={() => router.push(`/vendor/${vendor.handle}`)}
+          style={{
+            border: `2px solid ${isFeatured ? "#AABB23" : isPremium ? "#701890" : "#eee"}`,
+            borderRadius: 10, overflow: "hidden", cursor: "pointer",
+            backgroundColor: "white", position: "relative",
+            display: "flex", flexDirection: "column", alignItems: "center",
+            padding: 8, textAlign: "center",
+          }}>
+          <div style={{ width: 60, height: 60, borderRadius: 8, overflow: "hidden", backgroundColor: "#f4f4f4", marginBottom: 6 }}>
+            {vendor.logo_url
+              ? <img src={vendor.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#bbb" }}>No img</div>
+            }
+          </div>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>
+            {vendor.business_name}
+          </p>
+          <p style={{ margin: 0, fontSize: 10, color: "#888" }}>{vendor.category}</p>
+        </div>
+      );
+    }
+
     return (
       <div
         onClick={() => router.push(`/vendor/${vendor.handle}`)}
@@ -192,7 +239,102 @@ export default function Marketplace() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "sans-serif" }}>
+
+      {/* STICKY BLACK TOP BAR */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 100,
+        backgroundColor: "#111", color: "white",
+        padding: "12px 20px",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {loggedInProfile && (
+            <button onClick={() => setMenuOpen(!menuOpen)}
+              style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer", padding: "0 4px" }}>
+              ☰
+            </button>
+          )}
+          <span style={{ fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</span>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {loggedInProfile?.role === "vendor" && (
+            <button onClick={() => window.location.href = "/vendor-dashboard"}
+              style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              Dashboard
+            </button>
+          )}
+          {loggedInProfile?.role === "organizer" && (
+            <button onClick={() => window.location.href = "/organizer-dashboard"}
+              style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              Dashboard
+            </button>
+          )}
+          {loggedInProfile?.is_admin && (
+            <button onClick={() => window.location.href = "/admin"}
+              style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              Admin
+            </button>
+          )}
+          {loggedInProfile ? (
+            <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
+              style={{ padding: "6px 12px", backgroundColor: "#333", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+              Log Out
+            </button>
+          ) : (
+            <button onClick={() => window.location.href = "/"}
+              style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              Log In
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* SIDEBAR DROPDOWN MENU */}
+      {menuOpen && loggedInProfile && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200,
+        }} onClick={() => setMenuOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: "absolute", top: 0, left: 0,
+            width: 240, height: "100%",
+            backgroundColor: "white", boxShadow: "4px 0 16px rgba(0,0,0,0.2)",
+            display: "flex", flexDirection: "column",
+          }}>
+            <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>
+              Entre PRO Market
+            </div>
+            {[
+              { label: "🏡 Home", path: "/home" },
+              { label: "📊 Dashboard", path: loggedInProfile.role === "organizer" ? "/organizer-dashboard" : "/vendor-dashboard" },
+              { label: "🛒 Marketplace", path: "/marketplace" },
+              { label: "✉️ Messages", path: "/messages" },
+              { label: "💾 Saved Contacts", path: "/saved-contacts" },
+            ].map(item => (
+              <button key={item.path}
+                onClick={() => { setMenuOpen(false); window.location.href = item.path; }}
+                style={{
+                  padding: "14px 20px", backgroundColor: "white", border: "none",
+                  borderBottom: "1px solid #f0f0f0", cursor: "pointer",
+                  textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333",
+                }}>
+                {item.label}
+              </button>
+            ))}
+            <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
+              style={{
+                marginTop: "auto", padding: "14px 20px", backgroundColor: "white",
+                border: "none", borderTop: "1px solid #eee", cursor: "pointer",
+                textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000",
+              }}>
+              🚪 Log Out
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: 20 }}>
       <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
       <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
         Browse and connect with vendors for your next event
@@ -241,11 +383,25 @@ export default function Marketplace() {
         </p>
       )}
 
+      {/* VIEW TOGGLE — shows when 50+ vendors */}
+      {!loading && filtered.length >= 50 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16, gap: 8 }}>
+          <button onClick={() => setViewMode("card")}
+            style={{ padding: "7px 14px", backgroundColor: viewMode === "card" ? "#701890" : "#eee", color: viewMode === "card" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+            ▦ Cards
+          </button>
+          <button onClick={() => setViewMode("grid")}
+            style={{ padding: "7px 14px", backgroundColor: viewMode === "grid" ? "#701890" : "#eee", color: viewMode === "grid" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+            ⊞ Grid
+          </button>
+        </div>
+      )}
+
       {/* 🔥 FEATURED VENDORS */}
       {!loading && featuredVendors.length > 0 && (
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14, color: "#AABB23" }}>🔥 Featured Vendors</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
             {featuredVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
           </div>
         </div>
@@ -255,7 +411,7 @@ export default function Marketplace() {
       {!loading && premiumVendors.length > 0 && (
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14, color: "#701890" }}>💜 Premium Vendors</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
             {premiumVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
           </div>
         </div>
@@ -265,7 +421,7 @@ export default function Marketplace() {
       {!loading && regularVendors.length > 0 && (
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>All Vendors</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
             {regularVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
           </div>
         </div>
@@ -304,12 +460,7 @@ export default function Marketplace() {
         </div>
       </div>
 
-      {/* BACK BUTTON — bottom right */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
-        <button onClick={() => router.back()}
-          style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
-          ← Back
-        </button>
+
       </div>
     </div>
   );
