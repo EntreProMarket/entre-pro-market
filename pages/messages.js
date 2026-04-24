@@ -236,9 +236,7 @@ export default function Messages() {
           <p style={{ fontSize: 48 }}>🔒</p>
           <h2>Messaging Locked</h2>
           <p style={{ color: "#666", marginBottom: 24 }}>
-            {profile?.role === "vendor"
-              ? "Upgrade to Premium or Featured to unlock messaging."
-              : "Choose an Organizer plan to start messaging Vendors."}
+"Upgrade to Premium or Featured Vendor, or choose an Organizer plan to start messaging."
           </p>
           <button
             onClick={() => router.push(profile?.role === "vendor" ? "/vendor-info" : "/organizer-info")}
@@ -415,8 +413,12 @@ export default function Messages() {
                           <button
                             onClick={async () => {
                               if (!confirm("Delete this message?")) return;
-                              await supabase.from("messages").delete().eq("id", msg.id);
-                              setMessages(messages.filter(m => m.id !== msg.id));
+                              const { error } = await supabase.from("messages").delete().eq("id", msg.id);
+                              if (!error) {
+                                setMessages(prev => prev.filter(m => m.id !== msg.id));
+                              } else {
+                                alert("Could not delete: " + error.message);
+                              }
                             }}
                             title="Delete message"
                             style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 12, padding: 2 }}
