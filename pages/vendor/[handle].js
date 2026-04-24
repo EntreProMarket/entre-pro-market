@@ -189,8 +189,8 @@ export default function VendorPublicProfile() {
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
         {isOwner && (
-          <button onClick={() => router.push("/vendor-profile")} style={{ padding: "10px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
-            Edit Profile
+          <button onClick={() => router.push("/vendor-profile")} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14 }}>
+            ✏️ Edit Profile
           </button>
         )}
       </div>
