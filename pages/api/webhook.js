@@ -65,6 +65,7 @@ export default async function handler(req, res) {
     const { error } = await supabaseAdmin
       .from("profiles")
       .update({
+        role: role,           // ✅ Set role from metadata
         account_type: tier,
         subscription_expires_at: expiresAt,
         contacts_used_this_month: 0,
