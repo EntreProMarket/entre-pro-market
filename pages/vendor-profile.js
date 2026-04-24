@@ -53,6 +53,8 @@ export default function VendorProfile() {
   const [logoFile, setLogoFile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
+  const [accountType, setAccountType] = useState("free");
+  const [videoUrls, setVideoUrls] = useState(["", "", "", "", ""]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -71,6 +73,8 @@ export default function VendorProfile() {
         setHandle(profile.handle || "");
         setCategory(profile.category || "");
         setTags(profile.tags ? profile.tags.join(", ") : "");
+        setAccountType(profile.account_type || "free");
+        if (profile.video_urls) setVideoUrls(profile.video_urls.concat(["","","","",""]).slice(0,5));
         setCity(profile.city || "");
         setState(profile.state || "");
         setDescription(profile.description || "");
@@ -147,6 +151,7 @@ export default function VendorProfile() {
           handle,
           category,
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          video_urls: videoUrls.filter(v => v.trim()),
           city,
           state,
           description,
@@ -265,6 +270,28 @@ export default function VendorProfile() {
         <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer" }}>
           ← Back
         </button>
+      {/* VIDEO URLS — Premium and Featured only */}
+      {(accountType === "premium" || accountType === "featured") && (
+        <div style={{ marginBottom: 20 }}>
+          <label style={labelStyle}>
+            🎬 Video Links (up to {accountType === "featured" ? 10 : 5}) — YouTube, Instagram or TikTok URLs
+          </label>
+          {Array.from({ length: accountType === "featured" ? 10 : 5 }).map((_, i) => (
+            <input
+              key={i}
+              value={videoUrls[i] || ""}
+              onChange={e => {
+                const updated = [...videoUrls];
+                updated[i] = e.target.value;
+                setVideoUrls(updated);
+              }}
+              placeholder={`Video link ${i + 1}`}
+              style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 8, boxSizing: "border-box" }}
+            />
+          ))}
+        </div>
+      )}
+
         <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>
           {saving ? "Saving..." : "Save Profile"}
         </button>
