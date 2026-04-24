@@ -246,7 +246,7 @@ export default function Marketplace() {
         position: "sticky", top: 0, zIndex: 100,
         backgroundColor: "#111", color: "white",
         padding: "12px 20px",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
+        display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {loggedInProfile && (
@@ -255,35 +255,19 @@ export default function Marketplace() {
               ☰
             </button>
           )}
-          <span style={{ fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</span>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {loggedInProfile?.role === "vendor" && (
-            <button onClick={() => window.location.href = "/vendor-dashboard"}
-              style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-              Dashboard
-            </button>
-          )}
-          {loggedInProfile?.role === "organizer" && (
-            <button onClick={() => window.location.href = "/organizer-dashboard"}
-              style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-              Dashboard
-            </button>
-          )}
-          {loggedInProfile?.is_admin && (
-            <button onClick={() => window.location.href = "/admin"}
-              style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-              Admin
-            </button>
-          )}
+        <span style={{ fontWeight: "bold", fontSize: 16, position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
+          Entre PRO Market
+        </span>
+        <div>
           {loggedInProfile ? (
             <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
-              style={{ padding: "6px 12px", backgroundColor: "#333", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
               Log Out
             </button>
           ) : (
             <button onClick={() => window.location.href = "/"}
-              style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
               Log In
             </button>
           )}
