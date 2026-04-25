@@ -351,48 +351,52 @@ export default function Messages() {
           {activeConvo && (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-              {/* THREAD HEADER */}
-              <div style={{ padding: "12px 16px", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 10 }}>
-                <button
-                  onClick={() => { setActiveConvo(null); setActivePartner(null); setMessages([]); }}
-                  style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold" }}
-                >
-                  ←
-                </button>
-                {activePartner?.logo_url && (
-                  <img src={activePartner.logo_url} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
-                )}
-                <div style={{ flex: 1 }}>
-                  <strong style={{ fontSize: 14 }}>{getName(activePartner)}</strong>
-                  <p style={{ margin: 0, fontSize: 11, color: "#888" }}>@{activePartner?.handle}</p>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {activePartner?.handle && (
-                    <button
-                      onClick={() => router.push(`/${activePartner.role}/${activePartner.handle}`)}
-                      style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
-                    >
-                      View Profile
-                    </button>
-                  )}
-                  {rules.canSaveContacts && (
-                    <button
-                      onClick={async () => {
-                        const { data: userData } = await supabase.auth.getUser();
-                        const { error } = await supabase.from("saved_contacts").upsert({ 
-                          user_id: userData?.user?.id, 
-                          contact_id: activeConvo 
-                        });
-                        if (!error) alert("✅ Contact saved!");
-                        else alert("❌ Could not save: " + error.message);
-                      }}
-                      style={{ padding: "6px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
-                    >
-                      💾 Save Contact
-                    </button>
-                  )}
-                </div>
-              </div>
+               {/* THREAD HEADER */}
+               <div style={{ padding: "12px 16px", borderBottom: "1px solid #eee" }}>
+                 {/* Row 1: back + avatar + name */}
+                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                   <button
+                     onClick={() => { setActiveConvo(null); setActivePartner(null); setMessages([]); }}
+                     style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold", whiteSpace: "nowrap" }}
+                   >
+                     ←
+                   </button>
+                   {activePartner?.logo_url && (
+                     <img src={activePartner.logo_url} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
+                   )}
+                   <div>
+                     <strong style={{ fontSize: 14 }}>{getName(activePartner)}</strong>
+                     <p style={{ margin: 0, fontSize: 11, color: "#888" }}>@{activePartner?.handle}</p>
+                   </div>
+                 </div>
+                 {/* Row 2: action buttons */}
+                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                   {activePartner?.handle && (
+                     <button
+                       onClick={() => router.push(`/${activePartner.role}/${activePartner.handle}`)}
+                       style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
+                     >
+                       View Profile
+                     </button>
+                   )}
+                   {rules.canSaveContacts && (
+                     <button
+                       onClick={async () => {
+                         const { data: userData } = await supabase.auth.getUser();
+                         const { error } = await supabase.from("saved_contacts").upsert({ 
+                           user_id: userData?.user?.id, 
+                           contact_id: activeConvo 
+                         });
+                         if (!error) alert("✅ Contact saved!");
+                         else alert("❌ Could not save: " + error.message);
+                       }}
+                       style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
+                     >
+                       💾 Save Contact
+                     </button>
+                   )}
+                 </div>
+               </div>
 
               {/* MESSAGES */}
               <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10, minHeight: 300, maxHeight: 420 }}>
