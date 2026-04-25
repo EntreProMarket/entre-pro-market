@@ -260,13 +260,7 @@ export default function Marketplace() {
           Entre PRO Market
         </span>
         <div style={{ display: "flex", gap: 8 }}>
-          {loggedInProfile?.is_admin && (
-            <button onClick={() => window.location.replace("/admin")}
-              style={{ padding: "8px 16px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-              Admin
-            </button>
-          )}
-          {loggedInProfile ? (
+{loggedInProfile ? (
             <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
               style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
               Log Out
@@ -295,13 +289,17 @@ export default function Marketplace() {
             <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>
               Entre PRO Market
             </div>
-            {[
+            {(loggedInProfile?.is_admin ? [
+              { label: "🏡 Home", path: "/home" },
+              { label: "🔴 Admin Panel", path: "/admin" },
+              { label: "🛒 Marketplace", path: "/marketplace" },
+            ] : [
               { label: "🏡 Home", path: "/home" },
               { label: "📊 Dashboard", path: loggedInProfile.role === "organizer" ? "/organizer-dashboard" : "/vendor-dashboard" },
               { label: "🛒 Marketplace", path: "/marketplace" },
               { label: "✉️ Messages", path: "/messages" },
               { label: "💾 Saved Contacts", path: "/saved-contacts" },
-            ].map(item => (
+            ]).map(item => (
               <button key={item.path}
                 onClick={() => { setMenuOpen(false); window.location.href = item.path; }}
                 style={{
