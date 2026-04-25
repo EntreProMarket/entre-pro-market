@@ -259,7 +259,13 @@ export default function Marketplace() {
         <span style={{ fontWeight: "bold", fontSize: 16, position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
           Entre PRO Market
         </span>
-        <div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {loggedInProfile?.is_admin && (
+            <button onClick={() => window.location.replace("/admin")}
+              style={{ padding: "8px 16px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              Admin
+            </button>
+          )}
           {loggedInProfile ? (
             <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
               style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
