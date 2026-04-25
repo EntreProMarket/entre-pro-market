@@ -84,6 +84,7 @@ export default function Messages() {
   const [reportReason, setReportReason] = useState("");
   const [reportMsgId, setReportMsgId] = useState(null);
   const [vendorContactCount, setVendorContactCount] = useState(0);
+  const [deletedMsgIds, setDeletedMsgIds] = useState(new Set());
 
   useEffect(() => { loadProfile(); }, []);
   useEffect(() => { if (activeConvo) loadMessages(activeConvo); }, [activeConvo]);
@@ -150,7 +151,7 @@ export default function Messages() {
       .or(`and(sender_id.eq.${userId},recipient_id.eq.${partnerId}),and(sender_id.eq.${partnerId},recipient_id.eq.${userId})`)
       .order("created_at", { ascending: true });
 
-    setMessages(data || []);
+    setMessages((data || []).filter(m => !deletedMsgIds.has(m.id)));
     await supabase.from("messages").update({ read: true })
       .eq("sender_id", partnerId).eq("recipient_id", userId);
   };
@@ -299,14 +300,15 @@ export default function Messages() {
             ) : (
               conversations.map(convo => (
                 <div key={convo.partnerId}
-                  onClick={() => { setActiveConvo(convo.partnerId); loadPartner(convo.partnerId); }}
                   style={{
-                    padding: "12px 16px", borderBottom: "1px solid #f5f5f5",
-                    cursor: "pointer",
+                    borderBottom: "1px solid #f5f5f5",
                     backgroundColor: activeConvo === convo.partnerId ? "#f3e8ff" : "white",
-                    display: "flex", alignItems: "center", gap: 10,
+                    display: "flex", alignItems: "center", position: "relative",
                   }}
                 >
+                  {/* Tap to open conversation */}
+                  <div onClick={() => { setActiveConvo(convo.partnerId); loadPartner(convo.partnerId); }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, cursor: "pointer", padding: "12px 36px 12px 16px" }}>
                   {convo.partner?.logo_url ? (
                     <img src={convo.partner.logo_url} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover" }} />
                   ) : (
@@ -325,6 +327,21 @@ export default function Messages() {
                       {convo.unread}
                     </span>
                   )}
+                  </div>
+                  {/* X to delete whole conversation */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm("Delete this entire conversation?")) return;
+                      const { data: ud } = await supabase.auth.getUser();
+                      const uid = ud?.user?.id;
+                      await supabase.from("messages").delete()
+                        .or(`and(sender_id.eq.${uid},recipient_id.eq.${convo.partnerId}),and(sender_id.eq.${convo.partnerId},recipient_id.eq.${uid})`);
+                      setConversations(prev => prev.filter(c => c.partnerId !== convo.partnerId));
+                      if (activeConvo === convo.partnerId) { setActiveConvo(null); setMessages([]); }
+                    }}
+                    style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", color: "#bbb", cursor: "pointer", fontSize: 16, padding: 4, lineHeight: 1 }}
+                  >✕</button>
                 </div>
               ))
             )}
@@ -338,7 +355,7 @@ export default function Messages() {
               <div style={{ padding: "12px 16px", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 10 }}>
                 <button
                   onClick={() => { setActiveConvo(null); setActivePartner(null); setMessages([]); }}
-                  style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#701890", padding: "0 4px" }}
+                  style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold" }}
                 >
                   ←
                 </button>
@@ -353,7 +370,7 @@ export default function Messages() {
                   {activePartner?.handle && (
                     <button
                       onClick={() => router.push(`/${activePartner.role}/${activePartner.handle}`)}
-                      style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}
+                      style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
                     >
                       View Profile
                     </button>
@@ -369,7 +386,7 @@ export default function Messages() {
                         if (!error) alert("✅ Contact saved!");
                         else alert("❌ Could not save: " + error.message);
                       }}
-                      style={{ padding: "6px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}
+                      style={{ padding: "6px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
                     >
                       💾 Save Contact
                     </button>
@@ -415,6 +432,7 @@ export default function Messages() {
                               if (!confirm("Delete this message?")) return;
                               const { error } = await supabase.from("messages").delete().eq("id", msg.id);
                               if (!error) {
+                                setDeletedMsgIds(prev => new Set([...prev, msg.id]));
                                 setMessages(prev => prev.filter(m => m.id !== msg.id));
                               } else {
                                 alert("Could not delete: " + error.message);
