@@ -265,11 +265,7 @@ export default function VendorProfile() {
         </p>
       )}
 
-      {/* BUTTONS — both on the right */}
-      <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end", gap: 12 }}>
-        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer" }}>
-          ← Back
-        </button>
+
       {/* VIDEO URLS — Premium and Featured only */}
       {(accountType === "premium" || accountType === "featured") && (
         <div style={{ marginBottom: 20 }}>
@@ -292,7 +288,12 @@ export default function VendorProfile() {
         </div>
       )}
 
-        <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>
+      {/* BUTTONS */}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
+        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>
+          ← Back
+        </button>
+        <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>
           {saving ? "Saving..." : "Save Profile"}
         </button>
       </div>
