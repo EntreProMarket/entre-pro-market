@@ -159,8 +159,8 @@ export default function OrganizerPublicProfile() {
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
         {isOwner && (
-          <button onClick={() => router.push("/organizer-profile")} style={{ padding: "10px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", whiteSpace: "nowrap" }}>
-            Edit Profile
+          <button onClick={() => router.push("/organizer-profile")} style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
+            ✏️ Edit Profile
           </button>
         )}
       </div>
