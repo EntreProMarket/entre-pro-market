@@ -264,6 +264,45 @@ export default function VendorPublicProfile() {
         )}
       </div>
 
+            {/* VIDEO SECTION */}
+      {vendor.video_urls && vendor.video_urls.filter(v => v).length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {vendor.video_urls.filter(v => v).map((url, i) => {
+              // Convert to embed URL
+              let embedUrl = url;
+              if (url.includes("youtube.com/watch")) {
+                const id = new URL(url).searchParams.get("v");
+                embedUrl = `https://www.youtube.com/embed/${id}`;
+              } else if (url.includes("youtu.be/")) {
+                const id = url.split("youtu.be/")[1].split("?")[0];
+                embedUrl = `https://www.youtube.com/embed/${id}`;
+              } else if (url.includes("instagram.com")) {
+                return (
+                  <a key={i} href={url} target="_blank" rel="noreferrer"
+                    style={{ padding: "12px 16px", backgroundColor: "#f3e8ff", borderRadius: 8, color: "#701890", fontWeight: "bold", textDecoration: "none", display: "block" }}>
+                    📸 View on Instagram
+                  </a>
+                );
+              } else if (url.includes("tiktok.com")) {
+                return (
+                  <a key={i} href={url} target="_blank" rel="noreferrer"
+                    style={{ padding: "12px 16px", backgroundColor: "#f9ffe8", borderRadius: 8, color: "#AABB23", fontWeight: "bold", textDecoration: "none", display: "block" }}>
+                    🎵 View on TikTok
+                  </a>
+                );
+              }
+              return (
+                <iframe key={i} src={embedUrl} style={{ width: "100%", height: 200, borderRadius: 8, border: "none" }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* MESSAGE BUTTON */}
       {!isOwner && (() => {
         const vr = viewerProfile?.role;
