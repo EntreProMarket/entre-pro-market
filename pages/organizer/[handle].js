@@ -160,9 +160,9 @@ export default function OrganizerPublicProfile() {
         </div>
         </div>
 
-      {/* EDIT PROFILE BUTTON — own row */}
+      {/* EDIT PROFILE BUTTON — own row, right aligned */}
       {isOwner && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
           <button onClick={() => router.push("/organizer-profile")}
             style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
             ✏️ Edit Profile
