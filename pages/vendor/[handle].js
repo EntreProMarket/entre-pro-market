@@ -140,16 +140,24 @@ export default function VendorPublicProfile() {
       {/* OWNER NAV MENU — only visible to the vendor who owns this profile */}
       {isOwner && (
         <div style={{ position: "relative", marginBottom: 12 }}>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              padding: "8px 14px", backgroundColor: "#111", color: "white",
-              border: "none", borderRadius: 6, cursor: "pointer",
-              fontWeight: "bold", fontSize: 13,
-            }}
-          >
-            ☰ Menu
-          </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{
+                padding: "8px 14px", backgroundColor: "#111", color: "white",
+                border: "none", borderRadius: 6, cursor: "pointer",
+                fontWeight: "bold", fontSize: 13,
+              }}
+            >
+              ☰ Menu
+            </button>
+            {isOwner && (
+              <button onClick={() => router.push("/vendor-profile")}
+                style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
+                ✏️ Edit Profile
+              </button>
+            )}
+          </div>
           {menuOpen && (
             <div style={{
               position: "absolute", top: 40, left: 0,
@@ -190,15 +198,7 @@ export default function VendorPublicProfile() {
         </div>
       </div>
 
-      {/* EDIT PROFILE — own row, right aligned */}
-      {isOwner && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-          <button onClick={() => router.push("/vendor-profile")}
-            style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
-            ✏️ Edit Profile
-          </button>
-        </div>
-      )}
+
 
       {/* LOGO */}
       {vendor.logo_url && (
