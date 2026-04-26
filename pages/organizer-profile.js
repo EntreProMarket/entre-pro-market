@@ -171,7 +171,28 @@ export default function OrganizerProfile() {
 
       <input placeholder="Organizer Name" value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} style={inputStyle} />
       <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} style={inputStyle} />
-      <input placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle} />
+      <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+        <option value="">Select a Category...</option>
+        <option value="Music Event">Music Event</option>
+        <option value="Pop Up Shop">Pop Up Shop</option>
+        <option value="Business Expo">Business Expo</option>
+        <option value="Fashion Show">Fashion Show</option>
+        <option value="Spoken Word">Spoken Word</option>
+        <option value="Meet & Greet">Meet & Greet</option>
+        <option value="Art Show">Art Show</option>
+        <option value="Dance Event">Dance Event</option>
+        <option value="Party">Party</option>
+        <option value="Classes">Classes</option>
+        <option value="Paint & Sip">Paint & Sip</option>
+        <option value="Festival">Festival</option>
+        <option value="Corporate Event">Corporate Event</option>
+        <option value="Wedding">Wedding</option>
+        <option value="Birthday">Birthday</option>
+        <option value="Fundraiser">Fundraiser</option>
+        <option value="Community Event">Community Event</option>
+        <option value="Sports Event">Sports Event</option>
+        <option value="Other">Other</option>
+      </select>
       <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
       <input placeholder="State" value={stateVal} onChange={(e) => setStateVal(e.target.value)} style={inputStyle} />
       <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} />
