@@ -206,6 +206,7 @@ export default function VendorProfile() {
         <option value="Entertainment">Entertainment</option>
         <option value="Security">Security</option>
         <option value="Transportation">Transportation</option>
+        <option value="Poet">Poet</option>
         <option value="Other">Other</option>
       </select>
       <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
