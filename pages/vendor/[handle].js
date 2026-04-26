@@ -188,12 +188,17 @@ export default function VendorPublicProfile() {
           <h1 style={{ marginBottom: 5 }}>{vendor.business_name}</h1>
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
-        {isOwner && (
-          <button onClick={() => router.push("/vendor-profile")} style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
+      </div>
+
+      {/* EDIT PROFILE — own row, right aligned */}
+      {isOwner && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+          <button onClick={() => router.push("/vendor-profile")}
+            style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
             ✏️ Edit Profile
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* LOGO */}
       {vendor.logo_url && (
