@@ -280,17 +280,17 @@ export default function VendorPublicProfile() {
                 embedUrl = `https://www.youtube.com/embed/${id}`;
               } else if (url.includes("instagram.com")) {
                 return (
-                  <a key={i} href={url} target="_blank" rel="noreferrer"
-                    style={{ padding: "12px 16px", backgroundColor: "#f3e8ff", borderRadius: 8, color: "#701890", fontWeight: "bold", textDecoration: "none", display: "block" }}>
-                    📸 View on Instagram
-                  </a>
+                  <button key={i} onClick={() => window.location.href = url}
+                    style={{ padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, color: "#701890", fontWeight: "bold", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14 }}>
+                    📸 Watch on Instagram
+                  </button>
                 );
               } else if (url.includes("tiktok.com")) {
                 return (
-                  <a key={i} href={url} target="_blank" rel="noreferrer"
-                    style={{ padding: "12px 16px", backgroundColor: "#f9ffe8", borderRadius: 8, color: "#AABB23", fontWeight: "bold", textDecoration: "none", display: "block" }}>
-                    🎵 View on TikTok
-                  </a>
+                  <button key={i} onClick={() => window.location.href = url}
+                    style={{ padding: "12px 16px", backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, color: "#888B00", fontWeight: "bold", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 14 }}>
+                    🎵 Watch on TikTok
+                  </button>
                 );
               }
               return (
