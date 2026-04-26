@@ -8,7 +8,8 @@ const CATEGORIES = [
   "All", "DJ", "Photographer", "Videographer", "Caterer", "Decorator",
   "Venue", "Florist", "Hair & Makeup", "Music", "Bakery",
   "Clothing & Apparel", "Jewelry", "Crafts & Art", "Food & Beverage",
-  "Health & Wellness", "Entertainment", "Security", "Transportation", "Other"
+  "Health & Wellness", "Entertainment", "Security", "Transportation",
+  "Poet", "Other"
 ];
 
 export default function Marketplace() {
