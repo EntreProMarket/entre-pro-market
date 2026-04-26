@@ -158,12 +158,17 @@ export default function OrganizerPublicProfile() {
           <h1 style={{ marginBottom: 5 }}>{organizer.organizer_name || "Organizer"}</h1>
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
-        {isOwner && (
-          <button onClick={() => router.push("/organizer-profile")} style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
+        </div>
+
+      {/* EDIT PROFILE BUTTON — own row */}
+      {isOwner && (
+        <div style={{ marginBottom: 16 }}>
+          <button onClick={() => router.push("/organizer-profile")}
+            style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
             ✏️ Edit Profile
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* LOGO */}
       {organizer.logo_url && (
