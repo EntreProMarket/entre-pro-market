@@ -191,6 +191,7 @@ export default function OrganizerProfile() {
         <option value="Fundraiser">Fundraiser</option>
         <option value="Community Event">Community Event</option>
         <option value="Sports Event">Sports Event</option>
+        <option value="Venue">Venue</option>
         <option value="Other">Other</option>
       </select>
       <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
