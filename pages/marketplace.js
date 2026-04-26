@@ -6,10 +6,10 @@ import { useRouter } from "next/router";
 
 const CATEGORIES = [
   "All", "DJ", "Photographer", "Videographer", "Caterer", "Decorator",
-  "Venue", "Florist", "Hair & Makeup", "Music", "Bakery",
+  "Florist", "Hair & Makeup", "Music", "Bakery",
   "Clothing & Apparel", "Jewelry", "Crafts & Art", "Food & Beverage",
   "Health & Wellness", "Entertainment", "Security", "Transportation",
-  "Poet", "Other"
+  "Poetry & Literature", "Performing Arts", "Theater & Acting", "Other"
 ];
 
 export default function Marketplace() {
