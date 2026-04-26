@@ -96,6 +96,7 @@ export default function OrganizerPublicProfile() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
   const [viewerProfile, setViewerProfile] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!handle) return;
@@ -150,8 +151,51 @@ export default function OrganizerPublicProfile() {
   };
 
   return (
-    <div style={{ maxWidth: 800, margin: "auto", padding: 20 }}>
+    <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
 
+      {/* TOP BAR: Menu + Edit Profile */}
+      {isOwner && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{ padding: "8px 14px", backgroundColor: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}
+          >
+            ☰ Menu
+          </button>
+          <button onClick={() => router.push("/organizer-profile")}
+            style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
+            ✏️ Edit Profile
+          </button>
+        </div>
+      )}
+
+      {/* MENU DROPDOWN */}
+      {menuOpen && isOwner && (
+        <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200 }}>
+          <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 0, left: 0, width: 240, height: "100%", backgroundColor: "white", boxShadow: "4px 0 16px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}>
+            <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</div>
+            {[
+              { label: "🏡 Home", path: "/home" },
+              { label: "📊 Dashboard", path: "/organizer-dashboard" },
+              { label: "✏️ Edit Profile", path: "/organizer-profile" },
+              { label: "🛒 Marketplace", path: "/marketplace" },
+              { label: "✉️ Messages", path: "/messages" },
+              { label: "💾 Saved Contacts", path: "/saved-contacts" },
+            ].map(item => (
+              <button key={item.path} onClick={() => { setMenuOpen(false); router.push(item.path); }}
+                style={{ padding: "14px 20px", backgroundColor: "white", border: "none", borderBottom: "1px solid #f0f0f0", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333" }}>
+                {item.label}
+              </button>
+            ))}
+            <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }}
+              style={{ marginTop: "auto", padding: "14px 20px", backgroundColor: "white", border: "none", borderTop: "1px solid #eee", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000" }}>
+              🚪 Log Out
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* REMOVE old separate edit button if exists */}
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -160,15 +204,7 @@ export default function OrganizerPublicProfile() {
         </div>
         </div>
 
-      {/* EDIT PROFILE BUTTON — own row, right aligned */}
-      {isOwner && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-          <button onClick={() => router.push("/organizer-profile")}
-            style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
-            ✏️ Edit Profile
-          </button>
-        </div>
-      )}
+
 
       {/* LOGO */}
       {organizer.logo_url && (
