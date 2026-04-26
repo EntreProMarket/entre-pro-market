@@ -193,7 +193,6 @@ export default function VendorProfile() {
         <option value="Videographer">Videographer</option>
         <option value="Caterer">Caterer</option>
         <option value="Decorator">Decorator</option>
-        <option value="Venue">Venue</option>
         <option value="Florist">Florist</option>
         <option value="Hair & Makeup">Hair & Makeup</option>
         <option value="Music">Music</option>
@@ -206,7 +205,9 @@ export default function VendorProfile() {
         <option value="Entertainment">Entertainment</option>
         <option value="Security">Security</option>
         <option value="Transportation">Transportation</option>
-        <option value="Poet">Poet</option>
+        <option value="Poetry & Literature">Poetry & Literature</option>
+        <option value="Performing Arts">Performing Arts</option>
+        <option value="Theater & Acting">Theater & Acting</option>
         <option value="Other">Other</option>
       </select>
       <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
