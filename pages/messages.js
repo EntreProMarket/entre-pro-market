@@ -356,16 +356,7 @@ export default function Messages() {
                  {/* Row 1: back + avatar + name */}
                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                    <button
-                     onClick={() => {
-                      const prev = document.referrer;
-                      if (prev && (prev.includes("saved-contacts") || !prev.includes("messages"))) {
-                        router.back();
-                      } else {
-                        setActiveConvo(null);
-                        setActivePartner(null);
-                        setMessages([]);
-                      }
-                    }}
+                     onClick={() => { setActiveConvo(null); setActivePartner(null); setMessages([]); }}
                      style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold", whiteSpace: "nowrap" }}
                    >
                      ←
