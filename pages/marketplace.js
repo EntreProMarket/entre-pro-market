@@ -297,6 +297,7 @@ export default function Marketplace() {
             ] : [
               { label: "🏡 Home", path: "/home" },
               { label: "📊 Dashboard", path: loggedInProfile.role === "organizer" ? "/organizer-dashboard" : "/vendor-dashboard" },
+              { label: "👤 My Profile", path: loggedInProfile.role === "organizer" ? `/organizer/${loggedInProfile?.handle}` : `/vendor/${loggedInProfile?.handle}` },
               { label: "🛒 Marketplace", path: "/marketplace" },
               { label: "✉️ Messages", path: "/messages" },
               { label: "💾 Saved Contacts", path: "/saved-contacts" },
