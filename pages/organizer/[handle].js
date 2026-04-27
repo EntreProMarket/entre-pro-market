@@ -178,6 +178,7 @@ export default function OrganizerPublicProfile() {
               { label: "🏡 Home", path: "/home" },
               { label: "📊 Dashboard", path: "/organizer-dashboard" },
               { label: "✏️ Edit Profile", path: "/organizer-profile" },
+              { label: "👤 My Profile", path: `/organizer/${organizer?.handle}` },
               { label: "🛒 Marketplace", path: "/marketplace" },
               { label: "✉️ Messages", path: "/messages" },
               { label: "💾 Saved Contacts", path: "/saved-contacts" },
@@ -333,7 +334,7 @@ export default function OrganizerPublicProfile() {
         return canMessage ? (
           <div style={{ marginTop: 20, marginBottom: 10 }}>
             <button
-              onClick={() => router.push(`/messages?to=${organizer.id}`)}
+              onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)}
               style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}
             >
               ✉️ Send Message
