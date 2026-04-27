@@ -68,7 +68,7 @@ function getMessagingRules(role, tier) {
 
 export default function Messages() {
   const router = useRouter();
-  const { to } = router.query;
+  const { to, from: fromPage } = router.query;
   const messagesEndRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
@@ -356,7 +356,20 @@ export default function Messages() {
                  {/* Row 1: back + avatar + name */}
                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                    <button
-                     onClick={() => { setActiveConvo(null); setActivePartner(null); setMessages([]); }}
+                     onClick={() => {
+                      if (fromPage === "saved-contacts") {
+                        router.replace("/saved-contacts");
+                      } else if (fromPage && fromPage.startsWith("vendor/")) {
+                        router.replace("/" + fromPage);
+                      } else if (fromPage && fromPage.startsWith("organizer/")) {
+                        router.replace("/" + fromPage);
+                      } else {
+                        // Default: back to conversation list
+                        setActiveConvo(null);
+                        setActivePartner(null);
+                        setMessages([]);
+                      }
+                    }}
                      style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold", whiteSpace: "nowrap" }}
                    >
                      ←
