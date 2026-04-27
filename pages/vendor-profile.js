@@ -300,7 +300,8 @@ export default function VendorProfile() {
                  style={{ display: "block", marginBottom: 4 }}
                />
                <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-                 Select multiple images at once. Max {({ free: 6, premium: 20, featured: 40 })[accountType] || 6} total for your plan.
+                <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                  Select multiple images at once. Max {[6,20,40][["free","premium","featured"].indexOf(accountType)] || 6} total for your plan.
                </p>
              </div>
            ) : null;
