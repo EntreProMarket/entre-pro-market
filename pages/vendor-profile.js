@@ -245,20 +245,66 @@ export default function VendorProfile() {
 
       {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
-        <label style={labelStyle}>Portfolio</label>
-        {portfolioImages.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-            {portfolioImages.map((img, i) => (
-              <div key={i} style={{ position: "relative" }}>
-                <img src={img} alt="portfolio" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-        <input type="file" accept="image/*" multiple onChange={(e) => setPortfolioFiles(Array.from(e.target.files))} />
-        <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>You can select multiple images at once.</p>
-      </div>
+         <label style={labelStyle}>Portfolio</label>
+
+         {/* IMAGE LIMITS BY TIER */}
+         {(() => {
+           const limits = { free: 6, premium: 20, featured: 40 };
+           const limit = limits[accountType] || 6;
+           const count = portfolioImages.length;
+           return (
+             <p style={{ fontSize: 12, color: count >= limit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: count >= limit ? "bold" : "normal" }}>
+               {count}/{limit} images used
+               {count >= limit && " — Remove some before adding more"}
+             </p>
+           );
+         })()}
+
+         {/* WARNING FOR FILE TYPES */}
+         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
+           ⚠️ Accepted formats: JPG, PNG, GIF, WebP only. HEIC files (iPhone default) are not supported — convert to JPG first.
+         </div>
+
+         {/* EXISTING IMAGES */}
+         {portfolioImages.length > 0 && (
+           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
+             {portfolioImages.map((img, i) => (
+               <div key={i} style={{ position: "relative" }}>
+                 <img src={img} alt="portfolio" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                 <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+               </div>
+             ))}
+           </div>
+         )}
+
+         {/* UPLOAD — only show if under limit */}
+         {(() => {
+           const limits = { free: 6, premium: 20, featured: 40 };
+           const limit = limits[accountType] || 6;
+           return portfolioImages.length < limit ? (
+             <div>
+               <input
+                 type="file"
+                 accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                 multiple
+                 onChange={(e) => {
+                   const files = Array.from(e.target.files);
+                   const limits2 = { free: 6, premium: 20, featured: 40 };
+                   const remaining = (limits2[accountType] || 6) - portfolioImages.length;
+                   if (files.length > remaining) {
+                     alert(`You can only add ${remaining} more image(s). Please select fewer files.`);
+                     return;
+                   }
+                   setPortfolioFiles(files);
+                 }}
+                 style={{ display: "block", marginBottom: 4 }}
+               />
+               <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+                 Select multiple images at once. Max {({ free: 6, premium: 20, featured: 40 })[accountType] || 6} total for your plan.
+               </p>
+             </div>
+           ) : null;
+         })()}
 
       {/* STATUS MESSAGE */}
       {message && (
