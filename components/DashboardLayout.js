@@ -46,7 +46,11 @@ export default function DashboardLayout({ children }) {
       .select("handle, role")
       .eq("id", user.id)
       .single();
-    if (!profile?.handle) return;
+    // Public user with no role — send to vendor info instead of error
+    if (!profile?.handle || !profile?.role) {
+      router.push("/vendor-info");
+      return;
+    }
     if (profile.role === "vendor") router.push(`/vendor/${profile.handle}`);
     else if (profile.role === "organizer") router.push(`/organizer/${profile.handle}`);
   };
@@ -176,8 +180,8 @@ export default function DashboardLayout({ children }) {
         {navItem("🏠 Dashboard", goToDashboard)}
         {navItem("👤 Profile", goToProfile)}
         {navItem("🛒 Marketplace", () => navigate("/marketplace"))}
-        {navItem("✉️ Messages", () => navigate("/messages"))}
-        {navItem("💾 Saved Contacts", () => navigate("/saved-contacts"))}
+        {role && navItem("✉️ Messages", () => navigate("/messages"))}
+        {role && navItem("💾 Saved Contacts", () => navigate("/saved-contacts"))}
         {navItem("⚙️ Settings", () => navigate("/settings"))}
 
         {/* LOG OUT AT BOTTOM */}
