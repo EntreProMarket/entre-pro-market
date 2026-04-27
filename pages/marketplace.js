@@ -34,7 +34,7 @@ export default function Marketplace() {
         setShowGate(false);
         const { data: prof } = await supabase
           .from("profiles")
-          .select("role, account_type, is_admin")
+          .select("role, account_type, is_admin, handle")
           .eq("id", userData.user.id)
           .single();
         setLoggedInProfile(prof);
