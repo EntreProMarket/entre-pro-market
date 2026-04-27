@@ -137,58 +137,49 @@ export default function VendorPublicProfile() {
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
 
-      {/* OWNER NAV MENU — only visible to the vendor who owns this profile */}
+       {/* OWNER NAV MENU — only visible to the vendor who owns this profile */}
       {isOwner && (
-        <div style={{ position: "relative", marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              style={{
-                padding: "8px 14px", backgroundColor: "#111", color: "white",
-                border: "none", borderRadius: 6, cursor: "pointer",
-                fontWeight: "bold", fontSize: 13,
-              }}
-            >
-              ☰ Menu
-            </button>
-            {isOwner && (
-              <button onClick={() => router.push("/vendor-profile")}
-                style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
-                ✏️ Edit Profile
-              </button>
-            )}
-          </div>
-          {menuOpen && (
-            <div style={{
-              position: "absolute", top: 40, left: 0,
-              backgroundColor: "white", border: "1px solid #ddd",
-              borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-              zIndex: 100, minWidth: 180, overflow: "hidden",
-            }}>
-              {[
-                { label: "🏡 Home", path: "/home" },
-                { label: "📊 Dashboard", path: "/vendor-dashboard" },
-                { label: "✏️ Edit Profile", path: "/vendor-profile" },
-                { label: "🛒 Marketplace", path: "/marketplace" },
-                { label: "✉️ Messages", path: "/messages" },
-              ].map(item => (
-                <button
-                  key={item.path}
-                  onClick={() => { setMenuOpen(false); router.push(item.path); }}
-                  style={{
-                    display: "block", width: "100%", padding: "12px 16px",
-                    backgroundColor: "white", border: "none",
-                    borderBottom: "1px solid #f0f0f0", cursor: "pointer",
-                    textAlign: "left", fontSize: 14, fontWeight: "bold", color: "#333",
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{ padding: "8px 14px", backgroundColor: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}
+          >
+            ☰ Menu
+          </button>
+          <button onClick={() => router.push("/vendor-profile")}
+            style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, whiteSpace: "nowrap" }}>
+            ✏️ Edit Profile
+          </button>
         </div>
       )}
+
+      {/* SLIDING PANEL MENU */}
+      {menuOpen && isOwner && (
+        <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200 }}>
+          <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 0, left: 0, width: 240, height: "100%", backgroundColor: "white", boxShadow: "4px 0 16px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}>
+            <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</div>
+            {[
+              { label: "🏡 Home", path: "/home" },
+              { label: "📊 Dashboard", path: "/vendor-dashboard" },
+              { label: "👤 My Profile", path: `/vendor/${vendor?.handle}` },
+              { label: "✏️ Edit Profile", path: "/vendor-profile" },
+              { label: "🛒 Marketplace", path: "/marketplace" },
+              { label: "✉️ Messages", path: "/messages" },
+              { label: "💾 Saved Contacts", path: "/saved-contacts" },
+            ].map(item => (
+              <button key={item.path} onClick={() => { setMenuOpen(false); router.push(item.path); }}
+                style={{ padding: "14px 20px", backgroundColor: "white", border: "none", borderBottom: "1px solid #f0f0f0", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333" }}>
+                {item.label}
+              </button>
+            ))}
+            <button onClick={async () => { const { supabase } = await import("../../lib/supabaseClient"); await supabase.auth.signOut(); router.replace("/"); }}
+              style={{ marginTop: "auto", padding: "14px 20px", backgroundColor: "white", border: "none", borderTop: "1px solid #eee", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000" }}>
+              🚪 Log Out
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -318,7 +309,7 @@ export default function VendorPublicProfile() {
         return canMessage ? (
           <div style={{ marginTop: 20, marginBottom: 10 }}>
             <button
-              onClick={() => router.push(`/messages?to=${vendor.id}`)}
+              onClick={() => router.push(`/messages?to=${vendor.id}&from=vendor/${vendor.handle}`)}
               style={{
                 padding: "12px 24px",
                 backgroundColor: "#AABB23",
