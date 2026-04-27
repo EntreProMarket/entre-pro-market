@@ -114,7 +114,7 @@ export default function SavedContacts() {
                   {/* ACTIONS */}
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <button
-                      onClick={() => router.push(`/messages?to=${c.id}`)}
+                      onClick={() => router.push(`/messages?to=${c.id}&from=saved-contacts`)}
                       style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
                     >
                       ✉️ Message
