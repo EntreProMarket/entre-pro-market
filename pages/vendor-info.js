@@ -47,10 +47,12 @@ export default function VendorInfo() {
       alert("You are already registered as an Organizer and cannot become a Vendor.");
       return;
     }
-    if (userRole === "vendor") {
+    if (userRole === "vendor" && tier === "free") {
+      // Already a vendor upgrading to free does nothing
       router.push("/vendor-dashboard");
       return;
     }
+    // If already a vendor choosing a paid upgrade — fall through to Stripe
 
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
