@@ -10,6 +10,7 @@ export default function OrganizerDashboard() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [messageCount, setMessageCount] = useState(0);
+  const [profileViews, setProfileViews] = useState(0);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -30,12 +31,19 @@ export default function OrganizerDashboard() {
 
       setProfile(profileData);
 
-      // Load message count
-      const { count } = await supabase
+      // Message count
+      const { count: msgCount } = await supabase
         .from("messages")
         .select("*", { count: "exact", head: true })
         .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
-      setMessageCount(count || 0);
+      setMessageCount(msgCount || 0);
+
+      // Profile views count
+      const { count: viewCount } = await supabase
+        .from("profile_views")
+        .select("*", { count: "exact", head: true })
+        .eq("profile_id", user.id);
+      setProfileViews(viewCount || 0);
 
       setLoading(false);
     };
@@ -47,10 +55,10 @@ export default function OrganizerDashboard() {
   const tier = profile?.account_type || "basic";
 
   const tierConfig = {
-    basic:    { label: "Basic Organizer",   color: "#555",    bg: "#f5f5f5",  icon: "💼" },
-    pro:      { label: "Pro Organizer",     color: "#701890", bg: "#f3e8ff",  icon: "🚀" },
-    elite:    { label: "Elite Organizer",   color: "#AABB23", bg: "#f9ffe8",  icon: "👑" },
-    premium:  { label: "Pro Organizer",     color: "#701890", bg: "#f3e8ff",  icon: "🚀" },
+    basic:   { label: "Basic Organizer", color: "#555",    bg: "#f5f5f5", icon: "💼" },
+    pro:     { label: "Pro Organizer",   color: "#701890", bg: "#f3e8ff", icon: "🚀" },
+    elite:   { label: "Elite Organizer", color: "#AABB23", bg: "#f9ffe8", icon: "👑" },
+    premium: { label: "Pro Organizer",   color: "#701890", bg: "#f3e8ff", icon: "🚀" },
   };
 
   const { label, color, bg, icon } = tierConfig[tier] || tierConfig.basic;
@@ -155,16 +163,18 @@ export default function OrganizerDashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 8 }}>
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>
+              {profileViews}
+            </p>
+            <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Profile Views</p>
+          </div>
+          <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
+            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>
               {messageCount}
             </p>
             <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Messages</p>
           </div>
-          <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>—</p>
-            <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Profile Views</p>
-          </div>
         </div>
-        <p style={{ fontSize: 12, color: "#aaa" }}>📊 Full stats tracking coming soon.</p>
+
       </div>
     </DashboardLayout>
   );
