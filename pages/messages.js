@@ -11,7 +11,7 @@ function getMessagingRules(role, tier) {
     if (tier === "premium") return {
       canMessage: true,
       canMessageVendors: true,
-      canMessageOrganizers: false, // can only REPLY to organizers
+      canMessageOrganizers: false,
       canInitiateOrganizer: false,
       canSaveContacts: true,
       label: "Premium Vendor",
@@ -47,12 +47,11 @@ function getMessagingRules(role, tier) {
     if (tier === "elite") return {
       canMessage: true,
       canMessageVendors: true,
-      vendorLimit: null, // unlimited
+      vendorLimit: null,
       canMessageOrganizers: true,
       canSaveContacts: true,
       label: "Elite Organizer",
     };
-    // legacy premium organizer
     if (tier === "premium") return {
       canMessage: true,
       canMessageVendors: true,
@@ -105,7 +104,6 @@ export default function Messages() {
 
     if (msgRules.canMessage) {
       await loadConversations(user.id);
-      // Count vendor contacts this month for organizers
       if (profileData?.role === "organizer" && msgRules.vendorLimit) {
         const startOfMonth = new Date();
         startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
@@ -168,9 +166,7 @@ export default function Messages() {
     if (profile?.role === "vendor") {
       if (partnerRole === "vendor") return rules.canMessageVendors;
       if (partnerRole === "organizer") {
-        // Premium can only REPLY (check if organizer messaged first)
         if (rules.canInitiateOrganizer) return true;
-        // Check if organizer sent first message
         const organizerInitiated = messages.some(m => m.sender_id === partner.id);
         return organizerInitiated;
       }
@@ -179,7 +175,7 @@ export default function Messages() {
     if (profile?.role === "organizer") {
       if (partnerRole === "organizer") return rules.canMessageOrganizers;
       if (partnerRole === "vendor") {
-        if (!rules.vendorLimit) return true; // unlimited
+        if (!rules.vendorLimit) return true;
         return vendorContactCount < rules.vendorLimit;
       }
     }
@@ -229,22 +225,79 @@ export default function Messages() {
 
   if (loading) return <DashboardLayout><div style={{ padding: 20 }}>Loading...</div></DashboardLayout>;
 
-  // Locked screen
+  // ── LOCKED SCREEN — new style matching upgrade-required and saved-contacts-locked ──
   if (!rules?.canMessage) {
     return (
       <DashboardLayout>
-        <div style={{ maxWidth: 500, margin: "0 auto", textAlign: "center", padding: 40 }}>
-          <p style={{ fontSize: 48 }}>🔒</p>
-          <h2>Messaging Locked</h2>
-          <p style={{ color: "#666", marginBottom: 24 }}>
-"Upgrade to Premium or Featured Vendor, or choose an Organizer plan to start messaging."
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "70vh",
+          textAlign: "center",
+          padding: 30,
+        }}>
+          {/* LOCK ICON */}
+          <div style={{ fontSize: 72, marginBottom: 24 }}>🔒</div>
+
+          {/* TITLE */}
+          <h1 style={{ fontSize: 26, fontWeight: "bold", marginBottom: 12, color: "#111" }}>
+            Messaging Locked
+          </h1>
+
+          {/* DESCRIPTION */}
+          <p style={{ color: "#666", fontSize: 15, maxWidth: 320, lineHeight: 1.6, marginBottom: 32 }}>
+            Messaging is available to Premium & Featured Vendors and all Organizer plans. Upgrade your account to start connecting.
           </p>
+
+          {/* VENDOR PLANS BUTTON */}
           <button
-            onClick={() => router.push(profile?.role === "vendor" ? "/vendor-info" : "/organizer-info")}
-            style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15 }}
+            onClick={() => router.push("/vendor-info")}
+            style={{
+              padding: "14px 32px",
+              backgroundColor: "#701890",
+              color: "white",
+              border: "none",
+              borderRadius: 30,
+              fontWeight: "bold",
+              fontSize: 16,
+              cursor: "pointer",
+              marginBottom: 16,
+              width: "100%",
+              maxWidth: 280,
+            }}
           >
-            View Plans
+            View Vendor Plans
           </button>
+
+          {/* ORGANIZER PLANS BUTTON */}
+          <button
+            onClick={() => router.push("/organizer-info")}
+            style={{
+              padding: "14px 32px",
+              backgroundColor: "#AABB23",
+              color: "white",
+              border: "none",
+              borderRadius: 30,
+              fontWeight: "bold",
+              fontSize: 16,
+              cursor: "pointer",
+              marginBottom: 24,
+              width: "100%",
+              maxWidth: 280,
+            }}
+          >
+            View Organizer Plans
+          </button>
+
+          {/* BACK LINK */}
+          <p
+            onClick={() => router.back()}
+            style={{ color: "#701890", cursor: "pointer", fontSize: 14, textDecoration: "underline" }}
+          >
+            ← Go Back
+          </p>
         </div>
       </DashboardLayout>
     );
@@ -265,7 +318,6 @@ export default function Messages() {
             </button>
             <h1 style={{ margin: 0 }}>✉️ Messages</h1>
           </div>
-          {/* Contact limit badge for organizers */}
           {rules.vendorLimit && (
             <div style={{
               backgroundColor: vendorContactCount >= rules.vendorLimit ? "#fef2f2" : "#f0fdf4",
@@ -278,14 +330,9 @@ export default function Messages() {
           )}
         </div>
 
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-          minHeight: 500,
-        }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 500 }}>
 
-          {/* CONVERSATIONS LIST — hide when convo open on mobile */}
+          {/* CONVERSATIONS LIST */}
           <div style={{
             backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, overflow: "hidden",
             display: activeConvo ? "none" : "block",
@@ -306,29 +353,27 @@ export default function Messages() {
                     display: "flex", alignItems: "center", position: "relative",
                   }}
                 >
-                  {/* Tap to open conversation */}
                   <div onClick={() => { setActiveConvo(convo.partnerId); loadPartner(convo.partnerId); }}
                     style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, cursor: "pointer", padding: "12px 36px 12px 16px" }}>
-                  {convo.partner?.logo_url ? (
-                    <img src={convo.partner.logo_url} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: "#eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>👤</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontWeight: "bold", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {getName(convo.partner)}
-                    </p>
-                    <p style={{ margin: 0, fontSize: 11, color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {convo.lastMessage?.content}
-                    </p>
+                    {convo.partner?.logo_url ? (
+                      <img src={convo.partner.logo_url} style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: 38, height: 38, borderRadius: "50%", backgroundColor: "#eee", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>👤</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontWeight: "bold", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {getName(convo.partner)}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 11, color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {convo.lastMessage?.content}
+                      </p>
+                    </div>
+                    {convo.unread > 0 && (
+                      <span style={{ backgroundColor: "#701890", color: "white", borderRadius: "50%", width: 20, height: 20, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
+                        {convo.unread}
+                      </span>
+                    )}
                   </div>
-                  {convo.unread > 0 && (
-                    <span style={{ backgroundColor: "#701890", color: "white", borderRadius: "50%", width: 20, height: 20, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
-                      {convo.unread}
-                    </span>
-                  )}
-                  </div>
-                  {/* X to delete whole conversation */}
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
@@ -351,12 +396,11 @@ export default function Messages() {
           {activeConvo && (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-               {/* THREAD HEADER */}
-               <div style={{ padding: "12px 16px", borderBottom: "1px solid #eee" }}>
-                 {/* Row 1: back + avatar + name */}
-                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                   <button
-                     onClick={() => {
+              {/* THREAD HEADER */}
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid #eee" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <button
+                    onClick={() => {
                       if (fromPage === "saved-contacts") {
                         router.replace("/saved-contacts");
                       } else if (fromPage && fromPage.startsWith("vendor/")) {
@@ -364,52 +408,50 @@ export default function Messages() {
                       } else if (fromPage && fromPage.startsWith("organizer/")) {
                         router.replace("/" + fromPage);
                       } else {
-                        // Default: back to conversation list
                         setActiveConvo(null);
                         setActivePartner(null);
                         setMessages([]);
                       }
                     }}
-                     style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold", whiteSpace: "nowrap" }}
-                   >
-                     ←
-                   </button>
-                   {activePartner?.logo_url && (
-                     <img src={activePartner.logo_url} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
-                   )}
-                   <div>
-                     <strong style={{ fontSize: 14 }}>{getName(activePartner)}</strong>
-                     <p style={{ margin: 0, fontSize: 11, color: "#888" }}>@{activePartner?.handle}</p>
-                   </div>
-                 </div>
-                 {/* Row 2: action buttons */}
-                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                   {activePartner?.handle && (
-                     <button
-                       onClick={() => router.push(`/${activePartner.role}/${activePartner.handle}`)}
-                       style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
-                     >
-                       View Profile
-                     </button>
-                   )}
-                   {rules.canSaveContacts && (
-                     <button
-                       onClick={async () => {
-                         const { data: userData } = await supabase.auth.getUser();
-                         const { error } = await supabase.from("saved_contacts").upsert({ 
-                           user_id: userData?.user?.id, 
-                           contact_id: activeConvo 
-                         });
-                         if (!error) alert("✅ Contact saved!");
-                         else alert("❌ Could not save: " + error.message);
-                       }}
-                       style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
-                     >
-                       💾 Save Contact
-                     </button>
-                   )}
-                 </div>
-               </div>
+                    style={{ background: "none", border: "1px solid #ddd", fontSize: 16, cursor: "pointer", color: "#701890", padding: "4px 10px", borderRadius: 6, fontWeight: "bold", whiteSpace: "nowrap" }}
+                  >
+                    ←
+                  </button>
+                  {activePartner?.logo_url && (
+                    <img src={activePartner.logo_url} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
+                  )}
+                  <div>
+                    <strong style={{ fontSize: 14 }}>{getName(activePartner)}</strong>
+                    <p style={{ margin: 0, fontSize: 11, color: "#888" }}>@{activePartner?.handle}</p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {activePartner?.handle && (
+                    <button
+                      onClick={() => router.push(`/${activePartner.role}/${activePartner.handle}`)}
+                      style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
+                    >
+                      View Profile
+                    </button>
+                  )}
+                  {rules.canSaveContacts && (
+                    <button
+                      onClick={async () => {
+                        const { data: userData } = await supabase.auth.getUser();
+                        const { error } = await supabase.from("saved_contacts").upsert({
+                          user_id: userData?.user?.id,
+                          contact_id: activeConvo
+                        });
+                        if (!error) alert("✅ Contact saved!");
+                        else alert("❌ Could not save: " + error.message);
+                      }}
+                      style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, whiteSpace: "nowrap", fontWeight: "bold" }}
+                    >
+                      💾 Save Contact
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* MESSAGES */}
               <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10, minHeight: 300, maxHeight: 420 }}>
@@ -433,7 +475,6 @@ export default function Messages() {
                             {new Date(msg.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </p>
                         </div>
-                        {/* REPORT + DELETE BUTTONS */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           {!isMine && (
                             <button
