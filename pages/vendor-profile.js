@@ -28,6 +28,16 @@ function formatSocialLink(platform, value) {
   }
 }
 
+// ── PLAN LIMITS ──
+// Free:     5 photos, 0 videos
+// Premium: 20 photos, 5 videos
+// Featured: 40 photos, 10 videos
+const photoLimit = (accountType) =>
+  accountType === "featured" ? 40 : accountType === "premium" ? 20 : 5;
+
+const videoLimit = (accountType) =>
+  accountType === "featured" ? 10 : accountType === "premium" ? 5 : 0;
+
 export default function VendorProfile() {
   const router = useRouter();
 
@@ -54,7 +64,9 @@ export default function VendorProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [accountType, setAccountType] = useState("free");
-  const [videoUrls, setVideoUrls] = useState(["", "", "", "", ""]);
+
+  // Init with 10 slots to cover Featured vendors
+  const [videoUrls, setVideoUrls] = useState(["", "", "", "", "", "", "", "", "", ""]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -74,7 +86,10 @@ export default function VendorProfile() {
         setCategory(profile.category || "");
         setTags(profile.tags ? profile.tags.join(", ") : "");
         setAccountType(profile.account_type || "free");
-        if (profile.video_urls) setVideoUrls(profile.video_urls.concat(["","","","",""]).slice(0,5));
+        // Pad and slice to 10 to cover all tiers
+        if (profile.video_urls) {
+          setVideoUrls(profile.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
+        }
         setCity(profile.city || "");
         setState(profile.state || "");
         setDescription(profile.description || "");
@@ -243,8 +258,8 @@ export default function VendorProfile() {
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={labelStyle}>Portfolio</label>
 
-        <p style={{ fontSize: 12, color: portfolioImages.length >= (accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6) ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
-          {portfolioImages.length} / {accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6} images
+        <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit(accountType) ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
+          {portfolioImages.length} / {photoLimit(accountType)} images
         </p>
 
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
@@ -262,14 +277,14 @@ export default function VendorProfile() {
           </div>
         )}
 
-        {portfolioImages.length < (accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6) && (
+        {portfolioImages.length < photoLimit(accountType) && (
           <div>
             <input
               type="file"
               accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
               multiple
               onChange={(e) => {
-                const limit = accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6;
+                const limit = photoLimit(accountType);
                 const remaining = limit - portfolioImages.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
                 if (Array.from(e.target.files).length > remaining) {
@@ -285,7 +300,7 @@ export default function VendorProfile() {
           </div>
         )}
 
-      </div> {/* ← FIX: closes Portfolio div */}
+      </div> {/* closes Portfolio div */}
 
       {/* STATUS MESSAGE */}
       {message && (
@@ -295,12 +310,12 @@ export default function VendorProfile() {
       )}
 
       {/* VIDEO URLS — Premium and Featured only */}
-      {(accountType === "premium" || accountType === "featured") && (
+      {videoLimit(accountType) > 0 && (
         <div style={{ marginBottom: 20 }}>
           <label style={labelStyle}>
-            🎬 Video Links (up to {accountType === "featured" ? 10 : 5}) — YouTube, Instagram or TikTok URLs
+            🎬 Video Links (up to {videoLimit(accountType)}) — YouTube, Instagram or TikTok URLs
           </label>
-          {Array.from({ length: accountType === "featured" ? 10 : 5 }).map((_, i) => (
+          {Array.from({ length: videoLimit(accountType) }).map((_, i) => (
             <input
               key={i}
               value={videoUrls[i] || ""}
