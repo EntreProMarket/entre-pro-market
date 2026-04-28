@@ -93,7 +93,6 @@ export default function VendorProfile() {
     loadProfile();
   }, []);
 
-  // ── EXACT SAME UPLOAD PATTERN THAT WORKS ──
   const uploadFile = async (file, bucket) => {
     const fileName = `${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
@@ -104,8 +103,6 @@ export default function VendorProfile() {
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
     return data.publicUrl;
   };
-
-
 
   const removePortfolioImage = (url) => {
     setPortfolioImages(portfolioImages.filter((img) => img !== url));
@@ -222,7 +219,6 @@ export default function VendorProfile() {
         style={inputStyle}
       />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-
       </div>
 
       {/* ⚠️ WARNING */}
@@ -245,49 +241,51 @@ export default function VendorProfile() {
 
       {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
-         <label style={labelStyle}>Portfolio</label>
+        <label style={labelStyle}>Portfolio</label>
 
-         <p style={{ fontSize: 12, color: portfolioImages.length >= (accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6) ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
-           {portfolioImages.length} / {accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6} images
-         </p>
+        <p style={{ fontSize: 12, color: portfolioImages.length >= (accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6) ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
+          {portfolioImages.length} / {accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6} images
+        </p>
 
-         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
-           ⚠️ Accepted: JPG, PNG, WebP only. HEIC (iPhone default) not supported — convert to JPG first.
-         </div>
+        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
+          ⚠️ Accepted: JPG, PNG, WebP only. HEIC (iPhone default) not supported — convert to JPG first.
+        </div>
 
-         {portfolioImages.length > 0 && (
-           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-             {portfolioImages.map((img, i) => (
-               <div key={i} style={{ position: "relative" }}>
-                 <img src={img} alt="portfolio" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                 <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-               </div>
-             ))}
-           </div>
-         )}
+        {portfolioImages.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
+            {portfolioImages.map((img, i) => (
+              <div key={i} style={{ position: "relative" }}>
+                <img src={img} alt="portfolio" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
 
-         {portfolioImages.length < (accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6) && (
-           <div>
-             <input
-               type="file"
-               accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-               multiple
-               onChange={(e) => {
-                 const limit = accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6;
-                 const remaining = limit - portfolioImages.length;
-                 const files = Array.from(e.target.files).slice(0, remaining);
-                 if (Array.from(e.target.files).length > remaining) {
-                   alert("You can only add " + remaining + " more image(s).");
-                 }
-                 setPortfolioFiles(files);
-               }}
-               style={{ display: "block", marginBottom: 4 }}
-             />
-             <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-               Select multiple images at once.
-             </p>
-           </div>
-         )}
+        {portfolioImages.length < (accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6) && (
+          <div>
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              multiple
+              onChange={(e) => {
+                const limit = accountType === "featured" ? 40 : accountType === "premium" ? 20 : 6;
+                const remaining = limit - portfolioImages.length;
+                const files = Array.from(e.target.files).slice(0, remaining);
+                if (Array.from(e.target.files).length > remaining) {
+                  alert("You can only add " + remaining + " more image(s).");
+                }
+                setPortfolioFiles(files);
+              }}
+              style={{ display: "block", marginBottom: 4 }}
+            />
+            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
+              Select multiple images at once.
+            </p>
+          </div>
+        )}
+
+      </div> {/* ← FIX: closes Portfolio div */}
 
       {/* STATUS MESSAGE */}
       {message && (
@@ -295,7 +293,6 @@ export default function VendorProfile() {
           {message}
         </p>
       )}
-
 
       {/* VIDEO URLS — Premium and Featured only */}
       {(accountType === "premium" || accountType === "featured") && (
