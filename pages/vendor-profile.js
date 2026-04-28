@@ -134,7 +134,7 @@ export default function VendorProfile() {
     try {
       const { data: existing } = await supabase
         .from("profiles")
-        .select("logo_url, portfolio_images")
+        .select("logo_url")
         .eq("id", user.id)
         .single();
 
@@ -145,15 +145,21 @@ export default function VendorProfile() {
         if (uploaded) logoUrl = uploaded;
       }
 
-      let portfolio = existing?.portfolio_images || portfolioImages;
+      // ── FIX: always start from local state so deletions are respected ──
+      let portfolio = [...portfolioImages];
 
+      // Upload any new files and append them
       if (portfolioFiles.length > 0) {
-        const newUrls = [];
         for (const file of portfolioFiles) {
           const url = await uploadFile(file, "vendor-portfolio");
-          if (url) newUrls.push(url);
+          if (url) portfolio.push(url);
         }
-        if (newUrls.length > 0) portfolio = newUrls;
+      }
+
+      // Enforce the photo limit for this account type
+      const limit = photoLimit(accountType);
+      if (portfolio.length > limit) {
+        portfolio = portfolio.slice(0, limit);
       }
 
       const { error } = await supabase
@@ -179,6 +185,11 @@ export default function VendorProfile() {
         .eq("id", user.id);
 
       if (error) throw error;
+
+      // Update local state to reflect what was actually saved
+      setPortfolioImages(portfolio);
+      setPortfolioFiles([]);
+
       setMessage("✅ Profile saved!");
       setTimeout(() => router.push(`/vendor/${handle}`), 1200);
 
