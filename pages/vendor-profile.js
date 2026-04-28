@@ -38,6 +38,45 @@ const photoLimit = (accountType) =>
 const videoLimit = (accountType) =>
   accountType === "featured" ? 10 : accountType === "premium" ? 5 : 0;
 
+// ── IMAGE COMPRESSOR ──
+// Resizes and compresses an image file before upload to speed up saves
+function compressImage(file, maxWidth = 1200, quality = 0.8) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+              type: "image/jpeg",
+            });
+            resolve(compressed);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function VendorProfile() {
   const router = useRouter();
 
@@ -141,17 +180,23 @@ export default function VendorProfile() {
       let logoUrl = existing?.logo_url || null;
 
       if (logoFile) {
-        const uploaded = await uploadFile(logoFile, "vendor-logos");
+        setMessage("⏳ Compressing logo...");
+        const compressed = await compressImage(logoFile, 800, 0.85);
+        setMessage("⏳ Uploading logo...");
+        const uploaded = await uploadFile(compressed, "vendor-logos");
         if (uploaded) logoUrl = uploaded;
       }
 
-      // ── FIX: always start from local state so deletions are respected ──
+      // Always start from local state so deletions are respected
       let portfolio = [...portfolioImages];
 
-      // Upload any new files and append them
+      // Compress and upload any new files
       if (portfolioFiles.length > 0) {
-        for (const file of portfolioFiles) {
-          const url = await uploadFile(file, "vendor-portfolio");
+        setMessage(`⏳ Uploading 0 of ${portfolioFiles.length} images...`);
+        for (let i = 0; i < portfolioFiles.length; i++) {
+          setMessage(`⏳ Uploading ${i + 1} of ${portfolioFiles.length} images...`);
+          const compressed = await compressImage(portfolioFiles[i], 1200, 0.8);
+          const url = await uploadFile(compressed, "vendor-portfolio");
           if (url) portfolio.push(url);
         }
       }
@@ -161,6 +206,8 @@ export default function VendorProfile() {
       if (portfolio.length > limit) {
         portfolio = portfolio.slice(0, limit);
       }
+
+      setMessage("⏳ Saving profile...");
 
       const { error } = await supabase
         .from("profiles")
@@ -262,7 +309,12 @@ export default function VendorProfile() {
       {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 8 }}>
         <label style={labelStyle}>Logo</label>
-        <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files[0])} />
+        {/* FIX: explicit types instead of image/* so Android shows previews correctly */}
+        <input
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+          onChange={(e) => setLogoFile(e.target.files[0])}
+        />
       </div>
 
       {/* PORTFOLIO */}
@@ -315,7 +367,7 @@ export default function VendorProfile() {
 
       {/* STATUS MESSAGE */}
       {message && (
-        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", border: `1px solid ${message.startsWith("✅") ? "#86efac" : "#fca5a5"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>
+        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
           {message}
         </p>
       )}
