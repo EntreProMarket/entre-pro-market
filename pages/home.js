@@ -76,6 +76,30 @@ export default function HomePage() {
 
       <div style={{ padding: 20 }}>
 
+        {/* WELCOME BANNER for new public users */}
+        {profile && !profile.role && (
+          <div style={{
+            backgroundColor: "#f0fdf4", border: "1px solid #86efac",
+            borderRadius: 10, padding: "14px 20px", marginBottom: 20,
+            display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontWeight: "bold", color: "#166534", fontSize: 14 }}>👋 Welcome to EntreProMarket!</p>
+              <p style={{ margin: 0, fontSize: 12, color: "#555" }}>Join as a Vendor or Organizer to unlock all features.</p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => router.push("/vendor-info")}
+                style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", fontSize: 12, cursor: "pointer" }}>
+                🛒 Become a Vendor
+              </button>
+              <button onClick={() => router.push("/organizer-info")}
+                style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", fontSize: 12, cursor: "pointer" }}>
+                🎪 Become an Organizer
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* HERO */}
         <div style={{
           background: "linear-gradient(135deg, #701890, #9b2fc4)",
