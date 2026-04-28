@@ -23,7 +23,7 @@ export default function Marketplace() {
   const [showGate, setShowGate] = useState(false);
   const [gateLoading, setGateLoading] = useState(false);
   const [loggedInProfile, setLoggedInProfile] = useState(null);
-  const [viewMode, setViewMode] = useState("card"); // "card" or "grid"
+  const [viewMode, setViewMode] = useState("card");
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -90,21 +90,21 @@ export default function Marketplace() {
       return a;
     };
     const featured = shuffle((data || []).filter(v => v.account_type === "featured"));
-    const premium = shuffle((data || []).filter(v => v.account_type === "premium"));
-    const free = shuffle((data || []).filter(v => v.account_type !== "featured" && v.account_type !== "premium"));
-    const sorted = [...featured, ...premium, ...free];
+    const premium  = shuffle((data || []).filter(v => v.account_type === "premium"));
+    const free     = shuffle((data || []).filter(v => v.account_type !== "featured" && v.account_type !== "premium"));
+    const sorted   = [...featured, ...premium, ...free];
     setVendors(sorted);
     setFiltered(sorted);
     setLoading(false);
   };
 
   const featuredVendors = filtered.filter(v => v.account_type === "featured");
-  const premiumVendors = filtered.filter(v => v.account_type === "premium");
-  const regularVendors = filtered.filter(v => v.account_type !== "featured" && v.account_type !== "premium");
+  const premiumVendors  = filtered.filter(v => v.account_type === "premium");
+  const regularVendors  = filtered.filter(v => v.account_type !== "featured" && v.account_type !== "premium");
 
   const VendorCard = ({ vendor }) => {
     const isFeatured = vendor.account_type === "featured";
-    const isPremium = vendor.account_type === "premium";
+    const isPremium  = vendor.account_type === "premium";
 
     if (viewMode === "grid") {
       return (
@@ -131,47 +131,29 @@ export default function Marketplace() {
     }
 
     return (
-      <div
-        onClick={() => router.push(`/vendor/${vendor.handle}`)}
+      <div onClick={() => router.push(`/vendor/${vendor.handle}`)}
         style={{
           border: `2px solid ${isFeatured ? "#AABB23" : isPremium ? "#701890" : "#eee"}`,
-          borderRadius: 12,
-          overflow: "hidden",
-          cursor: "pointer",
+          borderRadius: 12, overflow: "hidden", cursor: "pointer",
           backgroundColor: "white",
           boxShadow: isFeatured ? "0 2px 12px rgba(170,187,35,0.2)" : "0 2px 8px rgba(0,0,0,0.07)",
           position: "relative",
-        }}
-      >
+        }}>
         {isFeatured && (
-          <div style={{
-            position: "absolute", top: 10, right: 10,
-            backgroundColor: "#AABB23", color: "white",
-            fontSize: 10, fontWeight: "bold",
-            padding: "3px 8px", borderRadius: 10, zIndex: 1,
-          }}>
+          <div style={{ position: "absolute", top: 10, right: 10, backgroundColor: "#AABB23", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>
             🔥 FEATURED
           </div>
         )}
         {isPremium && (
-          <div style={{
-            position: "absolute", top: 10, right: 10,
-            backgroundColor: "#701890", color: "white",
-            fontSize: 10, fontWeight: "bold",
-            padding: "3px 8px", borderRadius: 10, zIndex: 1,
-          }}>
+          <div style={{ position: "absolute", top: 10, right: 10, backgroundColor: "#701890", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>
             💜 PREMIUM
           </div>
         )}
         <div style={{ height: 160, backgroundColor: "#f4f4f4", overflow: "hidden" }}>
-          {vendor.logo_url ? (
-            <img src={vendor.logo_url} alt={vendor.business_name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>
-              No Image
-            </div>
-          )}
+          {vendor.logo_url
+            ? <img src={vendor.logo_url} alt={vendor.business_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Image</div>
+          }
         </div>
         <div style={{ padding: 14 }}>
           <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>{vendor.business_name}</h3>
@@ -181,11 +163,7 @@ export default function Marketplace() {
           </p>
           <div>
             {vendor.tags?.slice(0, 3).map(tag => (
-              <span key={tag} style={{
-                fontSize: 11, background: "#f0e8ff", color: "#701890",
-                padding: "3px 8px", borderRadius: 10,
-                marginRight: 4, display: "inline-block", marginBottom: 4,
-              }}>
+              <span key={tag} style={{ fontSize: 11, background: "#f0e8ff", color: "#701890", padding: "3px 8px", borderRadius: 10, marginRight: 4, display: "inline-block", marginBottom: 4 }}>
                 {tag}
               </span>
             ))}
@@ -195,7 +173,7 @@ export default function Marketplace() {
     );
   };
 
-  // EMAIL GATE OVERLAY
+  // EMAIL GATE
   if (showGate) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fafafa", fontFamily: "sans-serif", padding: 20 }}>
@@ -205,10 +183,7 @@ export default function Marketplace() {
           <p style={{ color: "#666", fontSize: 14, marginBottom: 24 }}>
             Enter your email to browse thousands of vendors — free, no account needed.
           </p>
-          <input
-            type="email"
-            placeholder="your@email.com"
-            value={gateEmail}
+          <input type="email" placeholder="your@email.com" value={gateEmail}
             onChange={e => setGateEmail(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleGateSubmit()}
             style={{ display: "block", width: "100%", padding: "12px 14px", marginBottom: 12, borderRadius: 6, border: "1px solid #ddd", fontSize: 15, boxSizing: "border-box" }}
@@ -217,9 +192,7 @@ export default function Marketplace() {
             style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 16, opacity: !gateEmail.includes("@") ? 0.6 : 1 }}>
             {gateLoading ? "Please wait..." : "Browse Vendors →"}
           </button>
-          <p style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>
-            No spam. We respect your privacy.
-          </p>
+          <p style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>No spam. We respect your privacy.</p>
           <div style={{ borderTop: "1px solid #eee", paddingTop: 16 }}>
             <p style={{ fontSize: 13, color: "#666", marginBottom: 10 }}>Already have an account?</p>
             <button onClick={() => router.push("/")}
@@ -232,38 +205,34 @@ export default function Marketplace() {
     );
   }
 
-  // ── FIX: build sidebar nav items with upgrade-required for no-role users ──
+  // ── SIDEBAR ITEMS with locked redirects for no-role users ──
   const sidebarItems = loggedInProfile?.is_admin ? [
-    { label: "🏡 Home", path: "/home" },
-    { label: "🔴 Admin Panel", path: "/admin" },
-    { label: "🛒 Marketplace", path: "/marketplace" },
+    { label: "🏡 Home",         path: "/home" },
+    { label: "🔴 Admin Panel",  path: "/admin" },
+    { label: "🛒 Marketplace",  path: "/marketplace" },
   ] : [
     { label: "🏡 Home", path: "/home" },
     {
       label: "📊 Dashboard",
-      path: !loggedInProfile?.role
-        ? "/upgrade-required"
-        : loggedInProfile.role === "organizer"
-          ? "/organizer-dashboard"
-          : "/vendor-dashboard",
+      path: !loggedInProfile?.role ? "/upgrade-required"
+        : loggedInProfile.role === "organizer" ? "/organizer-dashboard"
+        : "/vendor-dashboard",
     },
     {
       label: "👤 My Profile",
-      path: !loggedInProfile?.role
-        ? "/upgrade-required"
-        : loggedInProfile.role === "organizer"
-          ? `/organizer/${loggedInProfile?.handle}`
-          : `/vendor/${loggedInProfile?.handle}`,
+      path: !loggedInProfile?.role ? "/upgrade-required"
+        : loggedInProfile.role === "organizer" ? `/organizer/${loggedInProfile?.handle}`
+        : `/vendor/${loggedInProfile?.handle}`,
     },
-    { label: "🛒 Marketplace", path: "/marketplace" },
-    { label: "✉️ Messages", path: "/messages" },
-    { label: "💾 Saved Contacts", path: "/saved-contacts" },
+    { label: "🛒 Marketplace",    path: "/marketplace" },
+    { label: "✉️ Messages",       path: loggedInProfile?.role ? "/messages"        : "/messaging-locked" },
+    { label: "💾 Saved Contacts", path: loggedInProfile?.role ? "/saved-contacts"  : "/saved-contacts-locked" },
   ];
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "sans-serif" }}>
 
-      {/* STICKY BLACK TOP BAR */}
+      {/* TOP BAR */}
       <div style={{
         position: "sticky", top: 0, zIndex: 100,
         backgroundColor: "#111", color: "white",
@@ -296,12 +265,10 @@ export default function Marketplace() {
         </div>
       </div>
 
-      {/* SIDEBAR DROPDOWN MENU */}
+      {/* SIDEBAR */}
       {menuOpen && loggedInProfile && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200,
-        }} onClick={() => setMenuOpen(false)}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200 }}
+          onClick={() => setMenuOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{
             position: "absolute", top: 0, left: 0,
             width: 240, height: "100%",
@@ -312,22 +279,14 @@ export default function Marketplace() {
               Entre PRO Market
             </div>
             {sidebarItems.map(item => (
-              <button key={item.path}
+              <button key={item.label}
                 onClick={() => { setMenuOpen(false); window.location.href = item.path; }}
-                style={{
-                  padding: "14px 20px", backgroundColor: "white", border: "none",
-                  borderBottom: "1px solid #f0f0f0", cursor: "pointer",
-                  textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333",
-                }}>
+                style={{ padding: "14px 20px", backgroundColor: "white", border: "none", borderBottom: "1px solid #f0f0f0", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333" }}>
                 {item.label}
               </button>
             ))}
             <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
-              style={{
-                marginTop: "auto", padding: "14px 20px", backgroundColor: "white",
-                border: "none", borderTop: "1px solid #eee", cursor: "pointer",
-                textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000",
-              }}>
+              style={{ marginTop: "auto", padding: "14px 20px", backgroundColor: "white", border: "none", borderTop: "1px solid #eee", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000" }}>
               🚪 Log Out
             </button>
           </div>
@@ -341,11 +300,7 @@ export default function Marketplace() {
         </p>
 
         {/* AD BANNER */}
-        <div style={{
-          backgroundColor: "#f3e8ff", border: "1px solid #701890",
-          borderRadius: 10, padding: "14px 20px", marginBottom: 24,
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
-        }}>
+        <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "14px 20px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>📢 Advertise Here</p>
             <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Reach thousands of event organizers and shoppers</p>
@@ -383,7 +338,7 @@ export default function Marketplace() {
           </p>
         )}
 
-        {/* VIEW TOGGLE — shows when 50+ vendors */}
+        {/* VIEW TOGGLE */}
         {!loading && filtered.length >= 50 && (
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16, gap: 8 }}>
             <button onClick={() => setViewMode("card")}
@@ -397,7 +352,7 @@ export default function Marketplace() {
           </div>
         )}
 
-        {/* 🔥 FEATURED VENDORS */}
+        {/* FEATURED */}
         {!loading && featuredVendors.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: 18, marginBottom: 14, color: "#AABB23" }}>🔥 Featured Vendors</h2>
@@ -407,7 +362,7 @@ export default function Marketplace() {
           </div>
         )}
 
-        {/* 💜 PREMIUM VENDORS */}
+        {/* PREMIUM */}
         {!loading && premiumVendors.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: 18, marginBottom: 14, color: "#701890" }}>💜 Premium Vendors</h2>
@@ -429,11 +384,7 @@ export default function Marketplace() {
 
         {/* BOTTOM BANNERS */}
         <div style={{ marginTop: 40, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{
-            backgroundColor: "#f9ffe8", border: "1px solid #AABB23",
-            borderRadius: 10, padding: "14px 20px",
-            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
-          }}>
+          <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
             <div>
               <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>🛒 Are you a Vendor?</p>
               <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Join EntreProMarket and get discovered by event organizers</p>
@@ -442,12 +393,7 @@ export default function Marketplace() {
               Become a Vendor
             </button>
           </div>
-
-          <div style={{
-            backgroundColor: "#f3e8ff", border: "1px solid #701890",
-            borderRadius: 10, padding: "14px 20px",
-            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
-          }}>
+          <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
             <div>
               <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>🎪 Are you an Event Organizer?</p>
               <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Find and connect with the best vendors for your events</p>
