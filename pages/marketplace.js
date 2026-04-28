@@ -27,7 +27,6 @@ export default function Marketplace() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Check if visitor has already provided email or is logged in
     const checkAccess = async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
@@ -39,7 +38,6 @@ export default function Marketplace() {
           .single();
         setLoggedInProfile(prof);
       } else {
-        // Check localStorage for returning visitors
         const hasEmail = typeof window !== "undefined" && localStorage.getItem("epm_visitor_email");
         setShowGate(!hasEmail);
       }
@@ -51,9 +49,7 @@ export default function Marketplace() {
   const handleGateSubmit = async () => {
     if (!gateEmail || !gateEmail.includes("@")) return;
     setGateLoading(true);
-    // Save visitor email to Supabase
     await supabase.from("visitor_emails").insert([{ email: gateEmail }]).select();
-    // Store in localStorage so they don't see gate again
     if (typeof window !== "undefined") {
       localStorage.setItem("epm_visitor_email", gateEmail);
     }
@@ -85,7 +81,6 @@ export default function Marketplace() {
       .eq("role", "vendor")
       .not("business_name", "is", null);
     if (error) { console.log(error); setLoading(false); return; }
-    // Shuffle within each tier for dynamic ordering
     const shuffle = (arr) => {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -103,7 +98,6 @@ export default function Marketplace() {
     setLoading(false);
   };
 
-  // ✅ FIXED: featured is its own tier, separate from premium
   const featuredVendors = filtered.filter(v => v.account_type === "featured");
   const premiumVendors = filtered.filter(v => v.account_type === "premium");
   const regularVendors = filtered.filter(v => v.account_type !== "featured" && v.account_type !== "premium");
@@ -112,7 +106,6 @@ export default function Marketplace() {
     const isFeatured = vendor.account_type === "featured";
     const isPremium = vendor.account_type === "premium";
 
-    // Small grid mode
     if (viewMode === "grid") {
       return (
         <div onClick={() => router.push(`/vendor/${vendor.handle}`)}
@@ -239,6 +232,34 @@ export default function Marketplace() {
     );
   }
 
+  // ── FIX: build sidebar nav items with upgrade-required for no-role users ──
+  const sidebarItems = loggedInProfile?.is_admin ? [
+    { label: "🏡 Home", path: "/home" },
+    { label: "🔴 Admin Panel", path: "/admin" },
+    { label: "🛒 Marketplace", path: "/marketplace" },
+  ] : [
+    { label: "🏡 Home", path: "/home" },
+    {
+      label: "📊 Dashboard",
+      path: !loggedInProfile?.role
+        ? "/upgrade-required"
+        : loggedInProfile.role === "organizer"
+          ? "/organizer-dashboard"
+          : "/vendor-dashboard",
+    },
+    {
+      label: "👤 My Profile",
+      path: !loggedInProfile?.role
+        ? "/upgrade-required"
+        : loggedInProfile.role === "organizer"
+          ? `/organizer/${loggedInProfile?.handle}`
+          : `/vendor/${loggedInProfile?.handle}`,
+    },
+    { label: "🛒 Marketplace", path: "/marketplace" },
+    { label: "✉️ Messages", path: "/messages" },
+    { label: "💾 Saved Contacts", path: "/saved-contacts" },
+  ];
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "sans-serif" }}>
 
@@ -247,7 +268,7 @@ export default function Marketplace() {
         position: "sticky", top: 0, zIndex: 100,
         backgroundColor: "#111", color: "white",
         padding: "12px 20px",
-        display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {loggedInProfile && (
@@ -261,7 +282,7 @@ export default function Marketplace() {
           Entre PRO Market
         </span>
         <div style={{ display: "flex", gap: 8 }}>
-{loggedInProfile ? (
+          {loggedInProfile ? (
             <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
               style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
               Log Out
@@ -290,18 +311,7 @@ export default function Marketplace() {
             <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>
               Entre PRO Market
             </div>
-            {(loggedInProfile?.is_admin ? [
-              { label: "🏡 Home", path: "/home" },
-              { label: "🔴 Admin Panel", path: "/admin" },
-              { label: "🛒 Marketplace", path: "/marketplace" },
-            ] : [
-              { label: "🏡 Home", path: "/home" },
-              { label: "📊 Dashboard", path: loggedInProfile.role === "organizer" ? "/organizer-dashboard" : "/vendor-dashboard" },
-              { label: "👤 My Profile", path: loggedInProfile.role === "organizer" ? `/organizer/${loggedInProfile?.handle}` : `/vendor/${loggedInProfile?.handle}` },
-              { label: "🛒 Marketplace", path: "/marketplace" },
-              { label: "✉️ Messages", path: "/messages" },
-              { label: "💾 Saved Contacts", path: "/saved-contacts" },
-            ]).map(item => (
+            {sidebarItems.map(item => (
               <button key={item.path}
                 onClick={() => { setMenuOpen(false); window.location.href = item.path; }}
                 style={{
@@ -325,131 +335,128 @@ export default function Marketplace() {
       )}
 
       <div style={{ padding: 20 }}>
-      <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
-      <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
-        Browse and connect with vendors for your next event
-      </p>
-
-      {/* AD BANNER */}
-      <div style={{
-        backgroundColor: "#f3e8ff", border: "1px solid #701890",
-        borderRadius: 10, padding: "14px 20px", marginBottom: 24,
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
-      }}>
-        <div>
-          <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>📢 Advertise Here</p>
-          <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Reach thousands of event organizers and shoppers</p>
-        </div>
-        <button onClick={() => router.push("/contact")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-          Learn More
-        </button>
-      </div>
-
-      {/* SEARCH */}
-      <input type="text" placeholder="🔍 Search by name, city, category or tag..."
-        value={query} onChange={e => setQuery(e.target.value)}
-        style={{ width: "100%", padding: "12px 16px", marginBottom: 16, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box" }}
-      />
-
-      {/* CATEGORY FILTERS */}
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 24, paddingBottom: 4 }}>
-        {CATEGORIES.map(cat => (
-          <button key={cat} onClick={() => setCategory(cat)} style={{
-            padding: "7px 14px", borderRadius: 20, border: "1px solid #ddd",
-            backgroundColor: category === cat ? "#701890" : "#fff",
-            color: category === cat ? "#fff" : "#333",
-            cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
-            fontWeight: category === cat ? "bold" : "normal",
-          }}>
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {loading && <p style={{ color: "#888" }}>Loading vendors...</p>}
-      {!loading && filtered.length === 0 && (
-        <p style={{ color: "#888", textAlign: "center", marginTop: 40 }}>
-          No vendors found. Try a different search or category.
+        <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
+        <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
+          Browse and connect with vendors for your next event
         </p>
-      )}
 
-      {/* VIEW TOGGLE — shows when 50+ vendors */}
-      {!loading && filtered.length >= 50 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16, gap: 8 }}>
-          <button onClick={() => setViewMode("card")}
-            style={{ padding: "7px 14px", backgroundColor: viewMode === "card" ? "#701890" : "#eee", color: viewMode === "card" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-            ▦ Cards
-          </button>
-          <button onClick={() => setViewMode("grid")}
-            style={{ padding: "7px 14px", backgroundColor: viewMode === "grid" ? "#701890" : "#eee", color: viewMode === "grid" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-            ⊞ Grid
-          </button>
-        </div>
-      )}
-
-      {/* 🔥 FEATURED VENDORS */}
-      {!loading && featuredVendors.length > 0 && (
-        <div style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 14, color: "#AABB23" }}>🔥 Featured Vendors</h2>
-          <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
-            {featuredVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
-          </div>
-        </div>
-      )}
-
-      {/* 💜 PREMIUM VENDORS */}
-      {!loading && premiumVendors.length > 0 && (
-        <div style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 14, color: "#701890" }}>💜 Premium Vendors</h2>
-          <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
-            {premiumVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
-          </div>
-        </div>
-      )}
-
-      {/* ALL VENDORS */}
-      {!loading && regularVendors.length > 0 && (
-        <div style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: 18, marginBottom: 14 }}>All Vendors</h2>
-          <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
-            {regularVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
-          </div>
-        </div>
-      )}
-
-      {/* BOTTOM BANNERS */}
-      <div style={{ marginTop: 40, display: "flex", flexDirection: "column", gap: 12 }}>
-        {/* Become a Vendor */}
-        <div style={{
-          backgroundColor: "#f9ffe8", border: "1px solid #AABB23",
-          borderRadius: 10, padding: "14px 20px",
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
-        }}>
-          <div>
-            <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>🛒 Are you a Vendor?</p>
-            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Join EntreProMarket and get discovered by event organizers</p>
-          </div>
-          <button onClick={() => router.push("/vendor-info")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-            Become a Vendor
-          </button>
-        </div>
-
-        {/* Become an Organizer */}
+        {/* AD BANNER */}
         <div style={{
           backgroundColor: "#f3e8ff", border: "1px solid #701890",
-          borderRadius: 10, padding: "14px 20px",
+          borderRadius: 10, padding: "14px 20px", marginBottom: 24,
           display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
         }}>
           <div>
-            <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>🎪 Are you an Event Organizer?</p>
-            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Find and connect with the best vendors for your events</p>
+            <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>📢 Advertise Here</p>
+            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Reach thousands of event organizers and shoppers</p>
           </div>
-          <button onClick={() => router.push("/organizer-info")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-            Become an Organizer
+          <button onClick={() => router.push("/contact")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+            Learn More
           </button>
         </div>
-      </div>
 
+        {/* SEARCH */}
+        <input type="text" placeholder="🔍 Search by name, city, category or tag..."
+          value={query} onChange={e => setQuery(e.target.value)}
+          style={{ width: "100%", padding: "12px 16px", marginBottom: 16, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box" }}
+        />
+
+        {/* CATEGORY FILTERS */}
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 24, paddingBottom: 4 }}>
+          {CATEGORIES.map(cat => (
+            <button key={cat} onClick={() => setCategory(cat)} style={{
+              padding: "7px 14px", borderRadius: 20, border: "1px solid #ddd",
+              backgroundColor: category === cat ? "#701890" : "#fff",
+              color: category === cat ? "#fff" : "#333",
+              cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
+              fontWeight: category === cat ? "bold" : "normal",
+            }}>
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {loading && <p style={{ color: "#888" }}>Loading vendors...</p>}
+        {!loading && filtered.length === 0 && (
+          <p style={{ color: "#888", textAlign: "center", marginTop: 40 }}>
+            No vendors found. Try a different search or category.
+          </p>
+        )}
+
+        {/* VIEW TOGGLE — shows when 50+ vendors */}
+        {!loading && filtered.length >= 50 && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16, gap: 8 }}>
+            <button onClick={() => setViewMode("card")}
+              style={{ padding: "7px 14px", backgroundColor: viewMode === "card" ? "#701890" : "#eee", color: viewMode === "card" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              ▦ Cards
+            </button>
+            <button onClick={() => setViewMode("grid")}
+              style={{ padding: "7px 14px", backgroundColor: viewMode === "grid" ? "#701890" : "#eee", color: viewMode === "grid" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+              ⊞ Grid
+            </button>
+          </div>
+        )}
+
+        {/* 🔥 FEATURED VENDORS */}
+        {!loading && featuredVendors.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 18, marginBottom: 14, color: "#AABB23" }}>🔥 Featured Vendors</h2>
+            <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
+              {featuredVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
+            </div>
+          </div>
+        )}
+
+        {/* 💜 PREMIUM VENDORS */}
+        {!loading && premiumVendors.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 18, marginBottom: 14, color: "#701890" }}>💜 Premium Vendors</h2>
+            <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
+              {premiumVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
+            </div>
+          </div>
+        )}
+
+        {/* ALL VENDORS */}
+        {!loading && regularVendors.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 18, marginBottom: 14 }}>All Vendors</h2>
+            <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
+              {regularVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
+            </div>
+          </div>
+        )}
+
+        {/* BOTTOM BANNERS */}
+        <div style={{ marginTop: 40, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{
+            backgroundColor: "#f9ffe8", border: "1px solid #AABB23",
+            borderRadius: 10, padding: "14px 20px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>🛒 Are you a Vendor?</p>
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Join EntreProMarket and get discovered by event organizers</p>
+            </div>
+            <button onClick={() => router.push("/vendor-info")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              Become a Vendor
+            </button>
+          </div>
+
+          <div style={{
+            backgroundColor: "#f3e8ff", border: "1px solid #701890",
+            borderRadius: 10, padding: "14px 20px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>🎪 Are you an Event Organizer?</p>
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Find and connect with the best vendors for your events</p>
+            </div>
+            <button onClick={() => router.push("/organizer-info")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+              Become an Organizer
+            </button>
+          </div>
+        </div>
 
       </div>
     </div>
