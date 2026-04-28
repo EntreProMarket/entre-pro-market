@@ -9,16 +9,15 @@ export default function VendorDashboard() {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [messageCount, setMessageCount] = useState(0);
+  const [profileViews, setProfileViews] = useState(0);
 
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data?.user;
 
-      if (!user) {
-        router.replace("/");
-        return;
-      }
+      if (!user) { router.replace("/"); return; }
 
       const { data: profileData } = await supabase
         .from("profiles")
@@ -26,19 +25,30 @@ export default function VendorDashboard() {
         .eq("id", user.id)
         .single();
 
-      // ✅ SECURITY: Only vendors can access vendor dashboard
+      // SECURITY: Only vendors can access vendor dashboard
       if (!profileData || profileData.role !== "vendor") {
-        if (profileData?.role === "organizer") {
-          router.replace("/organizer-dashboard");
-        } else if (profileData?.is_admin) {
-          router.replace("/admin");
-        } else {
-          router.replace("/marketplace");
-        }
+        if (profileData?.role === "organizer") router.replace("/organizer-dashboard");
+        else if (profileData?.is_admin) router.replace("/admin");
+        else router.replace("/marketplace");
         return;
       }
 
       setProfile(profileData);
+
+      // Message count
+      const { count: msgCount } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
+      setMessageCount(msgCount || 0);
+
+      // Profile views count
+      const { count: viewCount } = await supabase
+        .from("profile_views")
+        .select("*", { count: "exact", head: true })
+        .eq("profile_id", user.id);
+      setProfileViews(viewCount || 0);
+
       setLoading(false);
     };
 
@@ -50,9 +60,9 @@ export default function VendorDashboard() {
   const tier = profile?.account_type || "free";
 
   const tierConfig = {
-    free:     { label: "Free",     color: "#888",    bg: "#f5f5f5"  },
-    premium:  { label: "Premium",  color: "#701890", bg: "#f3e8ff"  },
-    featured: { label: "Featured", color: "#AABB23", bg: "#f9ffe8"  },
+    free:     { label: "Free",     color: "#888",    bg: "#f5f5f5" },
+    premium:  { label: "Premium",  color: "#701890", bg: "#f3e8ff" },
+    featured: { label: "Featured", color: "#AABB23", bg: "#f9ffe8" },
   };
 
   const { label, color, bg } = tierConfig[tier] || tierConfig.free;
@@ -137,17 +147,21 @@ export default function VendorDashboard() {
         </div>
 
         {/* STATS */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 8 }}>
           <div style={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>—</p>
+            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>
+              {profileViews}
+            </p>
             <p style={{ fontSize: 13, color: "#888", margin: 0, marginTop: 4 }}>Profile Views</p>
           </div>
           <div style={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>—</p>
+            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>
+              {messageCount}
+            </p>
             <p style={{ fontSize: 13, color: "#888", margin: 0, marginTop: 4 }}>Messages</p>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: "#aaa" }}>📊 Stats tracking coming soon.</p>
+
       </div>
     </DashboardLayout>
   );
