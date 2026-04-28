@@ -34,6 +34,11 @@ export default function DashboardLayout({ children }) {
 
   const goToDashboard = () => {
     setMenuOpen(false);
+    // No role — send to upgrade page
+    if (!role) {
+      router.push("/upgrade-required");
+      return;
+    }
     if (role === "vendor") router.push("/vendor-dashboard");
     else if (role === "organizer") router.push("/organizer-dashboard");
   };
@@ -41,16 +46,19 @@ export default function DashboardLayout({ children }) {
   const goToProfile = async () => {
     setMenuOpen(false);
     if (!user) return;
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("handle, role")
       .eq("id", user.id)
       .single();
-    // Public user with no role — send to vendor info instead of error
-    if (!profile?.handle || !profile?.role) {
-      router.push("/vendor-info");
+
+    // No role — send to upgrade page
+    if (!profile?.role) {
+      router.push("/upgrade-required");
       return;
     }
+
     if (profile.role === "vendor") router.push(`/vendor/${profile.handle}`);
     else if (profile.role === "organizer") router.push(`/organizer/${profile.handle}`);
   };
@@ -204,7 +212,7 @@ export default function DashboardLayout({ children }) {
         </div>
       </div>
 
-      {/* MAIN CONTENT — full width on mobile */}
+      {/* MAIN CONTENT */}
       <div style={{ flex: 1, padding: 20 }}>
         {children}
       </div>
