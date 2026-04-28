@@ -34,11 +34,7 @@ export default function DashboardLayout({ children }) {
 
   const goToDashboard = () => {
     setMenuOpen(false);
-    // No role — send to upgrade page
-    if (!role) {
-      router.push("/upgrade-required");
-      return;
-    }
+    if (!role) { router.push("/upgrade-required"); return; }
     if (role === "vendor") router.push("/vendor-dashboard");
     else if (role === "organizer") router.push("/organizer-dashboard");
   };
@@ -46,19 +42,12 @@ export default function DashboardLayout({ children }) {
   const goToProfile = async () => {
     setMenuOpen(false);
     if (!user) return;
-
     const { data: profile } = await supabase
       .from("profiles")
       .select("handle, role")
       .eq("id", user.id)
       .single();
-
-    // No role — send to upgrade page
-    if (!profile?.role) {
-      router.push("/upgrade-required");
-      return;
-    }
-
+    if (!profile?.role) { router.push("/upgrade-required"); return; }
     if (profile.role === "vendor") router.push(`/vendor/${profile.handle}`);
     else if (profile.role === "organizer") router.push(`/organizer/${profile.handle}`);
   };
@@ -75,7 +64,6 @@ export default function DashboardLayout({ children }) {
       onClick={onClick}
       style={{
         cursor: "pointer",
-        marginBottom: 8,
         padding: "10px 14px",
         borderRadius: 6,
         fontSize: 15,
@@ -105,108 +93,55 @@ export default function DashboardLayout({ children }) {
         top: 0,
         zIndex: 100,
       }}>
-        {/* HAMBURGER */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "white",
-            fontSize: 24,
-            cursor: "pointer",
-            padding: "0 8px",
-            lineHeight: 1,
-          }}
-        >
+        <button onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "none", border: "none", color: "white", fontSize: 24, cursor: "pointer", padding: "0 8px", lineHeight: 1 }}>
           {menuOpen ? "✕" : "☰"}
         </button>
-
-        {/* BRAND */}
         <span style={{ fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</span>
-
-        {/* LOG OUT */}
-        <button
-          onClick={logout}
-          style={{
-            padding: "6px 12px",
-            backgroundColor: "#701890",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontSize: 13,
-            fontWeight: "bold",
-          }}
-        >
+        <button onClick={logout}
+          style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>
           Log Out
         </button>
       </div>
 
-      {/* SLIDE-IN MENU OVERLAY */}
+      {/* OVERLAY */}
       {menuOpen && (
-        <div
-          onClick={() => setMenuOpen(false)}
-          style={{
-            position: "fixed",
-            top: 0, left: 0,
-            width: "100%", height: "100%",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            zIndex: 200,
-          }}
+        <div onClick={() => setMenuOpen(false)}
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200 }}
         />
       )}
 
-      {/* SLIDE-IN SIDEBAR */}
+      {/* SIDEBAR */}
       <div style={{
-        position: "fixed",
-        top: 0, left: 0,
-        width: 220,
-        height: "100%",
-        backgroundColor: "#111",
-        color: "white",
-        padding: 20,
-        zIndex: 300,
+        position: "fixed", top: 0, left: 0,
+        width: 220, height: "100%",
+        backgroundColor: "#111", color: "white",
+        padding: 20, zIndex: 300,
         transform: menuOpen ? "translateX(0)" : "translateX(-100%)",
         transition: "transform 0.25s ease",
-        display: "flex",
-        flexDirection: "column",
+        display: "flex", flexDirection: "column",
         boxShadow: menuOpen ? "4px 0 20px rgba(0,0,0,0.4)" : "none",
       }}>
-        {/* CLOSE BUTTON */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Entre PRO Market</h2>
-          <button
-            onClick={() => setMenuOpen(false)}
-            style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer" }}
-          >
-            ✕
-          </button>
+          <button onClick={() => setMenuOpen(false)}
+            style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* NAV LINKS */}
         {navItem("🏡 Home", () => { window.location.assign("/home"); })}
         {navItem("🏠 Dashboard", goToDashboard)}
         {navItem("👤 Profile", goToProfile)}
         {navItem("🛒 Marketplace", () => navigate("/marketplace"))}
-        {role && navItem("✉️ Messages", () => navigate("/messages"))}
-        {role && navItem("💾 Saved Contacts", () => navigate("/saved-contacts"))}
+        {/* Saved Contacts and Messages: locked for no-role users */}
+        {navItem("✉️ Messages", () => navigate(role ? "/messages" : "/messaging-locked"))}
+        {navItem("💾 Saved Contacts", () => navigate(role ? "/saved-contacts" : "/saved-contacts-locked"))}
         {navItem("⚙️ Settings", () => navigate("/settings"))}
 
-        {/* LOG OUT AT BOTTOM */}
         <div style={{ marginTop: "auto" }}>
-          <p
-            onClick={logout}
-            style={{
-              cursor: "pointer",
-              color: "#ff6b6b",
-              padding: "10px 14px",
-              borderRadius: 6,
-              fontSize: 15,
-              margin: 0,
-            }}
+          <p onClick={logout}
+            style={{ cursor: "pointer", color: "#ff6b6b", padding: "10px 14px", borderRadius: 6, fontSize: 15, margin: 0 }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(255,107,107,0.1)"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
-          >
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}>
             🚪 Log Out
           </p>
         </div>
