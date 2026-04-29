@@ -77,7 +77,6 @@ function YouTubeIcon() {
   );
 }
 
-
 function XIcon() {
   return (
     <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
@@ -103,7 +102,8 @@ export default function OrganizerPublicProfile() {
 
     const loadProfile = async () => {
       const { data: userData } = await supabase.auth.getUser();
-      setUser(userData?.user || null);
+      const currentUser = userData?.user || null;
+      setUser(currentUser);
 
       const { data, error } = await supabase
         .from("profiles")
@@ -112,27 +112,37 @@ export default function OrganizerPublicProfile() {
         .single();
 
       // Load viewer profile
-      if (userData?.user) {
+      if (currentUser) {
         const { data: vp } = await supabase
           .from("profiles")
           .select("role, account_type, id")
-          .eq("id", userData.user.id)
+          .eq("id", currentUser.id)
           .single();
         setViewerProfile(vp);
       }
 
-      if (error) { console.log(error); } 
-      else {
-        setOrganizer(data);
-        if (data.account_type === "premium") {
-          const { data: eventsData } = await supabase
-            .from("organizer_events")
-            .select("*")
-            .eq("organizer_id", data.id)
-            .order("event_date", { ascending: true });
-          setEvents(eventsData || []);
-        }
+      if (error) { console.log(error); setLoading(false); return; }
+
+      setOrganizer(data);
+
+      if (data.account_type === "premium") {
+        const { data: eventsData } = await supabase
+          .from("organizer_events")
+          .select("*")
+          .eq("organizer_id", data.id)
+          .order("event_date", { ascending: true });
+        setEvents(eventsData || []);
       }
+
+      // ── TRACK PROFILE VIEW (only if not the owner) ──
+      const ownerViewing = currentUser && data.id === currentUser.id;
+      if (!ownerViewing) {
+        await supabase.from("profile_views").insert([{
+          profile_id: data.id,
+          viewer_id: currentUser?.id || null,
+        }]);
+      }
+
       setLoading(false);
     };
 
@@ -144,11 +154,7 @@ export default function OrganizerPublicProfile() {
 
   const isOwner = user && user.id === organizer.id;
 
-  const iconLinkStyle = {
-    display: "flex",
-    opacity: 1,
-    transition: "opacity 0.2s",
-  };
+  const iconLinkStyle = { display: "flex", opacity: 1, transition: "opacity 0.2s" };
 
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
@@ -196,16 +202,13 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      {/* REMOVE old separate edit button if exists */}
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <h1 style={{ marginBottom: 5 }}>{organizer.organizer_name || "Organizer"}</h1>
           <p style={{ color: "#777" }}>@{organizer.handle}</p>
         </div>
-        </div>
-
-
+      </div>
 
       {/* LOGO */}
       {organizer.logo_url && (
@@ -229,7 +232,7 @@ export default function OrganizerPublicProfile() {
         ))}
       </div>
 
-      {/* SOCIAL ICONS — green, no background */}
+      {/* SOCIAL ICONS */}
       <div style={{ marginTop: 25 }}>
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
@@ -328,9 +331,7 @@ export default function OrganizerPublicProfile() {
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type;
         const vr = viewerProfile?.role;
-        // Only Featured Vendors can initiate contact with organizers
-        const canMessage = vr === "featured" || vt === "featured" ||
-          (vr === "organizer");
+        const canMessage = vr === "featured" || vt === "featured" || (vr === "organizer");
         return canMessage ? (
           <div style={{ marginTop: 20, marginBottom: 10 }}>
             <button
@@ -341,7 +342,6 @@ export default function OrganizerPublicProfile() {
             </button>
           </div>
         ) : viewerProfile?.role === "vendor" ? (
-          // Non-featured vendor viewing organizer
           <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, textAlign: "center" }}>
             <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 13 }}>
               Want to work with organizers like this?
