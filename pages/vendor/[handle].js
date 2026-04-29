@@ -77,7 +77,6 @@ function YouTubeIcon() {
   );
 }
 
-
 function XIcon() {
   return (
     <svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill={ICON_COLOR}>
@@ -113,7 +112,8 @@ export default function VendorPublicProfile() {
       if (error) { console.log(error); setLoading(false); return; }
 
       setVendor(data);
-      if (user && data.id === user.id) setIsOwner(true);
+      const ownerViewing = user && data.id === user.id;
+      if (ownerViewing) setIsOwner(true);
 
       // Load viewer profile to check messaging permissions
       if (user) {
@@ -123,6 +123,14 @@ export default function VendorPublicProfile() {
           .eq("id", user.id)
           .single();
         setViewerProfile(vp);
+      }
+
+      // ── TRACK PROFILE VIEW (only if not the owner) ──
+      if (!ownerViewing) {
+        await supabase.from("profile_views").insert([{
+          profile_id: data.id,
+          viewer_id: user?.id || null,
+        }]);
       }
 
       setLoading(false);
@@ -137,7 +145,7 @@ export default function VendorPublicProfile() {
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
 
-       {/* OWNER NAV MENU — only visible to the vendor who owns this profile */}
+      {/* OWNER NAV MENU */}
       {isOwner && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <button
@@ -180,7 +188,6 @@ export default function VendorPublicProfile() {
         </div>
       )}
 
-
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
@@ -188,8 +195,6 @@ export default function VendorPublicProfile() {
           <p style={{ color: "#777" }}>@{vendor.handle}</p>
         </div>
       </div>
-
-
 
       {/* LOGO */}
       {vendor.logo_url && (
@@ -213,7 +218,7 @@ export default function VendorPublicProfile() {
         ))}
       </div>
 
-      {/* SOCIAL ICONS — purple, no background */}
+      {/* SOCIAL ICONS */}
       <div style={{ marginTop: 25 }}>
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
@@ -260,13 +265,12 @@ export default function VendorPublicProfile() {
         )}
       </div>
 
-            {/* VIDEO SECTION */}
+      {/* VIDEO SECTION */}
       {vendor.video_urls && vendor.video_urls.filter(v => v).length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {vendor.video_urls.filter(v => v).map((url, i) => {
-              // Convert to embed URL
               let embedUrl = url;
               if (url.includes("youtube.com/watch")) {
                 const id = new URL(url).searchParams.get("v");
@@ -310,17 +314,7 @@ export default function VendorPublicProfile() {
           <div style={{ marginTop: 20, marginBottom: 10 }}>
             <button
               onClick={() => router.push(`/messages?to=${vendor.id}&from=vendor/${vendor.handle}`)}
-              style={{
-                padding: "12px 24px",
-                backgroundColor: "#AABB23",
-                color: "white",
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-                fontWeight: "bold",
-                fontSize: 15,
-                width: "100%",
-              }}
+              style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}
             >
               ✉️ Send Message
             </button>
@@ -338,7 +332,6 @@ export default function VendorPublicProfile() {
             </button>
           </div>
         ) : (
-          // Public user — no account at all
           <div style={{ marginTop: 20, marginBottom: 10, padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, textAlign: "center" }}>
             <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 13 }}>
               Want to connect with vendors like this?
