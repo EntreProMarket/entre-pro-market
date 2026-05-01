@@ -9,41 +9,80 @@ export default function UpgradeSuccess() {
   const [tierLabel, setTierLabel] = useState("");
   const [tierIcon, setTierIcon] = useState("🎉");
   const [tierColor, setTierColor] = useState("#701890");
+  const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {
-    // Wait for router to be ready
     if (!router.isReady) return;
 
     const { role, tier } = router.query;
 
     const labels = {
-      premium:  { label: "Premium Vendor",   icon: "💜", color: "#701890" },
-      featured: { label: "Featured Vendor",  icon: "🔥", color: "#AABB23" },
-      basic:    { label: "Basic Organizer",  icon: "💼", color: "#555"    },
-      pro:      { label: "Pro Organizer",    icon: "🚀", color: "#701890" },
-      elite:    { label: "Elite Organizer",  icon: "👑", color: "#AABB23" },
+      premium:  { label: "Premium Vendor",  icon: "💜", color: "#701890" },
+      featured: { label: "Featured Vendor", icon: "🔥", color: "#AABB23" },
+      basic:    { label: "Basic Organizer", icon: "💼", color: "#555"    },
+      pro:      { label: "Pro Organizer",   icon: "🚀", color: "#701890" },
+      elite:    { label: "Elite Organizer", icon: "👑", color: "#AABB23" },
     };
 
-    const config = labels[tier] || { label: tier, icon: "✅", color: "#701890" };
+    const config = labels[tier] || { label: tier || "Member", icon: "✅", color: "#701890" };
     setTierLabel(config.label);
     setTierIcon(config.icon);
     setTierColor(config.color);
     setStatus("success");
 
-    // Auto redirect after 4 seconds
-    const timer = setTimeout(async () => {
-      await goToDashboard(role || new URLSearchParams(window.location.search).get("role"));
+    // Countdown timer
+    const countTimer = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(countTimer); }
+        return c - 1;
+      });
+    }, 1000);
+
+    // Auto redirect after 10 seconds
+    const timer = setTimeout(() => {
+      handleRedirect(role);
     }, 10000);
 
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); clearInterval(countTimer); };
   }, [router.isReady, router.query]);
 
-  const goToDashboard = async (roleParam) => {
+  const handleRedirect = async (roleParam) => {
     const currentRole = roleParam || new URLSearchParams(window.location.search).get("role");
+
+    // Wait up to 8 seconds for webhook to update the DB
+    let attempts = 0;
+    while (attempts < 8) {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) { window.location.href = "/"; return; }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, account_type, business_name, organizer_name")
+        .eq("id", user.id)
+        .single();
+
+      // Check if webhook has updated the role
+      if (profile?.role === currentRole) {
+        // Role is set — go to profile setup if new, dashboard if returning
+        if (currentRole === "organizer") {
+          window.location.href = profile.organizer_name ? "/organizer-dashboard" : "/organizer-profile";
+        } else {
+          window.location.href = profile.business_name ? "/vendor-dashboard" : "/vendor-profile";
+        }
+        return;
+      }
+
+      // Webhook hasn't fired yet — wait 1 second and try again
+      await new Promise(r => setTimeout(r, 1000));
+      attempts++;
+    }
+
+    // Fallback — use URL param if DB still not updated
     if (currentRole === "organizer") {
-      window.location.href = "/organizer-dashboard";
+      window.location.href = "/organizer-profile";
     } else {
-      window.location.href = "/vendor-dashboard";
+      window.location.href = "/vendor-profile";
     }
   };
 
@@ -100,15 +139,15 @@ export default function UpgradeSuccess() {
           color: tierColor,
           fontWeight: "bold",
         }}>
-          Your account is now active! Let's set up your profile.
+          Your account is now active! Setting up your profile...
         </div>
 
         <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>
-          Redirecting you in a moment...
+          {countdown > 0 ? `Redirecting in ${countdown} seconds...` : "Redirecting now..."}
         </p>
 
         <button
-          onClick={() => goToDashboard(router.query.role || new URLSearchParams(window.location.search).get('role'))}
+          onClick={() => handleRedirect(router.query.role)}
           style={{
             width: "100%",
             padding: "13px",
@@ -121,7 +160,7 @@ export default function UpgradeSuccess() {
             cursor: "pointer",
           }}
         >
-          Set Up My Profile →
+          Continue to Profile Setup →
         </button>
       </div>
     </div>
