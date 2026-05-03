@@ -22,6 +22,15 @@ export default function SavedContacts() {
         .from("profiles").select("*").eq("id", user.id).single();
       setProfile(profileData);
 
+      // ── LOCK: Basic Organizers and unrecognized tiers cannot save contacts ──
+      // Only pro, elite, and legacy premium organizers have access
+      const role = profileData?.role;
+      const tier = profileData?.account_type;
+      if (role === "organizer" && tier !== "pro" && tier !== "elite" && tier !== "premium") {
+        router.replace("/saved-contacts-locked");
+        return;
+      }
+
       const { data: savedData } = await supabase
         .from("saved_contacts")
         .select("*, contact:contact_id(id, business_name, organizer_name, logo_url, role, handle, account_type, category, city, state, website, instagram, facebook, x_twitter, tiktok, youtube)")
@@ -79,18 +88,14 @@ export default function SavedContacts() {
           <h1 style={{ margin: 0 }}>💾 Saved Contacts</h1>
         </div>
 
-        {/* SEARCH — only show if there are contacts */}
+        {/* SEARCH */}
         {contacts.length > 0 && (
           <input
             type="text"
             placeholder="🔍 Search by name, category, city..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{
-              display: "block", width: "100%", padding: "11px 14px",
-              borderRadius: 8, border: "1px solid #ddd", fontSize: 14,
-              marginBottom: 16, boxSizing: "border-box",
-            }}
+            style={{ display: "block", width: "100%", padding: "11px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 16, boxSizing: "border-box" }}
           />
         )}
 
@@ -137,37 +142,21 @@ export default function SavedContacts() {
                   boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
                 }}>
 
-                  {/* TOP ROW — avatar + info + remove */}
+                  {/* TOP ROW */}
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-
-                    {/* AVATAR */}
                     {c.logo_url ? (
                       <img src={c.logo_url} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                     ) : (
-                      <div style={{ width: 52, height: 52, borderRadius: "50%", backgroundColor: "#f0e8ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
-                        👤
-                      </div>
+                      <div style={{ width: 52, height: 52, borderRadius: "50%", backgroundColor: "#f0e8ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>👤</div>
                     )}
-
-                    {/* INFO */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
                         <strong style={{ fontSize: 15 }}>{getName(c)}</strong>
-                        {/* ROLE BADGE */}
-                        <span style={{
-                          fontSize: 10, fontWeight: "bold", padding: "2px 7px", borderRadius: 10,
-                          backgroundColor: c.role === "vendor" ? "#f3e8ff" : "#f9ffe8",
-                          color: c.role === "vendor" ? "#701890" : "#888B00",
-                        }}>
+                        <span style={{ fontSize: 10, fontWeight: "bold", padding: "2px 7px", borderRadius: 10, backgroundColor: c.role === "vendor" ? "#f3e8ff" : "#f9ffe8", color: c.role === "vendor" ? "#701890" : "#888B00" }}>
                           {c.role?.toUpperCase()}
                         </span>
-                        {/* TIER BADGE */}
                         {tier && (
-                          <span style={{
-                            fontSize: 10, fontWeight: "bold", padding: "2px 7px", borderRadius: 10,
-                            backgroundColor: tier.bg, color: tier.color,
-                            border: `1px solid ${tier.border}`,
-                          }}>
+                          <span style={{ fontSize: 10, fontWeight: "bold", padding: "2px 7px", borderRadius: 10, backgroundColor: tier.bg, color: tier.color, border: `1px solid ${tier.border}` }}>
                             {tier.label}
                           </span>
                         )}
@@ -176,40 +165,32 @@ export default function SavedContacts() {
                         {c.category && `${c.category} · `}{c.city}{c.state ? `, ${c.state}` : ""}
                       </p>
                     </div>
-
-                    {/* REMOVE */}
-                    <button
-                      onClick={() => removeContact(c.id)}
-                      style={{ padding: "6px 10px", backgroundColor: "white", color: "#cc0000", border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer", fontSize: 13, flexShrink: 0 }}
-                    >
+                    <button onClick={() => removeContact(c.id)}
+                      style={{ padding: "6px 10px", backgroundColor: "white", color: "#cc0000", border: "1px solid #fca5a5", borderRadius: 6, cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
                       ✕
                     </button>
                   </div>
 
-                  {/* SOCIAL LINKS ROW */}
+                  {/* SOCIAL LINKS */}
                   {(c.website || c.instagram || c.facebook || c.tiktok || c.youtube || c.x_twitter) && (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                      {c.website    && <a href={c.website}   target="_blank" rel="noopener noreferrer" style={socialBtn}>🌐 Web</a>}
-                      {c.instagram  && <a href={c.instagram} target="_blank" rel="noopener noreferrer" style={socialBtn}>📸 IG</a>}
-                      {c.facebook   && <a href={c.facebook}  target="_blank" rel="noopener noreferrer" style={socialBtn}>👥 FB</a>}
-                      {c.tiktok     && <a href={c.tiktok}    target="_blank" rel="noopener noreferrer" style={socialBtn}>🎵 TT</a>}
-                      {c.youtube    && <a href={c.youtube}   target="_blank" rel="noopener noreferrer" style={socialBtn}>▶️ YT</a>}
-                      {c.x_twitter  && <a href={c.x_twitter} target="_blank" rel="noopener noreferrer" style={socialBtn}>𝕏 X</a>}
+                      {c.website   && <a href={c.website}   target="_blank" rel="noopener noreferrer" style={socialBtn}>🌐 Web</a>}
+                      {c.instagram && <a href={c.instagram} target="_blank" rel="noopener noreferrer" style={socialBtn}>📸 IG</a>}
+                      {c.facebook  && <a href={c.facebook}  target="_blank" rel="noopener noreferrer" style={socialBtn}>👥 FB</a>}
+                      {c.tiktok    && <a href={c.tiktok}    target="_blank" rel="noopener noreferrer" style={socialBtn}>🎵 TT</a>}
+                      {c.youtube   && <a href={c.youtube}   target="_blank" rel="noopener noreferrer" style={socialBtn}>▶️ YT</a>}
+                      {c.x_twitter && <a href={c.x_twitter} target="_blank" rel="noopener noreferrer" style={socialBtn}>𝕏 X</a>}
                     </div>
                   )}
 
                   {/* ACTION BUTTONS */}
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={() => router.push(`/messages?to=${c.id}&from=saved-contacts`)}
-                      style={{ flex: 1, padding: "10px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}
-                    >
+                    <button onClick={() => router.push(`/messages?to=${c.id}&from=saved-contacts`)}
+                      style={{ flex: 1, padding: "10px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
                       ✉️ Message
                     </button>
-                    <button
-                      onClick={() => router.push(`/${c.role}/${c.handle}`)}
-                      style={{ flex: 1, padding: "10px", backgroundColor: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}
-                    >
+                    <button onClick={() => router.push(`/${c.role}/${c.handle}`)}
+                      style={{ flex: 1, padding: "10px", backgroundColor: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
                       👤 View Profile
                     </button>
                   </div>
@@ -225,13 +206,7 @@ export default function SavedContacts() {
 }
 
 const socialBtn = {
-  fontSize: 11,
-  fontWeight: "bold",
-  padding: "4px 10px",
-  borderRadius: 20,
-  backgroundColor: "#f5f5f5",
-  color: "#444",
-  border: "1px solid #e0e0e0",
-  textDecoration: "none",
-  display: "inline-block",
+  fontSize: 11, fontWeight: "bold", padding: "4px 10px", borderRadius: 20,
+  backgroundColor: "#f5f5f5", color: "#444", border: "1px solid #e0e0e0",
+  textDecoration: "none", display: "inline-block",
 };
