@@ -27,9 +27,6 @@ function formatSocialLink(platform, value) {
   }
 }
 
-// Image limits by organizer tier
-const IMAGE_LIMITS = { basic: 10, pro: 20, elite: 40 };
-
 export default function OrganizerProfile() {
   const router = useRouter();
 
@@ -57,12 +54,27 @@ export default function OrganizerProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
 
+  // ── LIMITS loaded from DB ──
+  const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
+
   useEffect(() => {
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       const currentUser = data?.user;
       if (!currentUser) { router.push("/"); return; }
       setUser(currentUser);
+
+      // Load limits from app_settings
+      const { data: settingsData } = await supabase.from("app_settings").select("*");
+      if (settingsData) {
+        const s = {};
+        settingsData.forEach(row => { s[row.key] = parseInt(row.value, 10); });
+        setImageLimits({
+          basic: s.organizer_basic_photos ?? 10,
+          pro:   s.organizer_pro_photos   ?? 20,
+          elite: s.organizer_elite_photos ?? 40,
+        });
+      }
 
       const { data: profile } = await supabase
         .from("profiles").select("*").eq("id", currentUser.id).single();
@@ -105,10 +117,7 @@ export default function OrganizerProfile() {
 
     try {
       const { data: existing } = await supabase
-        .from("profiles")
-        .select("logo_url, portfolio_images")
-        .eq("id", user.id)
-        .single();
+        .from("profiles").select("logo_url, portfolio_images").eq("id", user.id).single();
 
       let uploadedLogoUrl = existing?.logo_url || logoUrl;
       if (logoFile) {
@@ -116,10 +125,9 @@ export default function OrganizerProfile() {
         if (uploaded) uploadedLogoUrl = uploaded;
       }
 
-      // ✅ FIXED: merge new uploads WITH existing images
       let updatedPortfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
-        const limit = IMAGE_LIMITS[accountType] || 10;
+        const limit = imageLimits[accountType] ?? 10;
         const remaining = limit - updatedPortfolio.length;
         const filesToUpload = portfolioFiles.slice(0, remaining);
         for (const file of filesToUpload) {
@@ -159,22 +167,17 @@ export default function OrganizerProfile() {
     setSaving(false);
   };
 
-  // ✅ FIXED: delete from Supabase storage + state
   const removePortfolioImage = async (url) => {
     const fileName = url.split("/").pop();
     await supabase.storage.from("organizer-portfolio").remove([fileName]);
     const updated = portfolioImages.filter((img) => img !== url);
     setPortfolioImages(updated);
-
-    // Save updated list to DB immediately
     if (user) {
-      await supabase.from("profiles")
-        .update({ portfolio_images: updated })
-        .eq("id", user.id);
+      await supabase.from("profiles").update({ portfolio_images: updated }).eq("id", user.id);
     }
   };
 
-  const imageLimit = IMAGE_LIMITS[accountType] || 10;
+  const imageLimit = imageLimits[accountType] ?? 10;
   const imagesUsed = portfolioImages.length;
   const atLimit = imagesUsed >= imageLimit;
 
@@ -230,62 +233,41 @@ export default function OrganizerProfile() {
       {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
         <label style={labelStyle}>Logo</label>
-        {logoUrl && (
-          <img src={logoUrl} alt="logo" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", marginBottom: 8, display: "block" }} />
-        )}
+        {logoUrl && <img src={logoUrl} alt="logo" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", marginBottom: 8, display: "block" }} />}
         <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={(e) => setLogoFile(e.target.files[0])} />
       </div>
 
       {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={labelStyle}>Portfolio</label>
-
-        {/* Image count */}
         <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: atLimit ? "bold" : "normal" }}>
-          {imagesUsed}/{imageLimit} images used
-          {atLimit && " — Remove some before adding more"}
+          {imagesUsed}/{imageLimit} images used{atLimit && " — Remove some before adding more"}
         </p>
-
-        {/* File type warning */}
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
           ⚠️ Accepted formats: JPG, PNG, WebP only. HEIC (iPhone default) not supported — convert to JPG first.
         </div>
-
-        {/* Existing images */}
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
             {portfolioImages.map((img, i) => (
               <div key={i} style={{ position: "relative" }}>
                 <img src={img} alt="portfolio" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                <button
-                  onClick={() => removePortfolioImage(img)}
-                  style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}
-                >×</button>
+                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
               </div>
             ))}
           </div>
         )}
-
-        {/* Upload — only show if under limit */}
         {!atLimit && (
           <div>
-            <input
-              type="file"
-              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-              multiple
+            <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" multiple
               onChange={(e) => {
                 const remaining = imageLimit - portfolioImages.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
-                if (Array.from(e.target.files).length > remaining) {
-                  alert(`You can only add ${remaining} more image(s). Please select fewer files.`);
-                }
+                if (Array.from(e.target.files).length > remaining) alert(`You can only add ${remaining} more image(s). Please select fewer files.`);
                 setPortfolioFiles(files);
               }}
               style={{ display: "block", marginBottom: 4 }}
             />
-            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-              Select multiple images at once. Max {imageLimit} total for your plan.
-            </p>
+            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Select multiple images at once. Max {imageLimit} total for your plan.</p>
           </div>
         )}
       </div>
@@ -299,9 +281,7 @@ export default function OrganizerProfile() {
 
       {/* BUTTONS */}
       <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end", gap: 12 }}>
-        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>
-          ← Back
-        </button>
+        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
         <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>
           {saving ? "Saving..." : "Save Profile"}
         </button>
