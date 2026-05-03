@@ -28,18 +28,7 @@ function formatSocialLink(platform, value) {
   }
 }
 
-// ── PLAN LIMITS ──
-// Free:     5 photos, 0 videos
-// Premium: 20 photos, 5 videos
-// Featured: 40 photos, 10 videos
-const photoLimit = (accountType) =>
-  accountType === "featured" ? 40 : accountType === "premium" ? 20 : 5;
-
-const videoLimit = (accountType) =>
-  accountType === "featured" ? 10 : accountType === "premium" ? 5 : 0;
-
 // ── IMAGE COMPRESSOR ──
-// Resizes and compresses an image file before upload to speed up saves
 function compressImage(file, maxWidth = 1200, quality = 0.8) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -49,27 +38,15 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
+        if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-              type: "image/jpeg",
-            });
-            resolve(compressed);
-          },
-          "image/jpeg",
-          quality
-        );
+        canvas.toBlob((blob) => {
+          const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+          resolve(compressed);
+        }, "image/jpeg", quality);
       };
       img.src = e.target.result;
     };
@@ -103,9 +80,14 @@ export default function VendorProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [accountType, setAccountType] = useState("free");
-
-  // Init with 10 slots to cover Featured vendors
   const [videoUrls, setVideoUrls] = useState(["", "", "", "", "", "", "", "", "", ""]);
+
+  // ── LIMITS loaded from DB ──
+  const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
+  const [videoLimits, setVideoLimits] = useState({ free: 0, premium: 5, featured: 10 });
+
+  const photoLimit = photoLimits[accountType] ?? photoLimits.free;
+  const videoLimit = videoLimits[accountType] ?? videoLimits.free;
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -113,11 +95,25 @@ export default function VendorProfile() {
       const user = data.user;
       if (!user) { router.push("/"); return; }
 
+      // Load limits from app_settings
+      const { data: settingsData } = await supabase.from("app_settings").select("*");
+      if (settingsData) {
+        const s = {};
+        settingsData.forEach(row => { s[row.key] = parseInt(row.value, 10); });
+        setPhotoLimits({
+          free:     s.vendor_free_photos     ?? 5,
+          premium:  s.vendor_premium_photos  ?? 20,
+          featured: s.vendor_featured_photos ?? 40,
+        });
+        setVideoLimits({
+          free:     s.vendor_free_videos     ?? 0,
+          premium:  s.vendor_premium_videos  ?? 5,
+          featured: s.vendor_featured_videos ?? 10,
+        });
+      }
+
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+        .from("profiles").select("*").eq("id", user.id).single();
 
       if (profile) {
         setBusinessName(profile.business_name || "");
@@ -125,7 +121,6 @@ export default function VendorProfile() {
         setCategory(profile.category || "");
         setTags(profile.tags ? profile.tags.join(", ") : "");
         setAccountType(profile.account_type || "free");
-        // Pad and slice to 10 to cover all tiers
         if (profile.video_urls) {
           setVideoUrls(profile.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
         }
@@ -150,10 +145,7 @@ export default function VendorProfile() {
   const uploadFile = async (file, bucket) => {
     const fileName = `${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
-    if (error) {
-      setMessage("❌ Upload error: " + error.message);
-      return null;
-    }
+    if (error) { setMessage("❌ Upload error: " + error.message); return null; }
     const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
     return data.publicUrl;
   };
@@ -172,10 +164,7 @@ export default function VendorProfile() {
 
     try {
       const { data: existing } = await supabase
-        .from("profiles")
-        .select("logo_url")
-        .eq("id", user.id)
-        .single();
+        .from("profiles").select("logo_url").eq("id", user.id).single();
 
       let logoUrl = existing?.logo_url || null;
 
@@ -187,10 +176,8 @@ export default function VendorProfile() {
         if (uploaded) logoUrl = uploaded;
       }
 
-      // Always start from local state so deletions are respected
       let portfolio = [...portfolioImages];
 
-      // Compress and upload any new files
       if (portfolioFiles.length > 0) {
         setMessage(`⏳ Uploading 0 of ${portfolioFiles.length} images...`);
         for (let i = 0; i < portfolioFiles.length; i++) {
@@ -201,42 +188,34 @@ export default function VendorProfile() {
         }
       }
 
-      // Enforce the photo limit for this account type
-      const limit = photoLimit(accountType);
-      if (portfolio.length > limit) {
-        portfolio = portfolio.slice(0, limit);
-      }
+      // Enforce photo limit
+      if (portfolio.length > photoLimit) portfolio = portfolio.slice(0, photoLimit);
 
       setMessage("⏳ Saving profile...");
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          business_name: businessName,
-          handle,
-          category,
-          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-          video_urls: videoUrls.filter(v => v.trim()),
-          city,
-          state,
-          description,
-          website:   formatSocialLink("website",   website),
-          instagram: formatSocialLink("instagram", instagram),
-          facebook:  formatSocialLink("facebook",  facebook),
-          tiktok:    formatSocialLink("tiktok",    tiktok),
-          youtube:   formatSocialLink("youtube",   youtube),
-          x_twitter: formatSocialLink("x_twitter", xTwitter),
-          logo_url: logoUrl,
-          portfolio_images: portfolio,
-        })
-        .eq("id", user.id);
+      const { error } = await supabase.from("profiles").update({
+        business_name: businessName,
+        handle,
+        category,
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        video_urls: videoUrls.filter(v => v.trim()),
+        city,
+        state,
+        description,
+        website:   formatSocialLink("website",   website),
+        instagram: formatSocialLink("instagram", instagram),
+        facebook:  formatSocialLink("facebook",  facebook),
+        tiktok:    formatSocialLink("tiktok",    tiktok),
+        youtube:   formatSocialLink("youtube",   youtube),
+        x_twitter: formatSocialLink("x_twitter", xTwitter),
+        logo_url: logoUrl,
+        portfolio_images: portfolio,
+      }).eq("id", user.id);
 
       if (error) throw error;
 
-      // Update local state to reflect what was actually saved
       setPortfolioImages(portfolio);
       setPortfolioFiles([]);
-
       setMessage("✅ Profile saved!");
       setTimeout(() => router.push(`/vendor/${handle}`), 1200);
 
@@ -284,17 +263,9 @@ export default function VendorProfile() {
       <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} style={inputStyle} />
       <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} />
 
-      {/* TAGS */}
-      <input
-        placeholder="Tags (comma separated, e.g. weddings, corporate, outdoor)"
-        value={tags}
-        onChange={(e) => setTags(e.target.value)}
-        style={inputStyle}
-      />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-      </div>
+      <input placeholder="Tags (comma separated, e.g. weddings, corporate, outdoor)" value={tags} onChange={(e) => setTags(e.target.value)} style={inputStyle} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}></div>
 
-      {/* ⚠️ WARNING */}
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>
         ⚠️ Links must be public or they may not open correctly.
       </div>
@@ -309,26 +280,18 @@ export default function VendorProfile() {
       {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 8 }}>
         <label style={labelStyle}>Logo</label>
-        {/* FIX: explicit types instead of image/* so Android shows previews correctly */}
-        <input
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-          onChange={(e) => setLogoFile(e.target.files[0])}
-        />
+        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={(e) => setLogoFile(e.target.files[0])} />
       </div>
 
       {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={labelStyle}>Portfolio</label>
-
-        <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit(accountType) ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
-          {portfolioImages.length} / {photoLimit(accountType)} images
+        <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
+          {portfolioImages.length} / {photoLimit} images
         </p>
-
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
           ⚠️ Accepted: JPG, PNG, WebP only. HEIC (iPhone default) not supported — convert to JPG first.
         </div>
-
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
             {portfolioImages.map((img, i) => (
@@ -339,31 +302,21 @@ export default function VendorProfile() {
             ))}
           </div>
         )}
-
-        {portfolioImages.length < photoLimit(accountType) && (
+        {portfolioImages.length < photoLimit && (
           <div>
-            <input
-              type="file"
-              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-              multiple
+            <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" multiple
               onChange={(e) => {
-                const limit = photoLimit(accountType);
-                const remaining = limit - portfolioImages.length;
+                const remaining = photoLimit - portfolioImages.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
-                if (Array.from(e.target.files).length > remaining) {
-                  alert("You can only add " + remaining + " more image(s).");
-                }
+                if (Array.from(e.target.files).length > remaining) alert("You can only add " + remaining + " more image(s).");
                 setPortfolioFiles(files);
               }}
               style={{ display: "block", marginBottom: 4 }}
             />
-            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
-              Select multiple images at once.
-            </p>
+            <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Select multiple images at once.</p>
           </div>
         )}
-
-      </div> {/* closes Portfolio div */}
+      </div>
 
       {/* STATUS MESSAGE */}
       {message && (
@@ -372,33 +325,21 @@ export default function VendorProfile() {
         </p>
       )}
 
-      {/* VIDEO URLS — Premium and Featured only */}
-      {videoLimit(accountType) > 0 && (
+      {/* VIDEO URLS */}
+      {videoLimit > 0 && (
         <div style={{ marginBottom: 20 }}>
           <label style={labelStyle}>
-            🎬 Video Links (up to {videoLimit(accountType)}) — YouTube, Instagram or TikTok URLs
+            🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs
           </label>
-          {Array.from({ length: videoLimit(accountType) }).map((_, i) => (
-            <input
-              key={i}
-              value={videoUrls[i] || ""}
-              onChange={e => {
-                const updated = [...videoUrls];
-                updated[i] = e.target.value;
-                setVideoUrls(updated);
-              }}
-              placeholder={`Video link ${i + 1}`}
-              style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 8, boxSizing: "border-box" }}
-            />
+          {Array.from({ length: videoLimit }).map((_, i) => (
+            <input key={i} value={videoUrls[i] || ""} onChange={e => { const updated = [...videoUrls]; updated[i] = e.target.value; setVideoUrls(updated); }} placeholder={`Video link ${i + 1}`} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
           ))}
         </div>
       )}
 
       {/* BUTTONS */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
-        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>
-          ← Back
-        </button>
+        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
         <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>
           {saving ? "Saving..." : "Save Profile"}
         </button>
