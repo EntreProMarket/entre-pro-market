@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-// ── LINK FORMATTER ──
 function cleanHandle(value) {
   return value.trim().replace(/^@/, "").replace(/\s+/g, "");
 }
@@ -28,7 +27,6 @@ function formatSocialLink(platform, value) {
   }
 }
 
-// ── IMAGE COMPRESSOR ──
 function compressImage(file, maxWidth = 1200, quality = 0.8) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -54,12 +52,22 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
+// ── ADD MORE PLACEHOLDER LOGOS HERE — no other code changes needed ──
+const DEFAULT_LOGOS = [
+  "/default-logos/EPM-PH1.png",
+  "/default-logos/EPM-PH2.png",
+  "/default-logos/EPM-PH3.png",
+  // Add new filenames here as: "/default-logos/EPM-PH4.png", etc.
+];
+
 export default function VendorProfile() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [currentLogoUrl, setCurrentLogoUrl] = useState("");
+  const [showLogoPicker, setShowLogoPicker] = useState(false);
 
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
@@ -68,21 +76,17 @@ export default function VendorProfile() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [description, setDescription] = useState("");
-
   const [website, setWebsite] = useState("");
   const [instagram, setInstagram] = useState("");
   const [facebook, setFacebook] = useState("");
   const [tiktok, setTiktok] = useState("");
   const [youtube, setYoutube] = useState("");
   const [xTwitter, setXTwitter] = useState("");
-
   const [logoFile, setLogoFile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [accountType, setAccountType] = useState("free");
   const [videoUrls, setVideoUrls] = useState(["", "", "", "", "", "", "", "", "", ""]);
-
-  // ── LIMITS loaded from DB ──
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
   const [videoLimits, setVideoLimits] = useState({ free: 0, premium: 5, featured: 10 });
 
@@ -95,35 +99,22 @@ export default function VendorProfile() {
       const user = data.user;
       if (!user) { router.push("/"); return; }
 
-      // Load limits from app_settings
       const { data: settingsData } = await supabase.from("app_settings").select("*");
       if (settingsData) {
         const s = {};
         settingsData.forEach(row => { s[row.key] = parseInt(row.value, 10); });
-        setPhotoLimits({
-          free:     s.vendor_free_photos     ?? 5,
-          premium:  s.vendor_premium_photos  ?? 20,
-          featured: s.vendor_featured_photos ?? 40,
-        });
-        setVideoLimits({
-          free:     s.vendor_free_videos     ?? 0,
-          premium:  s.vendor_premium_videos  ?? 5,
-          featured: s.vendor_featured_videos ?? 10,
-        });
+        setPhotoLimits({ free: s.vendor_free_photos ?? 5, premium: s.vendor_premium_photos ?? 20, featured: s.vendor_featured_photos ?? 40 });
+        setVideoLimits({ free: s.vendor_free_videos ?? 0, premium: s.vendor_premium_videos ?? 5, featured: s.vendor_featured_videos ?? 10 });
       }
 
-      const { data: profile } = await supabase
-        .from("profiles").select("*").eq("id", user.id).single();
-
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       if (profile) {
         setBusinessName(profile.business_name || "");
         setHandle(profile.handle || "");
         setCategory(profile.category || "");
         setTags(profile.tags ? profile.tags.join(", ") : "");
         setAccountType(profile.account_type || "free");
-        if (profile.video_urls) {
-          setVideoUrls(profile.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
-        }
+        if (profile.video_urls) setVideoUrls(profile.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
         setCity(profile.city || "");
         setState(profile.state || "");
         setDescription(profile.description || "");
@@ -134,11 +125,10 @@ export default function VendorProfile() {
         setYoutube(profile.youtube || "");
         setXTwitter(profile.x_twitter || "");
         setPortfolioImages(profile.portfolio_images || []);
+        setCurrentLogoUrl(profile.logo_url || "");
       }
-
       setLoading(false);
     };
-
     loadProfile();
   }, []);
 
@@ -155,18 +145,20 @@ export default function VendorProfile() {
   };
 
   const handleSave = async () => {
+    // Require a logo
+    if (!currentLogoUrl && !logoFile) {
+      setMessage("⚠️ Please upload a logo or choose a placeholder image before saving.");
+      return;
+    }
+
     setSaving(true);
     setMessage("");
-
     const { data } = await supabase.auth.getUser();
     const user = data.user;
     if (!user) return;
 
     try {
-      const { data: existing } = await supabase
-        .from("profiles").select("logo_url").eq("id", user.id).single();
-
-      let logoUrl = existing?.logo_url || null;
+      let logoUrl = currentLogoUrl;
 
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
@@ -177,7 +169,6 @@ export default function VendorProfile() {
       }
 
       let portfolio = [...portfolioImages];
-
       if (portfolioFiles.length > 0) {
         setMessage(`⏳ Uploading 0 of ${portfolioFiles.length} images...`);
         for (let i = 0; i < portfolioFiles.length; i++) {
@@ -187,12 +178,9 @@ export default function VendorProfile() {
           if (url) portfolio.push(url);
         }
       }
-
-      // Enforce photo limit
       if (portfolio.length > photoLimit) portfolio = portfolio.slice(0, photoLimit);
 
       setMessage("⏳ Saving profile...");
-
       const { error } = await supabase.from("profiles").update({
         business_name: businessName,
         handle,
@@ -213,16 +201,14 @@ export default function VendorProfile() {
       }).eq("id", user.id);
 
       if (error) throw error;
-
+      setCurrentLogoUrl(logoUrl);
       setPortfolioImages(portfolio);
       setPortfolioFiles([]);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.push(`/vendor/${handle}`), 1200);
-
     } catch (err) {
       setMessage("❌ Error: " + err.message);
     }
-
     setSaving(false);
   };
 
@@ -230,7 +216,6 @@ export default function VendorProfile() {
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
-
       <h1 style={{ marginBottom: 20 }}>Edit Vendor Profile</h1>
 
       <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} />
@@ -262,14 +247,11 @@ export default function VendorProfile() {
       <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
       <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} style={inputStyle} />
       <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} />
-
-      <input placeholder="Tags (comma separated, e.g. weddings, corporate, outdoor)" value={tags} onChange={(e) => setTags(e.target.value)} style={inputStyle} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}></div>
+      <input placeholder="Tags (comma separated)" value={tags} onChange={(e) => setTags(e.target.value)} style={inputStyle} />
 
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>
         ⚠️ Links must be public or they may not open correctly.
       </div>
-
       <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} style={inputStyle} />
       <input placeholder="Instagram (e.g. nike or @nike)" value={instagram} onChange={(e) => setInstagram(e.target.value)} style={inputStyle} />
       <input placeholder="Meta / Facebook (e.g. nike or @nike)" value={facebook} onChange={(e) => setFacebook(e.target.value)} style={inputStyle} />
@@ -277,10 +259,62 @@ export default function VendorProfile() {
       <input placeholder="YouTube (e.g. nike or @nike)" value={youtube} onChange={(e) => setYoutube(e.target.value)} style={inputStyle} />
       <input placeholder="X / Twitter (e.g. nike or @nike)" value={xTwitter} onChange={(e) => setXTwitter(e.target.value)} style={inputStyle} />
 
-      {/* LOGO */}
-      <div style={{ marginTop: 16, marginBottom: 8 }}>
-        <label style={labelStyle}>Logo</label>
-        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={(e) => setLogoFile(e.target.files[0])} />
+      {/* ── LOGO (REQUIRED) ── */}
+      <div style={{ marginTop: 16, marginBottom: 16 }}>
+        <label style={labelStyle}>
+          Logo <span style={{ color: "#cc0000" }}>*</span>
+          <span style={{ fontSize: 12, color: "#888", fontWeight: "normal", marginLeft: 8 }}>(required)</span>
+        </label>
+
+        {/* Current logo preview */}
+        {currentLogoUrl ? (
+          <div style={{ marginBottom: 12 }}>
+            <img src={currentLogoUrl} alt="Current logo"
+              style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #701890", display: "block", marginBottom: 8 }} />
+            <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Current logo</p>
+          </div>
+        ) : (
+          <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>
+              ⚠️ No logo selected — please upload your own or choose a placeholder below.
+            </p>
+          </div>
+        )}
+
+        {/* Upload own logo */}
+        <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 6, color: "#333" }}>Upload your own:</p>
+        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+          onChange={(e) => {
+            setLogoFile(e.target.files[0]);
+            setCurrentLogoUrl(URL.createObjectURL(e.target.files[0]));
+          }}
+          style={{ display: "block", marginBottom: 12 }}
+        />
+
+        {/* Placeholder logo picker */}
+        <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8, color: "#333" }}>
+          Or choose a placeholder:
+          <button onClick={() => setShowLogoPicker(!showLogoPicker)}
+            style={{ marginLeft: 10, padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>
+            {showLogoPicker ? "Hide" : "Browse Placeholders"}
+          </button>
+        </p>
+
+        {showLogoPicker && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginBottom: 16, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+            {DEFAULT_LOGOS.map((src, i) => (
+              <img key={i} src={src} alt={`placeholder ${i + 1}`}
+                onClick={() => { setCurrentLogoUrl(src); setLogoFile(null); setShowLogoPicker(false); }}
+                style={{
+                  width: "100%", aspectRatio: "1", borderRadius: "50%", objectFit: "cover", cursor: "pointer",
+                  border: currentLogoUrl === src ? "3px solid #701890" : "2px solid transparent",
+                  boxShadow: currentLogoUrl === src ? "0 0 0 2px #701890" : "none",
+                  transition: "all 0.15s",
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* PORTFOLIO */}
@@ -320,7 +354,7 @@ export default function VendorProfile() {
 
       {/* STATUS MESSAGE */}
       {message && (
-        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
+        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : message.startsWith("⚠️") ? "#fff8e1" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : message.startsWith("⚠️") ? "#f0c040" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : message.startsWith("⚠️") ? "#856404" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
           {message}
         </p>
       )}
@@ -328,11 +362,9 @@ export default function VendorProfile() {
       {/* VIDEO URLS */}
       {videoLimit > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>
-            🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs
-          </label>
+          <label style={labelStyle}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs</label>
           {Array.from({ length: videoLimit }).map((_, i) => (
-            <input key={i} value={videoUrls[i] || ""} onChange={e => { const updated = [...videoUrls]; updated[i] = e.target.value; setVideoUrls(updated); }} placeholder={`Video link ${i + 1}`} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
+            <input key={i} value={videoUrls[i] || ""} onChange={e => { const updated = [...videoUrls]; updated[i] = e.target.value; setVideoUrls(updated); }} placeholder={`Video link ${i + 1}`} style={inputStyle} />
           ))}
         </div>
       )}
@@ -344,7 +376,6 @@ export default function VendorProfile() {
           {saving ? "Saving..." : "Save Profile"}
         </button>
       </div>
-
     </div>
   );
 }
