@@ -22,12 +22,18 @@ export default function SavedContacts() {
         .from("profiles").select("*").eq("id", user.id).single();
       setProfile(profileData);
 
-      // ── LOCK: Basic Organizers and unrecognized tiers cannot save contacts ──
-      // Only pro, elite, and legacy premium organizers have access
       const role = profileData?.role;
       const tier = profileData?.account_type;
+
+      // ── LOCK: Basic Organizers → locked page with organizer message
       if (role === "organizer" && tier !== "pro" && tier !== "elite" && tier !== "premium") {
-        router.replace("/saved-contacts-locked");
+        router.replace("/saved-contacts-locked?role=organizer");
+        return;
+      }
+
+      // ── LOCK: Free Vendors → locked page with vendor message
+      if (role === "vendor" && tier !== "premium" && tier !== "featured") {
+        router.replace("/saved-contacts-locked?role=vendor");
         return;
       }
 
@@ -133,14 +139,7 @@ export default function SavedContacts() {
               const borderColor = c.role === "vendor" ? "#701890" : "#AABB23";
 
               return (
-                <div key={saved.id} style={{
-                  backgroundColor: "white",
-                  border: "1px solid #eee",
-                  borderLeft: `4px solid ${borderColor}`,
-                  borderRadius: 10,
-                  padding: "16px",
-                  boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-                }}>
+                <div key={saved.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderLeft: `4px solid ${borderColor}`, borderRadius: 10, padding: "16px", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
 
                   {/* TOP ROW */}
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
