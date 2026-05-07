@@ -1,4 +1,5 @@
 // pages/upgrade-success.js
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
@@ -30,28 +31,27 @@ export default function UpgradeSuccess() {
     setTierColor(config.color);
     setStatus("success");
 
-    // Countdown timer
     const countTimer = setInterval(() => {
       setCountdown(c => {
-        if (c <= 1) { clearInterval(countTimer); }
+        if (c <= 1) clearInterval(countTimer);
         return c - 1;
       });
     }, 1000);
 
-    // Auto redirect after 10 seconds
     const timer = setTimeout(() => {
-      handleRedirect(role);
+      handleRedirect(role, tier);
     }, 10000);
 
     return () => { clearTimeout(timer); clearInterval(countTimer); };
   }, [router.isReady, router.query]);
 
-  const handleRedirect = async (roleParam) => {
+  const handleRedirect = async (roleParam, tierParam) => {
     const currentRole = roleParam || new URLSearchParams(window.location.search).get("role");
+    const currentTier = tierParam || new URLSearchParams(window.location.search).get("tier");
 
-    // Wait up to 8 seconds for webhook to update the DB
+    // ── FIX: wait for webhook to update BOTH role AND account_type ──
     let attempts = 0;
-    while (attempts < 8) {
+    while (attempts < 12) {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
       if (!user) { window.location.href = "/"; return; }
@@ -62,36 +62,38 @@ export default function UpgradeSuccess() {
         .eq("id", user.id)
         .single();
 
-      // Check if webhook has updated the role
-      if (profile?.role === currentRole) {
-        // Role is set — go to profile setup if new, dashboard if returning
+      // ── FIX: check account_type matches the purchased tier ──
+      // This correctly handles upgrades where role was already set
+      if (profile?.account_type === currentTier) {
         if (currentRole === "organizer") {
-          window.location.href = profile.organizer_name ? "/organizer-dashboard" : "/organizer-profile";
+          // New organizer = no name yet → profile setup; existing = dashboard
+          window.location.href = profile.organizer_name
+            ? "/organizer-dashboard"
+            : "/organizer-profile";
         } else {
-          window.location.href = profile.business_name ? "/vendor-dashboard" : "/vendor-profile";
+          // New vendor = no name yet → profile setup; existing = dashboard
+          window.location.href = profile.business_name
+            ? "/vendor-dashboard"
+            : "/vendor-profile";
         }
         return;
       }
 
-      // Webhook hasn't fired yet — wait 1 second and try again
+      // Webhook hasn't fired yet — wait 1s and retry
       await new Promise(r => setTimeout(r, 1000));
       attempts++;
     }
 
-    // Fallback — use URL param if DB still not updated
+    // Fallback after 12 seconds — webhook too slow, redirect anyway
     if (currentRole === "organizer") {
-      window.location.href = "/organizer-profile";
+      window.location.href = "/organizer-dashboard";
     } else {
-      window.location.href = "/vendor-profile";
+      window.location.href = "/vendor-dashboard";
     }
   };
 
   if (status === "loading") {
-    return (
-      <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>
-        Loading...
-      </div>
-    );
+    return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>Loading...</div>;
   }
 
   return (
@@ -106,11 +108,7 @@ export default function UpgradeSuccess() {
       backgroundColor: "#fafafa",
       textAlign: "center",
     }}>
-      <img
-        src="/logo-transparent.png"
-        alt="EntreProMarket"
-        style={{ width: 120, marginBottom: 24 }}
-      />
+      <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 120, marginBottom: 24 }} />
 
       <div style={{
         backgroundColor: "white",
@@ -147,7 +145,7 @@ export default function UpgradeSuccess() {
         </p>
 
         <button
-          onClick={() => handleRedirect(router.query.role)}
+          onClick={() => handleRedirect(router.query.role, router.query.tier)}
           style={{
             width: "100%",
             padding: "13px",
@@ -160,7 +158,7 @@ export default function UpgradeSuccess() {
             cursor: "pointer",
           }}
         >
-          Continue to Profile Setup →
+          Continue →
         </button>
       </div>
     </div>
