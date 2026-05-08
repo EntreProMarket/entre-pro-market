@@ -39,11 +39,9 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
         if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
-          const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-          resolve(compressed);
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
         }, "image/jpeg", quality);
       };
       img.src = e.target.result;
@@ -52,23 +50,11 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-// ── ADD MORE PLACEHOLDER LOGOS HERE — no other code changes needed ──
-const DEFAULT_LOGOS = [
-  "/default-logos/EPM-PH1.png",
-  "/default-logos/EPM-PH2.png",
-  "/default-logos/EPM-PH3.png",
-  // Add new filenames here as: "/default-logos/EPM-PH4.png", etc.
-];
-
 export default function VendorProfile() {
   const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [currentLogoUrl, setCurrentLogoUrl] = useState("");
-  const [showLogoPicker, setShowLogoPicker] = useState(false);
-
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
@@ -86,7 +72,7 @@ export default function VendorProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [accountType, setAccountType] = useState("free");
-  const [videoUrls, setVideoUrls] = useState(["", "", "", "", "", "", "", "", "", ""]);
+  const [videoUrls, setVideoUrls] = useState(["","","","","","","","","",""]);
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
   const [videoLimits, setVideoLimits] = useState({ free: 0, premium: 5, featured: 10 });
 
@@ -94,102 +80,82 @@ export default function VendorProfile() {
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const load = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data.user;
       if (!user) { router.push("/"); return; }
 
-      const { data: settingsData } = await supabase.from("app_settings").select("*");
-      if (settingsData) {
-        const s = {};
-        settingsData.forEach(row => { s[row.key] = parseInt(row.value, 10); });
-        setPhotoLimits({ free: s.vendor_free_photos ?? 5, premium: s.vendor_premium_photos ?? 20, featured: s.vendor_featured_photos ?? 40 });
-        setVideoLimits({ free: s.vendor_free_videos ?? 0, premium: s.vendor_premium_videos ?? 5, featured: s.vendor_featured_videos ?? 10 });
+      const { data: s } = await supabase.from("app_settings").select("*");
+      if (s) {
+        const m = {};
+        s.forEach(r => { m[r.key] = parseInt(r.value, 10); });
+        setPhotoLimits({ free: m.vendor_free_photos ?? 5, premium: m.vendor_premium_photos ?? 20, featured: m.vendor_featured_photos ?? 40 });
+        setVideoLimits({ free: m.vendor_free_videos ?? 0, premium: m.vendor_premium_videos ?? 5, featured: m.vendor_featured_videos ?? 10 });
       }
 
-      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      if (profile) {
-        setBusinessName(profile.business_name || "");
-        setHandle(profile.handle || "");
-        setCategory(profile.category || "");
-        setTags(profile.tags ? profile.tags.join(", ") : "");
-        setAccountType(profile.account_type || "free");
-        if (profile.video_urls) setVideoUrls(profile.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
-        setCity(profile.city || "");
-        setState(profile.state || "");
-        setDescription(profile.description || "");
-        setWebsite(profile.website || "");
-        setInstagram(profile.instagram || "");
-        setFacebook(profile.facebook || "");
-        setTiktok(profile.tiktok || "");
-        setYoutube(profile.youtube || "");
-        setXTwitter(profile.x_twitter || "");
-        setPortfolioImages(profile.portfolio_images || []);
-        setCurrentLogoUrl(profile.logo_url || "");
+      const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      if (p) {
+        setBusinessName(p.business_name || "");
+        setHandle(p.handle || "");
+        setCategory(p.category || "");
+        setTags(p.tags ? p.tags.join(", ") : "");
+        setAccountType(p.account_type || "free");
+        if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
+        setCity(p.city || "");
+        setState(p.state || "");
+        setDescription(p.description || "");
+        setWebsite(p.website || "");
+        setInstagram(p.instagram || "");
+        setFacebook(p.facebook || "");
+        setTiktok(p.tiktok || "");
+        setYoutube(p.youtube || "");
+        setXTwitter(p.x_twitter || "");
+        setPortfolioImages(p.portfolio_images || []);
       }
       setLoading(false);
     };
-    loadProfile();
+    load();
   }, []);
 
   const uploadFile = async (file, bucket) => {
     const fileName = `${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) { setMessage("❌ Upload error: " + error.message); return null; }
-    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-    return data.publicUrl;
-  };
-
-  const removePortfolioImage = (url) => {
-    setPortfolioImages(portfolioImages.filter((img) => img !== url));
+    return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
   };
 
   const handleSave = async () => {
-    // Require a logo
-    if (!currentLogoUrl && !logoFile) {
-      setMessage("⚠️ Please upload a logo or choose a placeholder image before saving.");
-      return;
-    }
-
     setSaving(true);
     setMessage("");
     const { data } = await supabase.auth.getUser();
     const user = data.user;
     if (!user) return;
-
     try {
-      let logoUrl = currentLogoUrl;
-
+      const { data: ex } = await supabase.from("profiles").select("logo_url").eq("id", user.id).single();
+      let logoUrl = ex?.logo_url || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
-        const compressed = await compressImage(logoFile, 800, 0.85);
+        const comp = await compressImage(logoFile, 800, 0.85);
         setMessage("⏳ Uploading logo...");
-        const uploaded = await uploadFile(compressed, "vendor-logos");
-        if (uploaded) logoUrl = uploaded;
+        const up = await uploadFile(comp, "vendor-logos");
+        if (up) logoUrl = up;
       }
-
       let portfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
-        setMessage(`⏳ Uploading 0 of ${portfolioFiles.length} images...`);
         for (let i = 0; i < portfolioFiles.length; i++) {
           setMessage(`⏳ Uploading ${i + 1} of ${portfolioFiles.length} images...`);
-          const compressed = await compressImage(portfolioFiles[i], 1200, 0.8);
-          const url = await uploadFile(compressed, "vendor-portfolio");
+          const comp = await compressImage(portfolioFiles[i], 1200, 0.8);
+          const url = await uploadFile(comp, "vendor-portfolio");
           if (url) portfolio.push(url);
         }
       }
       if (portfolio.length > photoLimit) portfolio = portfolio.slice(0, photoLimit);
-
       setMessage("⏳ Saving profile...");
       const { error } = await supabase.from("profiles").update({
-        business_name: businessName,
-        handle,
-        category,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        business_name: businessName, handle, category,
+        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
         video_urls: videoUrls.filter(v => v.trim()),
-        city,
-        state,
-        description,
+        city, state, description,
         website:   formatSocialLink("website",   website),
         instagram: formatSocialLink("instagram", instagram),
         facebook:  formatSocialLink("facebook",  facebook),
@@ -199,13 +165,11 @@ export default function VendorProfile() {
         logo_url: logoUrl,
         portfolio_images: portfolio,
       }).eq("id", user.id);
-
       if (error) throw error;
-      setCurrentLogoUrl(logoUrl);
       setPortfolioImages(portfolio);
       setPortfolioFiles([]);
       setMessage("✅ Profile saved!");
-      setTimeout(() => router.push(`/vendor/${handle}`), 1200);
+      setTimeout(() => router.replace("/vendor-dashboard"), 1200);
     } catch (err) {
       setMessage("❌ Error: " + err.message);
     }
@@ -217,121 +181,45 @@ export default function VendorProfile() {
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 20 }}>Edit Vendor Profile</h1>
-
-      <input placeholder="Business Name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} />
-      <input placeholder="Handle" value={handle} onChange={(e) => setHandle(e.target.value)} style={inputStyle} />
-      <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+      <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
+      <input placeholder="Handle" value={handle} onChange={e => setHandle(e.target.value)} style={iS} />
+      <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
         <option value="">Select a Category...</option>
-        <option value="DJ">DJ</option>
-        <option value="Photographer">Photographer</option>
-        <option value="Videographer">Videographer</option>
-        <option value="Caterer">Caterer</option>
-        <option value="Decorator">Decorator</option>
-        <option value="Florist">Florist</option>
-        <option value="Hair & Makeup">Hair & Makeup</option>
-        <option value="Music">Music</option>
-        <option value="Bakery">Bakery</option>
-        <option value="Clothing & Apparel">Clothing & Apparel</option>
-        <option value="Jewelry">Jewelry</option>
-        <option value="Crafts & Art">Crafts & Art</option>
-        <option value="Food & Beverage">Food & Beverage</option>
-        <option value="Health & Wellness">Health & Wellness</option>
-        <option value="Entertainment">Entertainment</option>
-        <option value="Security">Security</option>
-        <option value="Transportation">Transportation</option>
-        <option value="Poetry & Literature">Poetry & Literature</option>
-        <option value="Performing Arts">Performing Arts</option>
-        <option value="Theater & Acting">Theater & Acting</option>
-        <option value="Other">Other</option>
+        {["DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"].map(c => <option key={c} value={c}>{c}</option>)}
       </select>
-      <input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} style={inputStyle} />
-      <input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} style={inputStyle} />
-      <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...inputStyle, resize: "vertical" }} />
-      <input placeholder="Tags (comma separated)" value={tags} onChange={(e) => setTags(e.target.value)} style={inputStyle} />
-
+      <input placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={iS} />
+      <input placeholder="State" value={state} onChange={e => setState(e.target.value)} style={iS} />
+      <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+      <input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} style={iS} />
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>
         ⚠️ Links must be public or they may not open correctly.
       </div>
-      <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} style={inputStyle} />
-      <input placeholder="Instagram (e.g. nike or @nike)" value={instagram} onChange={(e) => setInstagram(e.target.value)} style={inputStyle} />
-      <input placeholder="Meta / Facebook (e.g. nike or @nike)" value={facebook} onChange={(e) => setFacebook(e.target.value)} style={inputStyle} />
-      <input placeholder="TikTok (e.g. nike or @nike)" value={tiktok} onChange={(e) => setTiktok(e.target.value)} style={inputStyle} />
-      <input placeholder="YouTube (e.g. nike or @nike)" value={youtube} onChange={(e) => setYoutube(e.target.value)} style={inputStyle} />
-      <input placeholder="X / Twitter (e.g. nike or @nike)" value={xTwitter} onChange={(e) => setXTwitter(e.target.value)} style={inputStyle} />
+      <input placeholder="Website" value={website} onChange={e => setWebsite(e.target.value)} style={iS} />
+      <input placeholder="Instagram (e.g. nike or @nike)" value={instagram} onChange={e => setInstagram(e.target.value)} style={iS} />
+      <input placeholder="Meta / Facebook (e.g. nike or @nike)" value={facebook} onChange={e => setFacebook(e.target.value)} style={iS} />
+      <input placeholder="TikTok (e.g. nike or @nike)" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
+      <input placeholder="YouTube (e.g. nike or @nike)" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
+      <input placeholder="X / Twitter (e.g. nike or @nike)" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
 
-      {/* ── LOGO (REQUIRED) ── */}
-      <div style={{ marginTop: 16, marginBottom: 16 }}>
-        <label style={labelStyle}>
-          Logo <span style={{ color: "#cc0000" }}>*</span>
-          <span style={{ fontSize: 12, color: "#888", fontWeight: "normal", marginLeft: 8 }}>(required)</span>
-        </label>
-
-        {/* Current logo preview */}
-        {currentLogoUrl ? (
-          <div style={{ marginBottom: 12 }}>
-            <img src={currentLogoUrl} alt="Current logo"
-              style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #701890", display: "block", marginBottom: 8 }} />
-            <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Current logo</p>
-          </div>
-        ) : (
-          <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
-            <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>
-              ⚠️ No logo selected — please upload your own or choose a placeholder below.
-            </p>
-          </div>
-        )}
-
-        {/* Upload own logo */}
-        <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 6, color: "#333" }}>Upload your own:</p>
-        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-          onChange={(e) => {
-            setLogoFile(e.target.files[0]);
-            setCurrentLogoUrl(URL.createObjectURL(e.target.files[0]));
-          }}
-          style={{ display: "block", marginBottom: 12 }}
-        />
-
-        {/* Placeholder logo picker */}
-        <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8, color: "#333" }}>
-          Or choose a placeholder:
-          <button onClick={() => setShowLogoPicker(!showLogoPicker)}
-            style={{ marginLeft: 10, padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>
-            {showLogoPicker ? "Hide" : "Browse Placeholders"}
-          </button>
-        </p>
-
-        {showLogoPicker && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginBottom: 16, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-            {DEFAULT_LOGOS.map((src, i) => (
-              <img key={i} src={src} alt={`placeholder ${i + 1}`}
-                onClick={() => { setCurrentLogoUrl(src); setLogoFile(null); setShowLogoPicker(false); }}
-                style={{
-                  width: "100%", aspectRatio: "1", borderRadius: "50%", objectFit: "cover", cursor: "pointer",
-                  border: currentLogoUrl === src ? "3px solid #701890" : "2px solid transparent",
-                  boxShadow: currentLogoUrl === src ? "0 0 0 2px #701890" : "none",
-                  transition: "all 0.15s",
-                }}
-              />
-            ))}
-          </div>
-        )}
+      <div style={{ marginTop: 16, marginBottom: 8 }}>
+        <label style={lS}>Logo</label>
+        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => setLogoFile(e.target.files[0])} />
       </div>
 
-      {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
-        <label style={labelStyle}>Portfolio</label>
+        <label style={lS}>Portfolio</label>
         <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
           {portfolioImages.length} / {photoLimit} images
         </p>
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
-          ⚠️ Accepted: JPG, PNG, WebP only. HEIC (iPhone default) not supported — convert to JPG first.
+          ⚠️ Accepted: JPG, PNG, WebP only. HEIC not supported — convert to JPG first.
         </div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
             {portfolioImages.map((img, i) => (
               <div key={i} style={{ position: "relative" }}>
                 <img src={img} alt="portfolio" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+                <button onClick={() => setPortfolioImages(portfolioImages.filter(x => x !== img))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
               </div>
             ))}
           </div>
@@ -339,39 +227,34 @@ export default function VendorProfile() {
         {portfolioImages.length < photoLimit && (
           <div>
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" multiple
-              onChange={(e) => {
+              onChange={e => {
                 const remaining = photoLimit - portfolioImages.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
                 if (Array.from(e.target.files).length > remaining) alert("You can only add " + remaining + " more image(s).");
                 setPortfolioFiles(files);
-              }}
-              style={{ display: "block", marginBottom: 4 }}
-            />
+              }} style={{ display: "block", marginBottom: 4 }} />
             <p style={{ fontSize: 12, color: "#888", marginTop: 4 }}>Select multiple images at once.</p>
           </div>
         )}
       </div>
 
-      {/* STATUS MESSAGE */}
       {message && (
-        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : message.startsWith("⚠️") ? "#fff8e1" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : message.startsWith("⚠️") ? "#f0c040" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : message.startsWith("⚠️") ? "#856404" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
+        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
           {message}
         </p>
       )}
 
-      {/* VIDEO URLS */}
       {videoLimit > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs</label>
+          <label style={lS}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs</label>
           {Array.from({ length: videoLimit }).map((_, i) => (
-            <input key={i} value={videoUrls[i] || ""} onChange={e => { const updated = [...videoUrls]; updated[i] = e.target.value; setVideoUrls(updated); }} placeholder={`Video link ${i + 1}`} style={inputStyle} />
+            <input key={i} value={videoUrls[i] || ""} onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }} placeholder={`Video link ${i + 1}`} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 8, boxSizing: "border-box" }} />
           ))}
         </div>
       )}
 
-      {/* BUTTONS */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
-        <button onClick={() => router.back()} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
+        <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
         <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>
           {saving ? "Saving..." : "Save Profile"}
         </button>
@@ -380,5 +263,5 @@ export default function VendorProfile() {
   );
 }
 
-const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
-const labelStyle = { display: "block", fontWeight: "bold", marginBottom: 6, fontSize: 14, color: "#333" };
+const iS = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
+const lS = { display: "block", fontWeight: "bold", marginBottom: 6, fontSize: 14, color: "#333" };
