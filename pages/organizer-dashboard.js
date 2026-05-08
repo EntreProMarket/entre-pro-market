@@ -13,41 +13,35 @@ export default function OrganizerDashboard() {
   const [profileViews, setProfileViews] = useState(0);
 
   useEffect(() => {
-    const loadUser = async () => {
+    const load = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data?.user;
-
       if (!user) { router.replace("/"); return; }
 
-      const { data: profileData } = await supabase
-        .from("profiles").select("*").eq("id", user.id).single();
+      const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
 
-      if (!profileData || profileData.role !== "organizer") {
-        if (profileData?.role === "vendor") router.replace("/vendor-dashboard");
-        else if (profileData?.is_admin) router.replace("/admin");
+      if (!p || p.role !== "organizer") {
+        if (p?.role === "vendor") router.replace("/vendor-dashboard");
+        else if (p?.is_admin) router.replace("/admin");
         else router.replace("/marketplace");
         return;
       }
 
-      setProfile(profileData);
+      setProfile(p);
 
-      // Message count
       const { count: msgCount } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
+        .from("messages").select("*", { count: "exact", head: true })
         .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
       setMessageCount(msgCount || 0);
 
-      // Profile views count
       const { count: viewCount } = await supabase
-        .from("profile_views")
-        .select("*", { count: "exact", head: true })
+        .from("profile_views").select("*", { count: "exact", head: true })
         .eq("profile_id", user.id);
       setProfileViews(viewCount || 0);
 
       setLoading(false);
     };
-    loadUser();
+    load();
   }, []);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
@@ -62,19 +56,11 @@ export default function OrganizerDashboard() {
   };
 
   const { label, color, bg, icon } = tierConfig[tier] || tierConfig.basic;
-
-  const vendorLimit = tier === "basic" ? 5 : tier === "pro" || tier === "premium" ? 20 : null;
+  const vendorLimit = tier === "basic" ? 5 : (tier === "pro" || tier === "premium") ? 20 : null;
   const contactsUsed = profile?.contacts_used_this_month || 0;
 
-  const fields = [
-    profile?.organizer_name,
-    profile?.city,
-    profile?.description,
-    profile?.logo_url,
-    profile?.website || profile?.instagram,
-  ];
-  const completed = fields.filter(Boolean).length;
-  const percent = Math.round((completed / fields.length) * 100);
+  const fields = [profile?.organizer_name, profile?.city, profile?.description, profile?.logo_url, profile?.website || profile?.instagram];
+  const percent = Math.round((fields.filter(Boolean).length / fields.length) * 100);
 
   return (
     <DashboardLayout>
@@ -86,11 +72,7 @@ export default function OrganizerDashboard() {
         </p>
 
         {/* TIER BADGE */}
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          backgroundColor: bg, border: `1px solid ${color}`,
-          borderRadius: 20, padding: "6px 16px", marginBottom: 24,
-        }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: bg, border: `1px solid ${color}`, borderRadius: 20, padding: "6px 16px", marginBottom: 24 }}>
           <span style={{ fontSize: 16 }}>{icon}</span>
           <span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label}</span>
         </div>
@@ -98,9 +80,9 @@ export default function OrganizerDashboard() {
         {/* UPGRADE PROMPTS */}
         {tier === "basic" && (
           <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "16px 20px", marginBottom: 24 }}>
-            <p style={{ margin: 0, fontWeight: "bold", color: "#701890", marginBottom: 8 }}>⬆️ Upgrade to Pro or Elite</p>
+            <p style={{ margin: 0, fontWeight: "bold", color: "#701890", marginBottom: 8 }}>⬆️ Upgrade to Pro</p>
             <p style={{ margin: 0, fontSize: 13, color: "#555", marginBottom: 12 }}>
-              Contact more vendors and unlock advanced features.
+              Contact up to 20 vendors per month, save contacts, and unlock more features.
             </p>
             <button onClick={() => router.push("/organizer-info")}
               style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer" }}>
@@ -109,11 +91,11 @@ export default function OrganizerDashboard() {
           </div>
         )}
 
-        {tier === "pro" && (
+        {(tier === "pro" || tier === "premium") && (
           <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: "16px 20px", marginBottom: 24 }}>
             <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", marginBottom: 8 }}>👑 Upgrade to Elite</p>
             <p style={{ margin: 0, fontSize: 13, color: "#555", marginBottom: 12 }}>
-              Get unlimited vendor contacts, save contacts, and create events.
+              Get unlimited vendor contacts, save contacts, and unlock all premium features.
             </p>
             <button onClick={() => router.push("/organizer-info")}
               style={{ padding: "10px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer" }}>
@@ -127,12 +109,7 @@ export default function OrganizerDashboard() {
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", marginBottom: 24 }}>
             <p style={{ margin: "0 0 8px", fontWeight: "bold" }}>📊 Vendor Contacts This Month</p>
             <div style={{ backgroundColor: "#eee", borderRadius: 20, height: 10, overflow: "hidden", marginBottom: 8 }}>
-              <div style={{
-                width: `${Math.min((contactsUsed / vendorLimit) * 100, 100)}%`,
-                height: "100%",
-                backgroundColor: contactsUsed >= vendorLimit ? "#cc0000" : "#701890",
-                borderRadius: 20,
-              }} />
+              <div style={{ width: `${Math.min((contactsUsed / vendorLimit) * 100, 100)}%`, height: "100%", backgroundColor: contactsUsed >= vendorLimit ? "#cc0000" : "#701890", borderRadius: 20 }} />
             </div>
             <p style={{ margin: 0, fontSize: 13, color: contactsUsed >= vendorLimit ? "#cc0000" : "#666" }}>
               {contactsUsed} / {vendorLimit} contacts used
@@ -150,9 +127,7 @@ export default function OrganizerDashboard() {
           {percent < 100 ? (
             <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>
               Complete your profile to attract more vendors.{" "}
-              <span onClick={() => router.push("/organizer-profile")} style={{ color: "#701890", cursor: "pointer", textDecoration: "underline" }}>
-                Edit Profile
-              </span>
+              <span onClick={() => router.push("/organizer-profile")} style={{ color: "#701890", cursor: "pointer", textDecoration: "underline" }}>Edit Profile</span>
             </p>
           ) : (
             <p style={{ fontSize: 12, color: "#AABB23", marginTop: 8, marginBottom: 0, fontWeight: "bold" }}>✅ Profile is fully complete!</p>
@@ -162,15 +137,11 @@ export default function OrganizerDashboard() {
         {/* STATS */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 8 }}>
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>
-              {profileViews}
-            </p>
+            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>{profileViews}</p>
             <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Profile Views</p>
           </div>
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>
-              {messageCount}
-            </p>
+            <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>{messageCount}</p>
             <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Messages</p>
           </div>
         </div>
