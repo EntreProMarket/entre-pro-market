@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-function cleanHandle(value) {
-  return value.trim().replace(/^@/, "").replace(/\s+/g, "");
-}
+function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function formatSocialLink(platform, value) {
   if (!value || !value.trim()) return "";
   const v = value.trim();
@@ -27,6 +25,16 @@ function formatSocialLink(platform, value) {
   }
 }
 
+// ── ADD MORE PLACEHOLDER LOGOS HERE — no other code changes needed ──
+const DEFAULT_LOGOS = [
+  "/default-logos/EPM-PH1.png",
+  "/default-logos/EPM-PH2.png",
+  "/default-logos/EPM-PH3.png",
+  // Add new filenames here as: "/default-logos/EPM-PH4.png", etc.
+];
+
+const BLANK_EVENT = { event_name: "", event_date: "", venue: "", event_type: "", description: "", info_url: "" };
+
 export default function OrganizerProfile() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -34,6 +42,8 @@ export default function OrganizerProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [showLogoPicker, setShowLogoPicker] = useState(false);
+
   const [organizerName, setOrganizerName] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
@@ -52,6 +62,13 @@ export default function OrganizerProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
+
+  // Elite-only features
+  const [videoUrls, setVideoUrls] = useState(["", "", "", "", ""]);
+  const [events, setEvents] = useState([]);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [eventForm, setEventForm] = useState(BLANK_EVENT);
+  const [savingEvent, setSavingEvent] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -85,6 +102,17 @@ export default function OrganizerProfile() {
         setLogoUrl(p.logo_url || "");
         setPortfolioImages(p.portfolio_images || []);
         setAccountType(p.account_type || "basic");
+        if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","",""]).slice(0, 5));
+
+        // Load events for Elite
+        if (p.account_type === "elite") {
+          const { data: evData } = await supabase
+            .from("organizer_events")
+            .select("*")
+            .eq("organizer_id", currentUser.id)
+            .order("event_date", { ascending: true });
+          setEvents(evData || []);
+        }
       }
       setLoading(false);
     };
@@ -99,6 +127,10 @@ export default function OrganizerProfile() {
   };
 
   const handleSave = async () => {
+    if (!logoUrl && !logoFile) {
+      setMessage("⚠️ Please upload a logo or choose a placeholder image before saving.");
+      return;
+    }
     if (!user) return;
     setSaving(true);
     setMessage("");
@@ -130,17 +162,41 @@ export default function OrganizerProfile() {
         tags: tags.split(",").map(t => t.trim()).filter(Boolean),
         logo_url: uploadedLogoUrl,
         portfolio_images: updatedPortfolio,
+        video_urls: accountType === "elite" ? videoUrls.filter(v => v.trim()) : [],
         role: "organizer",
       });
       if (error) throw error;
       setPortfolioImages(updatedPortfolio);
       setPortfolioFiles([]);
+      setLogoUrl(uploadedLogoUrl);
       setMessage("✅ Profile saved!");
-      setTimeout(() => router.replace("/organizer-dashboard"), 1200);
+      setTimeout(() => router.push(`/organizer/${handle}`), 1200);
     } catch (err) {
       setMessage("❌ Error: " + err.message);
     }
     setSaving(false);
+  };
+
+  const saveEvent = async () => {
+    if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
+    setSavingEvent(true);
+    if (editingEvent) {
+      await supabase.from("organizer_events").update({ ...eventForm }).eq("id", editingEvent);
+      setEvents(events.map(e => e.id === editingEvent ? { ...e, ...eventForm } : e));
+    } else {
+      const { data } = await supabase.from("organizer_events").insert([{ ...eventForm, organizer_id: user.id }]).select().single();
+      if (data) setEvents([...events, data]);
+    }
+    setEditingEvent(null);
+    setEventForm(BLANK_EVENT);
+    setSavingEvent(false);
+    setMessage("✅ Event saved!");
+  };
+
+  const deleteEvent = async (id) => {
+    if (!confirm("Delete this event?")) return;
+    await supabase.from("organizer_events").delete().eq("id", id);
+    setEvents(events.filter(e => e.id !== id));
   };
 
   const removePortfolioImage = async (url) => {
@@ -159,6 +215,7 @@ export default function OrganizerProfile() {
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 20 }}>Edit Organizer Profile</h1>
+
       <input placeholder="Organizer Name" value={organizerName} onChange={e => setOrganizerName(e.target.value)} style={iS} />
       <input placeholder="Handle" value={handle} onChange={e => setHandle(e.target.value)} style={iS} />
       <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
@@ -168,6 +225,7 @@ export default function OrganizerProfile() {
       <input placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={iS} />
       <input placeholder="State" value={stateVal} onChange={e => setStateVal(e.target.value)} style={iS} />
       <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>
         ⚠️ Links must be public or they may not open correctly.
       </div>
@@ -179,12 +237,41 @@ export default function OrganizerProfile() {
       <input placeholder="X / Twitter (e.g. nike or @nike)" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
       <input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} style={iS} />
 
+      {/* ── LOGO (REQUIRED) ── */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
-        <label style={lS}>Logo</label>
-        {logoUrl && <img src={logoUrl} alt="logo" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", marginBottom: 8, display: "block" }} />}
-        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => setLogoFile(e.target.files[0])} />
+        <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(required)</span></label>
+        {logoUrl ? (
+          <div style={{ marginBottom: 12 }}>
+            <img src={logoUrl} alt="logo" style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #701890", display: "block", marginBottom: 8 }} />
+          </div>
+        ) : (
+          <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ Please upload your own logo or choose a placeholder below.</p>
+          </div>
+        )}
+        <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Upload your own:</p>
+        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+          onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); }}
+          style={{ display: "block", marginBottom: 12 }} />
+        <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>
+          Or choose a placeholder:
+          <button onClick={() => setShowLogoPicker(!showLogoPicker)}
+            style={{ marginLeft: 10, padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>
+            {showLogoPicker ? "Hide" : "Browse Placeholders"}
+          </button>
+        </p>
+        {showLogoPicker && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginBottom: 16, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+            {DEFAULT_LOGOS.map((src, i) => (
+              <img key={i} src={src} alt={`placeholder ${i + 1}`}
+                onClick={() => { setLogoUrl(src); setLogoFile(null); setShowLogoPicker(false); }}
+                style={{ width: "100%", aspectRatio: "1", borderRadius: "50%", objectFit: "cover", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }} />
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={lS}>Portfolio</label>
         <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: atLimit ? "bold" : "normal" }}>
@@ -217,8 +304,78 @@ export default function OrganizerProfile() {
         )}
       </div>
 
+      {/* ── ELITE ONLY: VIDEO LINKS ── */}
+      {accountType === "elite" && (
+        <div style={{ marginTop: 20, marginBottom: 20, backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: 16 }}>
+          <label style={{ ...lS, color: "#888B00" }}>👑 Video Links (Elite — up to 5)</label>
+          <p style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>YouTube, Instagram or TikTok URLs</p>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <input key={i} value={videoUrls[i] || ""} onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }}
+              placeholder={`Video link ${i + 1}`} style={iS} />
+          ))}
+        </div>
+      )}
+
+      {/* ── ELITE ONLY: EVENT MANAGEMENT ── */}
+      {accountType === "elite" && (
+        <div style={{ marginTop: 20, marginBottom: 20, backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: 16 }}>
+          <label style={{ ...lS, color: "#888B00" }}>👑 Events (Elite — Create & Manage)</label>
+
+          {/* Event form */}
+          <div style={{ backgroundColor: "white", borderRadius: 8, padding: 16, marginBottom: 16, border: "1px solid #eee" }}>
+            <p style={{ fontWeight: "bold", marginBottom: 10, fontSize: 14 }}>{editingEvent ? "✏️ Edit Event" : "➕ Add New Event"}</p>
+            <input placeholder="Event Name *" value={eventForm.event_name} onChange={e => setEventForm({ ...eventForm, event_name: e.target.value })} style={iS} />
+            <input type="date" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} style={iS} />
+            <input placeholder="Venue" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
+            <input placeholder="Event Type (e.g. Concert, Pop Up)" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
+            <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Info / Ticket URL" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              {editingEvent && (
+                <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); }}
+                  style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>
+                  Cancel
+                </button>
+              )}
+              <button onClick={saveEvent} disabled={savingEvent}
+                style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>
+                {savingEvent ? "Saving..." : editingEvent ? "Update Event" : "Add Event"}
+              </button>
+            </div>
+          </div>
+
+          {/* Existing events list */}
+          {events.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {events.map(ev => (
+                <div key={ev.id} style={{ backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
+                      {ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}
+                      {ev.venue && ` · ${ev.venue}`}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", venue: ev.venue || "", event_type: ev.event_type || "", description: ev.description || "", info_url: ev.info_url || "" }); }}
+                      style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>
+                      Edit
+                    </button>
+                    <button onClick={() => deleteEvent(ev.id)}
+                      style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {events.length === 0 && <p style={{ fontSize: 13, color: "#888", margin: 0 }}>No events yet. Add your first event above!</p>}
+        </div>
+      )}
+
       {message && (
-        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", border: `1px solid ${message.startsWith("✅") ? "#86efac" : "#fca5a5"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>
+        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("⚠️") ? "#fff8e1" : "#fef2f2", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("⚠️") ? "#f0c040" : "#fca5a5"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("⚠️") ? "#856404" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>
           {message}
         </p>
       )}
