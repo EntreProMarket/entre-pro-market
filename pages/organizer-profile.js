@@ -25,7 +25,6 @@ function formatSocialLink(platform, value) {
   }
 }
 
-// Auto-format any URL (for tickets/info links)
 function formatUrl(value) {
   if (!value || !value.trim()) return "";
   const v = value.trim();
@@ -35,6 +34,13 @@ function formatUrl(value) {
 }
 
 const DEFAULT_LOGOS = [
+  "/default-logos/EPM-PH1.png",
+  "/default-logos/EPM-PH2.png",
+  "/default-logos/EPM-PH3.png",
+];
+
+// Flyer placeholders — same images reused for events
+const FLYER_PLACEHOLDERS = [
   "/default-logos/EPM-PH1.png",
   "/default-logos/EPM-PH2.png",
   "/default-logos/EPM-PH3.png",
@@ -75,6 +81,7 @@ export default function OrganizerProfile() {
   const [eventForm, setEventForm] = useState(BLANK_EVENT);
   const [savingEvent, setSavingEvent] = useState(false);
   const [flyerFile, setFlyerFile] = useState(null);
+  const [showFlyerPicker, setShowFlyerPicker] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -179,6 +186,11 @@ export default function OrganizerProfile() {
 
   const saveEvent = async () => {
     if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
+    // ── MANDATORY FLYER CHECK ──
+    if (!eventForm.flyer_url && !flyerFile) {
+      setMessage("⚠️ Please upload a flyer or choose a placeholder image for this event.");
+      return;
+    }
     setSavingEvent(true);
 
     let flyerUrl = eventForm.flyer_url || "";
@@ -187,7 +199,11 @@ export default function OrganizerProfile() {
       if (up) flyerUrl = up;
     }
 
-    const eventData = { ...eventForm, flyer_url: flyerUrl, info_url: formatUrl(eventForm.info_url) };
+    const eventData = {
+      ...eventForm,
+      flyer_url: flyerUrl,
+      info_url: formatUrl(eventForm.info_url),
+    };
 
     if (editingEvent) {
       await supabase.from("organizer_events").update(eventData).eq("id", editingEvent);
@@ -199,6 +215,7 @@ export default function OrganizerProfile() {
     setEditingEvent(null);
     setEventForm(BLANK_EVENT);
     setFlyerFile(null);
+    setShowFlyerPicker(false);
     setSavingEvent(false);
     setMessage("✅ Event saved!");
   };
@@ -219,6 +236,9 @@ export default function OrganizerProfile() {
 
   const imageLimit = imageLimits[accountType] ?? 10;
   const atLimit = portfolioImages.length >= imageLimit;
+
+  // Current flyer preview source
+  const flyerPreviewSrc = flyerFile ? URL.createObjectURL(flyerFile) : eventForm.flyer_url;
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
@@ -263,7 +283,8 @@ export default function OrganizerProfile() {
           style={{ display: "block", marginBottom: 12 }} />
         <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>
           Or choose a placeholder:
-          <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ marginLeft: 10, padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>
+          <button onClick={() => setShowLogoPicker(!showLogoPicker)}
+            style={{ marginLeft: 10, padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>
             {showLogoPicker ? "Hide" : "Browse Placeholders"}
           </button>
         </p>
@@ -336,33 +357,59 @@ export default function OrganizerProfile() {
             <input placeholder="Event Type (e.g. Concert, Pop Up)" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
 
-            {/* TICKETS LINK — auto-formats URL */}
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block", color: "#333" }}>
               🎟️ Tickets / Info URL <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(https:// auto-added)</span>
             </label>
             <input placeholder="e.g. eventbrite.com/your-event" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
 
-            {/* FLYER IMAGE */}
+            {/* ── MANDATORY FLYER WITH PLACEHOLDER PICKER ── */}
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block", color: "#333" }}>
-              📸 Event Flyer <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(1 image, optional)</span>
+              📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(required — upload your own or pick a placeholder)</span>
             </label>
-            {(eventForm.flyer_url || flyerFile) && (
-              <div style={{ marginBottom: 8 }}>
-                <img src={flyerFile ? URL.createObjectURL(flyerFile) : eventForm.flyer_url}
-                  alt="flyer preview" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8 }} />
-                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); }}
+
+            {/* Flyer preview */}
+            {flyerPreviewSrc ? (
+              <div style={{ marginBottom: 10 }}>
+                <img src={flyerPreviewSrc} alt="flyer preview"
+                  style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "2px solid #AABB23" }} />
+                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); setShowFlyerPicker(false); }}
                   style={{ marginTop: 4, fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer" }}>
-                  Remove flyer
+                  ✕ Remove flyer
                 </button>
               </div>
+            ) : (
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A flyer image is required for each event.</p>
+              </div>
             )}
+
+            <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Upload your own flyer:</p>
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp"
-              onChange={e => setFlyerFile(e.target.files[0])}
-              style={{ display: "block", marginBottom: 12 }} />
+              onChange={e => { setFlyerFile(e.target.files[0]); setShowFlyerPicker(false); }}
+              style={{ display: "block", marginBottom: 10 }} />
+
+            <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>
+              Or use a placeholder:
+              <button onClick={() => setShowFlyerPicker(!showFlyerPicker)}
+                style={{ marginLeft: 10, padding: "4px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>
+                {showFlyerPicker ? "Hide" : "Browse Placeholders"}
+              </button>
+            </p>
+
+            {showFlyerPicker && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                {FLYER_PLACEHOLDERS.map((src, i) => (
+                  <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setShowFlyerPicker(false); }}
+                    style={{ cursor: "pointer", border: eventForm.flyer_url === src ? "3px solid #AABB23" : "2px solid transparent", borderRadius: 8, overflow: "hidden" }}>
+                    <img src={src} alt={`flyer placeholder ${i + 1}`} style={{ width: "100%", height: 80, objectFit: "cover", display: "block" }} />
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {editingEvent && (
-                <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); }}
+                <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setShowFlyerPicker(false); }}
                   style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
               )}
               <button onClick={saveEvent} disabled={savingEvent}
@@ -376,16 +423,18 @@ export default function OrganizerProfile() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {events.map(ev => (
                 <div key={ev.id} style={{ backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                  <div>
-                    {ev.flyer_url && <img src={ev.flyer_url} alt="flyer" style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 6, marginBottom: 6, display: "block" }} />}
-                    <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
-                      {ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}
-                      {ev.venue && ` · ${ev.venue}`}
-                    </p>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    {ev.flyer_url && <img src={ev.flyer_url} alt="flyer" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />}
+                    <div>
+                      <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
+                        {ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}
+                        {ev.venue && ` · ${ev.venue}`}
+                      </p>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", venue: ev.venue || "", event_type: ev.event_type || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "" }); }}
+                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", venue: ev.venue || "", event_type: ev.event_type || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "" }); setFlyerFile(null); }}
                       style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                     <button onClick={() => deleteEvent(ev.id)}
                       style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
