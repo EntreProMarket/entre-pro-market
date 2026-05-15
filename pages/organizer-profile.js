@@ -39,14 +39,26 @@ const DEFAULT_LOGOS = [
   "/default-logos/EPM-PH3.png",
 ];
 
-// Flyer placeholders — same images reused for events
 const FLYER_PLACEHOLDERS = [
   "/default-logos/EPM-PH1.png",
   "/default-logos/EPM-PH2.png",
   "/default-logos/EPM-PH3.png",
 ];
 
-const BLANK_EVENT = { event_name: "", event_date: "", venue: "", event_type: "", description: "", info_url: "", flyer_url: "" };
+const BLANK_EVENT = {
+  event_name: "", event_date: "", event_end_date: "",
+  event_start_time: "", event_end_time: "",
+  venue: "", event_type: "", description: "", info_url: "", flyer_url: ""
+};
+
+// Format a time string like "14:30" to "2:30 PM"
+function formatTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
 
 export default function OrganizerProfile() {
   const router = useRouter();
@@ -116,7 +128,6 @@ export default function OrganizerProfile() {
         setPortfolioImages(p.portfolio_images || []);
         setAccountType(p.account_type || "basic");
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","",""]).slice(0, 5));
-
         if (p.account_type === "elite") {
           const { data: evData } = await supabase
             .from("organizer_events").select("*").eq("organizer_id", currentUser.id)
@@ -177,7 +188,8 @@ export default function OrganizerProfile() {
       setPortfolioFiles([]);
       setLogoUrl(uploadedLogoUrl);
       setMessage("✅ Profile saved!");
-      setTimeout(() => router.replace("/organizer-dashboard"), 1200);
+      // ── FIX: redirect to public profile so they can see results ──
+      setTimeout(() => router.replace(`/organizer/${handle}`), 1200);
     } catch (err) {
       setMessage("❌ Error: " + err.message);
     }
@@ -186,7 +198,6 @@ export default function OrganizerProfile() {
 
   const saveEvent = async () => {
     if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
-    // ── MANDATORY FLYER CHECK ──
     if (!eventForm.flyer_url && !flyerFile) {
       setMessage("⚠️ Please upload a flyer or choose a placeholder image for this event.");
       return;
@@ -200,16 +211,24 @@ export default function OrganizerProfile() {
     }
 
     const eventData = {
-      ...eventForm,
-      flyer_url: flyerUrl,
+      event_name: eventForm.event_name,
+      event_date: eventForm.event_date || null,
+      event_end_date: eventForm.event_end_date || null,
+      event_start_time: eventForm.event_start_time || null,
+      event_end_time: eventForm.event_end_time || null,
+      venue: eventForm.venue,
+      event_type: eventForm.event_type,
+      description: eventForm.description,
       info_url: formatUrl(eventForm.info_url),
+      flyer_url: flyerUrl,
     };
 
     if (editingEvent) {
       await supabase.from("organizer_events").update(eventData).eq("id", editingEvent);
       setEvents(events.map(e => e.id === editingEvent ? { ...e, ...eventData } : e));
     } else {
-      const { data } = await supabase.from("organizer_events").insert([{ ...eventData, organizer_id: user.id }]).select().single();
+      const { data } = await supabase.from("organizer_events")
+        .insert([{ ...eventData, organizer_id: user.id }]).select().single();
       if (data) setEvents([...events, data]);
     }
     setEditingEvent(null);
@@ -236,8 +255,6 @@ export default function OrganizerProfile() {
 
   const imageLimit = imageLimits[accountType] ?? 10;
   const atLimit = portfolioImages.length >= imageLimit;
-
-  // Current flyer preview source
   const flyerPreviewSrc = flyerFile ? URL.createObjectURL(flyerFile) : eventForm.flyer_url;
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
@@ -255,7 +272,6 @@ export default function OrganizerProfile() {
       <input placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={iS} />
       <input placeholder="State" value={stateVal} onChange={e => setStateVal(e.target.value)} style={iS} />
       <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
-
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>
         ⚠️ Links must be public or they may not open correctly.
       </div>
@@ -351,8 +367,33 @@ export default function OrganizerProfile() {
 
           <div style={{ backgroundColor: "white", borderRadius: 8, padding: 16, marginBottom: 16, border: "1px solid #eee" }}>
             <p style={{ fontWeight: "bold", marginBottom: 10, fontSize: 14 }}>{editingEvent ? "✏️ Edit Event" : "➕ Add New Event"}</p>
+
             <input placeholder="Event Name *" value={eventForm.event_name} onChange={e => setEventForm({ ...eventForm, event_name: e.target.value })} style={iS} />
-            <input type="date" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} style={iS} />
+
+            {/* DATE RANGE */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: "#555", fontWeight: "bold", display: "block", marginBottom: 4 }}>Start Date</label>
+                <input type="date" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: "#555", fontWeight: "bold", display: "block", marginBottom: 4 }}>End Date <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(multi-day)</span></label>
+                <input type="date" value={eventForm.event_end_date} onChange={e => setEventForm({ ...eventForm, event_end_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} />
+              </div>
+            </div>
+
+            {/* TIME RANGE */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: "#555", fontWeight: "bold", display: "block", marginBottom: 4 }}>Start Time</label>
+                <input type="time" value={eventForm.event_start_time} onChange={e => setEventForm({ ...eventForm, event_start_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: "#555", fontWeight: "bold", display: "block", marginBottom: 4 }}>End Time</label>
+                <input type="time" value={eventForm.event_end_time} onChange={e => setEventForm({ ...eventForm, event_end_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} />
+              </div>
+            </div>
+
             <input placeholder="Venue" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
             <input placeholder="Event Type (e.g. Concert, Pop Up)" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
@@ -362,12 +403,10 @@ export default function OrganizerProfile() {
             </label>
             <input placeholder="e.g. eventbrite.com/your-event" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
 
-            {/* ── MANDATORY FLYER WITH PLACEHOLDER PICKER ── */}
+            {/* FLYER — mandatory */}
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block", color: "#333" }}>
-              📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(required — upload your own or pick a placeholder)</span>
+              📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(required)</span>
             </label>
-
-            {/* Flyer preview */}
             {flyerPreviewSrc ? (
               <div style={{ marginBottom: 10 }}>
                 <img src={flyerPreviewSrc} alt="flyer preview"
@@ -379,15 +418,13 @@ export default function OrganizerProfile() {
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
-                <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A flyer image is required for each event.</p>
+                <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A flyer image is required.</p>
               </div>
             )}
-
             <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 6 }}>Upload your own flyer:</p>
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp"
               onChange={e => { setFlyerFile(e.target.files[0]); setShowFlyerPicker(false); }}
               style={{ display: "block", marginBottom: 10 }} />
-
             <p style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8 }}>
               Or use a placeholder:
               <button onClick={() => setShowFlyerPicker(!showFlyerPicker)}
@@ -395,7 +432,6 @@ export default function OrganizerProfile() {
                 {showFlyerPicker ? "Hide" : "Browse Placeholders"}
               </button>
             </p>
-
             {showFlyerPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
                 {FLYER_PLACEHOLDERS.map((src, i) => (
@@ -429,12 +465,15 @@ export default function OrganizerProfile() {
                       <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
                       <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
                         {ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}
-                        {ev.venue && ` · ${ev.venue}`}
+                        {ev.event_end_date && ev.event_end_date !== ev.event_date && ` – ${new Date(ev.event_end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+                        {ev.event_start_time && ` · ${formatTime(ev.event_start_time)}`}
+                        {ev.event_end_time && ` – ${formatTime(ev.event_end_time)}`}
                       </p>
+                      {ev.venue && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#aaa" }}>{ev.venue}</p>}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", venue: ev.venue || "", event_type: ev.event_type || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "" }); setFlyerFile(null); }}
+                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", event_type: ev.event_type || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "" }); setFlyerFile(null); }}
                       style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                     <button onClick={() => deleteEvent(ev.id)}
                       style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
