@@ -132,39 +132,17 @@ export default function VendorProfile() {
   }, [router]);
 
   const uploadFile = async (file, bucket) => {
-  try {
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 10);
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `${timestamp}-${randomStr}.${fileExt}`;
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `\( {timestamp}- \){randomStr}.${fileExt}`;
 
-    console.log(`Uploading to bucket: ${bucket}`);
-    console.log(`File name: ${fileName}`);
-
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
-
+    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
-      console.error("Upload error:", error);
       setMessage("❌ Upload error: " + error.message);
+      console.error("Upload error:", error);
       return null;
     }
-
-    const { data } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
-  } catch (err) {
-    console.error("Upload failed:", err);
-    setMessage("❌ Upload error: " + err.message);
-    return null;
-  }
-};
     return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
   };
 
