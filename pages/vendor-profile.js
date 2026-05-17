@@ -57,7 +57,7 @@ export default function VendorProfile() {
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState("profile");
 
-  // Profile states...
+  // Profile states
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
@@ -88,7 +88,6 @@ export default function VendorProfile() {
   const [shopFiles, setShopFiles] = useState([]);
 
   useEffect(() => {
-    // ... your load function stays the same ...
     const load = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data.user;
@@ -134,7 +133,6 @@ export default function VendorProfile() {
     load();
   }, [router]);
 
-  // Fixed uploadFile function
   const uploadFile = async (file, bucket) => {
     const timestamp = Date.now();
     const fileExt = file.name.split('.').pop();
@@ -143,16 +141,13 @@ export default function VendorProfile() {
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
       setMessage("❌ Upload error: " + error.message);
-      console.error(error);
+      console.error("Upload error:", error);
       return null;
     }
     return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
   };
 
-  // ... keep your handleSave function exactly as it was ...
-
   const handleSave = async () => {
-    // (Your full original handleSave - paste it here if needed)
     setSaving(true);
     setMessage("");
     const { data } = await supabase.auth.getUser();
@@ -213,8 +208,7 @@ export default function VendorProfile() {
     }
 
     setMessage("⏳ Uploading product image...");
-    const url = await uploadFile(shopFiles[0], "vendor-portfolio");   // Fixed call
-
+    const url = await uploadFile(shopFiles[0], "vendor-portfolio");
     if (!url) return;
 
     const { data: user } = await supabase.auth.getUser();
@@ -228,9 +222,9 @@ export default function VendorProfile() {
     });
 
     if (error) {
-      setMessage("❌ Error: " + error.message);
+      setMessage("❌ Error adding product: " + error.message);
     } else {
-      setMessage("✅ Product added successfully!");
+      setMessage("✅ Product added to shop!");
       setNewProduct({ title: "", description: "", price: "" });
       setShopFiles([]);
 
@@ -247,19 +241,91 @@ export default function VendorProfile() {
 
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
-      <h1>Edit Vendor Profile</h1>
+      <h1 style={{ marginBottom: 20 }}>Edit Vendor Profile</h1>
 
-      {/* Tabs */}
       <div style={{ display: "flex", marginBottom: 24, borderBottom: "2px solid #ddd" }}>
-        <button onClick={() => setActiveTab("profile")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none" }}>📋 Profile</button>
-        <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none" }}>🛒 Shop</button>
+        <button 
+          onClick={() => setActiveTab("profile")}
+          style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none", background: "none", border: "none" }}
+        >
+          📋 Profile
+        </button>
+        <button 
+          onClick={() => setActiveTab("shop")}
+          style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none" }}
+        >
+          🛒 Shop / Products
+        </button>
       </div>
 
+      {/* PROFILE TAB */}
       {activeTab === "profile" && (
-        /* Your full profile form here - same as before */
-        // ... (keep all your profile inputs, portfolio, etc.)
+        <>
+          <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
+          <input placeholder="Handle" value={handle} onChange={e => setHandle(e.target.value)} style={iS} />
+          <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
+            <option value="">Select a Category...</option>
+            {["DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={iS} />
+          <input placeholder="State" value={state} onChange={e => setState(e.target.value)} style={iS} />
+          <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+          <input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} style={iS} />
+
+          <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>
+            ⚠️ Links must be public or they may not open correctly.
+          </div>
+
+          <input placeholder="Website" value={website} onChange={e => setWebsite(e.target.value)} style={iS} />
+          <input placeholder="Instagram" value={instagram} onChange={e => setInstagram(e.target.value)} style={iS} />
+          <input placeholder="Facebook" value={facebook} onChange={e => setFacebook(e.target.value)} style={iS} />
+          <input placeholder="TikTok" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
+          <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
+          <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
+
+          <div style={{ marginTop: 16, marginBottom: 8 }}>
+            <label style={lS}>Logo</label>
+            <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} />
+          </div>
+
+          <div style={{ marginTop: 20, marginBottom: 8 }}>
+            <label style={lS}>Portfolio</label>
+            <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
+              {portfolioImages.length} / {photoLimit} images
+            </p>
+            {portfolioImages.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
+                {portfolioImages.map((img, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    <img src={img} alt="" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                    <button onClick={() => setPortfolioImages(portfolioImages.filter(x => x !== img))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {portfolioImages.length < photoLimit && (
+              <input type="file" accept="image/*" multiple onChange={e => {
+                const remaining = photoLimit - portfolioImages.length;
+                const files = Array.from(e.target.files).slice(0, remaining);
+                setPortfolioFiles(files);
+              }} />
+            )}
+          </div>
+
+          {videoLimit > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <label style={lS}>Video Links (up to {videoLimit})</label>
+              {Array.from({ length: videoLimit }).map((_, i) => (
+                <input key={i} value={videoUrls[i] || ""} onChange={e => {
+                  const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u);
+                }} placeholder={`Video ${i+1}`} style={iS} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
+      {/* SHOP TAB */}
       {activeTab === "shop" && (
         <div>
           <h2>Add New Product</h2>
@@ -267,22 +333,45 @@ export default function VendorProfile() {
           <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} style={{...iS, height: 100}} />
           <input type="number" step="0.01" placeholder="Price in USD" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} style={iS} />
 
-          <label style={lS}>Image</label>
+          <label style={lS}>Product Image</label>
           <input type="file" accept="image/*" onChange={e => setShopFiles(Array.from(e.target.files))} />
 
-          <button onClick={addShopProduct} style={{ padding: "14px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, marginTop: 16 }}>
+          <button onClick={addShopProduct} style={{ padding: "14px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, marginTop: 16, fontWeight: "bold" }}>
             Add Product to Shop
           </button>
 
-          <h3>Your Products ({shopProducts.length})</h3>
-          {/* product grid */}
+          <h3 style={{ marginTop: 40 }}>Your Shop Products ({shopProducts.length})</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+            {shopProducts.map(p => (
+              <div key={p.id} style={{ border: "1px solid #ddd", borderRadius: 8, overflow: "hidden" }}>
+                <img src={p.image_url} alt={p.title} style={{ width: "100%", height: 140, objectFit: "cover" }} />
+                <div style={{ padding: 10 }}>
+                  <p style={{ margin: "4px 0", fontWeight: "bold" }}>{p.title}</p>
+                  <p style={{ margin: 0, color: "#701890", fontWeight: "bold" }}>${(p.price / 100).toFixed(2)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {message && <p style={{ padding: "12px", background: message.includes("✅") ? "#d4edda" : "#f8d7da", borderRadius: 6 }}>{message}</p>}
+      {message && (
+        <p style={{ padding: "12px 16px", backgroundColor: message.includes("✅") ? "#f0fdf4" : "#fef2f2", borderRadius: 6, marginTop: 16 }}>
+          {message}
+        </p>
+      )}
+
+      {activeTab === "profile" && (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
+          <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20 }}>← Back</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold" }}>
+            {saving ? "Saving..." : "Save Profile"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-const iS = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12 };
+const iS = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
 const lS = { display: "block", fontWeight: "bold", marginBottom: 6, fontSize: 14, color: "#333" };
