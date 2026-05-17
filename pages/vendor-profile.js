@@ -258,7 +258,6 @@ export default function VendorProfile() {
         </button>
       </div>
 
-      {/* PROFILE TAB */}
       {activeTab === "profile" && (
         <>
           <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
@@ -325,7 +324,6 @@ export default function VendorProfile() {
         </>
       )}
 
-      {/* SHOP TAB */}
       {activeTab === "shop" && (
         <div>
           <h2>Add New Product</h2>
