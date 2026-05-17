@@ -140,7 +140,7 @@ export default function VendorProfile() {
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
       setMessage("❌ Upload error: " + error.message);
-      console.error(error);
+      console.error("Upload error:", error);
       return null;
     }
     return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
