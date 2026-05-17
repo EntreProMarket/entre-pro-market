@@ -135,7 +135,7 @@ export default function VendorProfile() {
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 10);
     const fileExt = file.name.split('.').pop() || 'jpg';
-    const fileName = `\( {timestamp}- \){randomStr}.${fileExt}`;
+    const fileName = `\( {timestamp}- \){randomStr}.${fileExt}`;.${fileExt}`;
 
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
