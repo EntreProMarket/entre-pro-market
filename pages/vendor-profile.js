@@ -57,7 +57,6 @@ export default function VendorProfile() {
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState("profile");
 
-  // Profile states
   const [businessName, setBusinessName] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
@@ -82,7 +81,6 @@ export default function VendorProfile() {
   const photoLimit = photoLimits[accountType] ?? photoLimits.free;
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
 
-  // Shop states
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
   const [shopFiles, setShopFiles] = useState([]);
@@ -139,12 +137,10 @@ export default function VendorProfile() {
     const fileExt = file.name.split('.').pop() || 'jpg';
     const fileName = `\( {timestamp}- \){randomStr}.${fileExt}`;
 
-    console.log("Uploading with filename:", fileName); // for debugging
-
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
       setMessage("❌ Upload error: " + error.message);
-      console.error("Upload error:", error);
+      console.error(error);
       return null;
     }
     return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
@@ -247,18 +243,8 @@ export default function VendorProfile() {
       <h1 style={{ marginBottom: 20 }}>Edit Vendor Profile</h1>
 
       <div style={{ display: "flex", marginBottom: 24, borderBottom: "2px solid #ddd" }}>
-        <button 
-          onClick={() => setActiveTab("profile")}
-          style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none", background: "none", border: "none" }}
-        >
-          📋 Profile
-        </button>
-        <button 
-          onClick={() => setActiveTab("shop")}
-          style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none" }}
-        >
-          🛒 Shop / Products
-        </button>
+        <button onClick={() => setActiveTab("profile")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none", background: "none", border: "none" }}>📋 Profile</button>
+        <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none" }}>🛒 Shop / Products</button>
       </div>
 
       {activeTab === "profile" && (
