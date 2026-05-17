@@ -135,8 +135,11 @@ export default function VendorProfile() {
 
   const uploadFile = async (file, bucket) => {
     const timestamp = Date.now();
-    const fileExt = file.name.split('.').pop();
-    const fileName = `\( {timestamp}- \){Math.random().toString(36).substring(2)}.${fileExt}`;
+    const randomStr = Math.random().toString(36).substring(2, 10);
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `\( {timestamp}- \){randomStr}.${fileExt}`;
+
+    console.log("Uploading with filename:", fileName); // for debugging
 
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
