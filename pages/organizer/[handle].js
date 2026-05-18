@@ -25,6 +25,12 @@ function formatSocialLink(platform, value) {
   }
 }
 
+function formatTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
 const IC = "#AABB23";
 const IS = 32;
 function WebsiteIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill="none" stroke={IC} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>; }
@@ -42,7 +48,8 @@ export default function OrganizerPublicProfile() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedEvent, setSelectedEvent] = useState(null); // event popup
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [viewerProfile, setViewerProfile] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -52,30 +59,21 @@ export default function OrganizerPublicProfile() {
       const { data: userData } = await supabase.auth.getUser();
       const currentUser = userData?.user || null;
       setUser(currentUser);
-
       const { data, error } = await supabase.from("profiles").select("*").eq("handle", handle).single();
-
       if (currentUser) {
         const { data: vp } = await supabase.from("profiles").select("role, account_type, id").eq("id", currentUser.id).single();
         setViewerProfile(vp);
       }
-
       if (error) { setLoading(false); return; }
       setOrganizer(data);
-
       if (data.account_type === "elite") {
-        const { data: evData } = await supabase
-          .from("organizer_events").select("*").eq("organizer_id", data.id)
-          .order("event_date", { ascending: true });
+        const { data: evData } = await supabase.from("organizer_events").select("*").eq("organizer_id", data.id).order("event_date", { ascending: true });
         setEvents(evData || []);
       }
-
-      // Track view
       const ownerViewing = currentUser && data.id === currentUser.id;
       if (!ownerViewing) {
         await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: currentUser?.id || null }]);
       }
-
       setLoading(false);
     };
     load();
@@ -90,7 +88,6 @@ export default function OrganizerPublicProfile() {
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
 
-      {/* OWNER MENU */}
       {isOwner && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <button onClick={() => setMenuOpen(!menuOpen)} style={{ padding: "8px 14px", backgroundColor: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>☰ Menu</button>
@@ -102,47 +99,24 @@ export default function OrganizerPublicProfile() {
         <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200 }}>
           <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 0, left: 0, width: 240, height: "100%", backgroundColor: "white", boxShadow: "4px 0 16px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column" }}>
             <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>Entre PRO Market</div>
-            {[
-              { label: "🏡 Home", path: "/home" },
-              { label: "📊 Dashboard", path: "/organizer-dashboard" },
-              { label: "✏️ Edit Profile", path: "/organizer-profile" },
-              { label: "👤 My Profile", path: `/organizer/${organizer?.handle}` },
-              { label: "🛒 Marketplace", path: "/marketplace" },
-              { label: "✉️ Messages", path: "/messages" },
-              { label: "💾 Saved Contacts", path: "/saved-contacts" },
-            ].map(item => (
-              <button key={item.path} onClick={() => { setMenuOpen(false); router.push(item.path); }}
-                style={{ padding: "14px 20px", backgroundColor: "white", border: "none", borderBottom: "1px solid #f0f0f0", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333" }}>
-                {item.label}
-              </button>
+            {[{ label: "🏡 Home", path: "/home" }, { label: "📊 Dashboard", path: "/organizer-dashboard" }, { label: "✏️ Edit Profile", path: "/organizer-profile" }, { label: "👤 My Profile", path: `/organizer/${organizer?.handle}` }, { label: "🛒 Marketplace", path: "/marketplace" }, { label: "✉️ Messages", path: "/messages" }, { label: "💾 Saved Contacts", path: "/saved-contacts" }].map(item => (
+              <button key={item.path} onClick={() => { setMenuOpen(false); router.push(item.path); }} style={{ padding: "14px 20px", backgroundColor: "white", border: "none", borderBottom: "1px solid #f0f0f0", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333" }}>{item.label}</button>
             ))}
-            <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }}
-              style={{ marginTop: "auto", padding: "14px 20px", backgroundColor: "white", border: "none", borderTop: "1px solid #eee", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000" }}>
-              🚪 Log Out
-            </button>
+            <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }} style={{ marginTop: "auto", padding: "14px 20px", backgroundColor: "white", border: "none", borderTop: "1px solid #eee", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000" }}>🚪 Log Out</button>
           </div>
         </div>
       )}
 
       <h1 style={{ marginBottom: 5 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
-
-      {organizer.logo_url && (
-        <img src={organizer.logo_url} onClick={() => setSelectedImage(organizer.logo_url)}
-          style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12, marginBottom: 20, cursor: "pointer" }} />
-      )}
-
+      {organizer.logo_url && <img src={organizer.logo_url} onClick={() => setSelectedImage(organizer.logo_url)} style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12, marginBottom: 20, cursor: "pointer" }} />}
       <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
       <p><strong>Location:</strong> {organizer.city}{organizer.state ? `, ${organizer.state}` : ""}</p>
       <p style={{ marginTop: 20 }}>{organizer.description}</p>
-
       <div style={{ marginTop: 15 }}>
-        {organizer.tags?.map(tag => (
-          <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>{tag}</span>
-        ))}
+        {organizer.tags?.map(tag => <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>{tag}</span>)}
       </div>
 
-      {/* SOCIAL LINKS */}
       <div style={{ marginTop: 25 }}>
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
@@ -155,22 +129,15 @@ export default function OrganizerPublicProfile() {
         </div>
       </div>
 
-      {/* PORTFOLIO */}
       <div style={{ marginTop: 30 }}>
         <h3>Portfolio</h3>
         {organizer.portfolio_images && organizer.portfolio_images.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => (
-              <img key={i} src={img} alt="portfolio" onClick={() => setSelectedImage(img)}
-                style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 8, cursor: "pointer" }} />
-            ))}
+            {organizer.portfolio_images.map((img, i) => <img key={i} src={img} alt="portfolio" onClick={() => setSelectedImage(img)} style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 8, cursor: "pointer" }} />)}
           </div>
-        ) : (
-          <p style={{ color: "#888" }}>No portfolio images yet.</p>
-        )}
+        ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
 
-      {/* ELITE: VIDEOS */}
       {organizer.account_type === "elite" && organizer.video_urls && organizer.video_urls.filter(v => v).length > 0 && (
         <div style={{ marginTop: 30 }}>
           <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
@@ -187,29 +154,23 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      {/* ELITE: UPCOMING EVENTS — click opens popup */}
+      {/* ELITE EVENTS — cards open popup */}
       {organizer.account_type === "elite" && (
         <div style={{ marginTop: 30 }}>
           <h3>📅 Upcoming Events</h3>
-          {events.length === 0 ? (
-            <p style={{ color: "#888" }}>No upcoming events posted yet.</p>
-          ) : (
+          {events.length === 0 ? <p style={{ color: "#888" }}>No upcoming events posted yet.</p> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
               {events.map(event => (
-                <div key={event.id}
-                  onClick={() => setSelectedEvent(event)}
+                <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }}
                   style={{ border: "2px solid #AABB23", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(170,187,35,0.3)"}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-                >
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
                   <div style={{ height: 130, backgroundColor: "#f4f4f4" }}>
-                    {event.flyer_url
-                      ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>
-                    }
+                    {event.flyer_url ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                   </div>
                   <div style={{ padding: 12 }}>
                     <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h4>
+                    {event.category && <p style={{ margin: "0 0 2px", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{event.category}</p>}
                     <p style={{ margin: "0 0 2px", fontSize: 12, color: "#701890", fontWeight: "bold" }}>
                       📅 {event.event_date ? new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD"}
                     </p>
@@ -223,17 +184,13 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      {/* MESSAGE BUTTON */}
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type;
         const vr = viewerProfile?.role;
         const canMessage = vr === "featured" || vt === "featured" || vr === "organizer";
         return canMessage ? (
           <div style={{ marginTop: 20 }}>
-            <button onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)}
-              style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>
-              ✉️ Send Message
-            </button>
+            <button onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
           </div>
         ) : viewerProfile?.role === "vendor" ? (
           <div style={{ marginTop: 20, padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, textAlign: "center" }}>
@@ -248,43 +205,57 @@ export default function OrganizerPublicProfile() {
         <button onClick={() => router.back()} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
 
-      {/* FULLSCREEN IMAGE */}
+      {/* FULLSCREEN PORTFOLIO IMAGE */}
       {selectedImage && (
         <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
           <img src={selectedImage} alt="enlarged" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 10 }} />
         </div>
       )}
 
-      {/* ── EVENT POPUP MODAL ── */}
+      {/* EVENT POPUP MODAL */}
       {selectedEvent && (
-        <div onClick={() => setSelectedEvent(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
-            {selectedEvent.flyer_url && (
-              <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: "16px 16px 0 0" }} />
-            )}
-            <div style={{ padding: 24 }}>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888", lineHeight: 1 }}>✕</button>
-              </div>
-              <h2 style={{ margin: "0 0 12px", fontSize: 20, color: "#111" }}>{selectedEvent.event_name}</h2>
-              <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>
-                📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Date TBD"}
-              </p>
-              {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
-              {selectedEvent.event_type && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#888" }}>🎭 {selectedEvent.event_type}</p>}
-              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
-              {selectedEvent.info_url && (
-                <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`}
-                  target="_blank" rel="noreferrer"
-                  style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>
-                  🎟️ Get Tickets / More Info
-                </a>
+        <div onClick={() => { if (flyerFullscreen) { setFlyerFullscreen(false); } else { setSelectedEvent(null); } }}
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
+          {flyerFullscreen ? (
+            <img src={selectedEvent.flyer_url} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", borderRadius: 8, objectFit: "contain" }} />
+          ) : (
+            <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+              {selectedEvent.flyer_url && (
+                <div style={{ position: "relative" }}>
+                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name}
+                    onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }}
+                    style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
+                  <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
+                </div>
               )}
-              <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>
-                Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span>
-              </p>
+              <div style={{ padding: 24 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                  <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
+                </div>
+                <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>{selectedEvent.event_name}</h2>
+                {selectedEvent.category && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#AABB23", fontWeight: "bold" }}>{selectedEvent.category}</p>}
+                <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>
+                  📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Date TBD"}
+                  {selectedEvent.event_end_date && selectedEvent.event_end_date !== selectedEvent.event_date && <span> – {new Date(selectedEvent.event_end_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</span>}
+                </p>
+                {(selectedEvent.event_start_time || selectedEvent.event_end_time) && (
+                  <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>
+                )}
+                {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
+                {selectedEvent.event_type && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#888" }}>🎭 {selectedEvent.event_type}</p>}
+                {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
+                {selectedEvent.info_url && (
+                  <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer"
+                    style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>
+                    🎟️ Get Tickets / More Info
+                  </a>
+                )}
+                <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>
+                  Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span>
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
