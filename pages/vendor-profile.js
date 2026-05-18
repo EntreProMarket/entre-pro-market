@@ -135,7 +135,7 @@ export default function VendorProfile() {
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).substring(2, 10);
     const fileExt = file.name.split('.').pop() || 'jpg';
-    const fileName = `\( {timestamp}- \){randomStr}.${fileExt}`;
+    const fileName = `${timestamp}-${randomStr}.${fileExt}`;
 
     const { error } = await supabase.storage.from(bucket).upload(fileName, file);
     if (error) {
@@ -210,10 +210,11 @@ export default function VendorProfile() {
     const url = await uploadFile(shopFiles[0], "vendor-portfolio");
     if (!url) return;
 
-    const { data: user } = await supabase.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user.id;
 
     const { error } = await supabase.from("vendor_products").insert({
-      vendor_id: user.user.id,
+      vendor_id: userId,
       title: newProduct.title,
       description: newProduct.description,
       price: Math.round(parseFloat(newProduct.price) * 100),
@@ -230,7 +231,7 @@ export default function VendorProfile() {
       const { data: products } = await supabase
         .from("vendor_products")
         .select("*")
-        .eq("vendor_id", user.user.id)
+        .eq("vendor_id", userId)
         .order("created_at", { ascending: false });
       setShopProducts(products || []);
     }
@@ -243,8 +244,8 @@ export default function VendorProfile() {
       <h1 style={{ marginBottom: 20 }}>Edit Vendor Profile</h1>
 
       <div style={{ display: "flex", marginBottom: 24, borderBottom: "2px solid #ddd" }}>
-        <button onClick={() => setActiveTab("profile")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none", background: "none", border: "none" }}>📋 Profile</button>
-        <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none" }}>🛒 Shop / Products</button>
+        <button onClick={() => setActiveTab("profile")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none", background: "none", border: "none", cursor: "pointer" }}>📋 Profile</button>
+        <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none", cursor: "pointer" }}>🛒 Shop / Products</button>
       </div>
 
       {activeTab === "profile" && (
@@ -273,7 +274,7 @@ export default function VendorProfile() {
 
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo</label>
-            <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} />
+            <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => setLogoFile(e.target.files[0])} />
           </div>
 
           <div style={{ marginTop: 20, marginBottom: 8 }}>
@@ -281,20 +282,24 @@ export default function VendorProfile() {
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>
               {portfolioImages.length} / {photoLimit} images
             </p>
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>
+              ⚠️ JPG, PNG, WebP only. No HEIC — convert to JPG first.
+            </div>
             {portfolioImages.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
                   <div key={i} style={{ position: "relative" }}>
                     <img src={img} alt="" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                    <button onClick={() => setPortfolioImages(portfolioImages.filter(x => x !== img))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20 }}>×</button>
+                    <button onClick={() => setPortfolioImages(portfolioImages.filter(x => x !== img))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
                   </div>
                 ))}
               </div>
             )}
             {portfolioImages.length < photoLimit && (
-              <input type="file" accept="image/*" multiple onChange={e => {
+              <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" multiple onChange={e => {
                 const remaining = photoLimit - portfolioImages.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
+                if (Array.from(e.target.files).length > remaining) alert(`You can only add ${remaining} more image(s).`);
                 setPortfolioFiles(files);
               }} />
             )}
@@ -302,11 +307,11 @@ export default function VendorProfile() {
 
           {videoLimit > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <label style={lS}>Video Links (up to {videoLimit})</label>
+              <label style={lS}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs</label>
               {Array.from({ length: videoLimit }).map((_, i) => (
                 <input key={i} value={videoUrls[i] || ""} onChange={e => {
                   const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u);
-                }} placeholder={`Video ${i+1}`} style={iS} />
+                }} placeholder={`Video ${i + 1}`} style={iS} />
               ))}
             </div>
           )}
@@ -316,14 +321,14 @@ export default function VendorProfile() {
       {activeTab === "shop" && (
         <div>
           <h2>Add New Product</h2>
-          <input placeholder="Product Title" value={newProduct.title} onChange={e => setNewProduct({...newProduct, title: e.target.value})} style={iS} />
-          <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} style={{...iS, height: 100}} />
-          <input type="number" step="0.01" placeholder="Price in USD" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} style={iS} />
+          <input placeholder="Product Title" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
+          <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 100 }} />
+          <input type="number" step="0.01" placeholder="Price in USD" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
 
           <label style={lS}>Product Image</label>
-          <input type="file" accept="image/*" onChange={e => setShopFiles(Array.from(e.target.files))} />
+          <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={e => setShopFiles(Array.from(e.target.files))} />
 
-          <button onClick={addShopProduct} style={{ padding: "14px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, marginTop: 16, fontWeight: "bold" }}>
+          <button onClick={addShopProduct} style={{ padding: "14px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, marginTop: 16, fontWeight: "bold", cursor: "pointer" }}>
             Add Product to Shop
           </button>
 
@@ -343,15 +348,15 @@ export default function VendorProfile() {
       )}
 
       {message && (
-        <p style={{ padding: "12px 16px", backgroundColor: message.includes("✅") ? "#f0fdf4" : "#fef2f2", borderRadius: 6, marginTop: 16 }}>
+        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
           {message}
         </p>
       )}
 
       {activeTab === "profile" && (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
-          <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20 }}>← Back</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold" }}>
+          <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>
             {saving ? "Saving..." : "Save Profile"}
           </button>
         </div>
