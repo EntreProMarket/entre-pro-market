@@ -13,7 +13,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch product from Supabase
     const { createClient } = require("@supabase/supabase-js");
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      mode: "payment",                    // One-time payment for products
+      mode: "payment",
       line_items: [{
         price_data: {
           currency: "usd",
@@ -46,7 +45,7 @@ export default async function handler(req, res) {
         quantity: 1,
       }],
       success_url: `${req.headers.origin}/product-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `\( {req.headers.origin}/vendor/ \){product.vendor_id}`,
+      cancel_url: `\( {req.headers.origin}/vendor/ \){product.vendor_id}`,   // Fixed
       metadata: {
         productId: product.id,
         buyerId: userId,
