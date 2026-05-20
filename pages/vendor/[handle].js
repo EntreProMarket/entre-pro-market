@@ -207,7 +207,7 @@ export default function VendorPublicProfile() {
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
-        <button onClick={() => router.back()} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
+        <button onClick={() => router.push("/marketplace")} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
 
       {selectedImage && (
