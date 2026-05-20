@@ -35,7 +35,7 @@ function XIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={
 
 export default function VendorPublicProfile() {
   const router = useRouter();
-  const { handle } = router.query;
+  const { handle, tab } = router.query;
   const [vendor, setVendor] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,11 @@ export default function VendorPublicProfile() {
   const [viewerProfile, setViewerProfile] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+
+  // ── Support ?tab=shop query param (used by product page back button) ──
+  useEffect(() => {
+    if (tab === "shop") setActiveTab("shop");
+  }, [tab]);
 
   useEffect(() => {
     if (!handle) return;
@@ -62,7 +67,6 @@ export default function VendorPublicProfile() {
       if (!ownerViewing) {
         await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: user?.id || null }]);
       }
-      // Load active products
       const { data: prods } = await supabase.from("vendor_products").select("*").eq("vendor_id", data.id).eq("is_active", true).order("created_at", { ascending: false });
       setProducts(prods || []);
       setLoading(false);
@@ -108,6 +112,7 @@ export default function VendorPublicProfile() {
         )}
       </div>
 
+      {/* PROFILE TAB */}
       {activeTab === "profile" && (
         <>
           {vendor.logo_url && <img src={vendor.logo_url} alt="logo" onClick={() => setSelectedImage(vendor.logo_url)} style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12, marginBottom: 20, cursor: "pointer" }} />}
@@ -173,23 +178,30 @@ export default function VendorPublicProfile() {
         </>
       )}
 
+      {/* SHOP TAB */}
       {activeTab === "shop" && (
         <div>
           <h3 style={{ marginBottom: 16 }}>🛒 {vendor.business_name}'s Shop</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
-            {products.map(p => (
-              <div key={p.id} onClick={() => router.push(`/product/${p.id}`)}
-                style={{ border: "1px solid #eee", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(112,24,144,0.15)"}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"}>
-                <img src={p.image_url} alt={p.title} style={{ width: "100%", height: 180, objectFit: "cover" }} />
-                <div style={{ padding: 12 }}>
-                  <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
-                  <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 16 }}>${(p.price / 100).toFixed(2)}</p>
-                  <button style={{ marginTop: 10, width: "100%", padding: "8px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>View & Buy</button>
+            {products.map(p => {
+              const imgs = p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
+              return (
+                <div key={p.id} onClick={() => router.push(`/product/${p.id}`)}
+                  style={{ border: "1px solid #eee", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(112,24,144,0.15)"}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"}>
+                  <div style={{ position: "relative" }}>
+                    <img src={imgs[0]} alt={p.title} style={{ width: "100%", height: 180, objectFit: "cover" }} />
+                    {imgs.length > 1 && <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 6px", borderRadius: 8 }}>1 / {imgs.length}</div>}
+                  </div>
+                  <div style={{ padding: 12 }}>
+                    <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
+                    <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 16 }}>${(p.price / 100).toFixed(2)}</p>
+                    <button style={{ marginTop: 10, width: "100%", padding: "8px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>View & Buy</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
