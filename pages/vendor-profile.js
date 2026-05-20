@@ -1,5 +1,5 @@
 // pages/vendor-profile.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
@@ -43,6 +43,7 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
 }
 
 const PRODUCT_LIMIT = 10;
+const MAX_PRODUCT_IMAGES = 6;
 
 export default function VendorProfile() {
   const router = useRouter();
@@ -76,9 +77,13 @@ export default function VendorProfile() {
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
-  const [shopFile, setShopFile] = useState(null);
+  const [newProductImages, setNewProductImages] = useState([]); // up to 6 files
+  const [newProductImageKey, setNewProductImageKey] = useState(0); // reset file input
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({ title: "", description: "", price: "" });
+  const [editProductImages, setEditProductImages] = useState([]); // existing urls
+  const [editProductNewFiles, setEditProductNewFiles] = useState([]);
+  const [editProductFileKey, setEditProductFileKey] = useState(0);
   const [userId, setUserId] = useState(null);
 
   useEffect(() => {
@@ -173,30 +178,56 @@ export default function VendorProfile() {
   };
 
   const addProduct = async () => {
-    if (!newProduct.title || !newProduct.price || !shopFile) { alert("Title, price, and image are required."); return; }
+    if (!newProduct.title || !newProduct.price) { alert("Title and price are required."); return; }
+    if (newProductImages.length === 0) { alert("At least one product image is required."); return; }
     if (shopProducts.length >= PRODUCT_LIMIT) { alert(`You've reached the ${PRODUCT_LIMIT} product limit.`); return; }
-    setMessage("⏳ Uploading product image...");
-    const url = await uploadFile(shopFile, "vendor-portfolio");
-    if (!url) return;
+    setMessage("⏳ Uploading product images...");
+    const uploadedUrls = [];
+    for (const file of newProductImages) {
+      const url = await uploadFile(file, "vendor-portfolio");
+      if (url) uploadedUrls.push(url);
+    }
+    if (uploadedUrls.length === 0) return;
     const { error } = await supabase.from("vendor_products").insert({
       vendor_id: userId, title: newProduct.title, description: newProduct.description,
-      price: Math.round(parseFloat(newProduct.price) * 100), image_url: url, is_active: true,
+      price: Math.round(parseFloat(newProduct.price) * 100),
+      image_url: uploadedUrls[0], // first image as primary
+      images: uploadedUrls,
+      is_active: true,
     });
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product added!");
-    setNewProduct({ title: "", description: "", price: "" }); setShopFile(null);
+    setNewProduct({ title: "", description: "", price: "" });
+    setNewProductImages([]);
+    setNewProductImageKey(k => k + 1); // reset file input
     await loadProducts(userId);
   };
 
   const saveEditProduct = async () => {
     if (!editForm.title || !editForm.price) { alert("Title and price are required."); return; }
+    let updatedImages = [...editProductImages];
+    if (editProductNewFiles.length > 0) {
+      const remaining = MAX_PRODUCT_IMAGES - updatedImages.length;
+      setMessage("⏳ Uploading new images...");
+      for (const file of editProductNewFiles.slice(0, remaining)) {
+        const url = await uploadFile(file, "vendor-portfolio");
+        if (url) updatedImages.push(url);
+      }
+    }
     const { error } = await supabase.from("vendor_products").update({
       title: editForm.title, description: editForm.description,
       price: Math.round(parseFloat(editForm.price) * 100),
+      image_url: updatedImages[0] || null,
+      images: updatedImages,
     }).eq("id", editingProduct);
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product updated!"); setEditingProduct(null);
+    setEditProductNewFiles([]); setEditProductFileKey(k => k + 1);
     await loadProducts(userId);
+  };
+
+  const removeEditImage = (url) => {
+    setEditProductImages(editProductImages.filter(u => u !== url));
   };
 
   const toggleProduct = async (id, current) => {
@@ -220,6 +251,7 @@ export default function VendorProfile() {
         <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none", cursor: "pointer" }}>🛒 Shop / Products</button>
       </div>
 
+      {/* ── PROFILE TAB ── */}
       {activeTab === "profile" && (
         <>
           <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
@@ -239,14 +271,6 @@ export default function VendorProfile() {
           <input placeholder="TikTok" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
           <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
           <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
-
-          {/* PAYMENT HANDLES */}
-          <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
-            <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Payment Handles (for Shop checkout)</label>
-            <input placeholder="CashApp handle (e.g. $YourHandle)" value={cashappHandle} onChange={e => setCashappHandle(e.target.value)} style={iS} />
-            <input placeholder="Venmo handle (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
-          </div>
-
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo</label>
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => setLogoFile(e.target.files[0])} />
@@ -282,9 +306,7 @@ export default function VendorProfile() {
               ))}
             </div>
           )}
-
           {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
-
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
             <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>{saving ? "Saving..." : "Save Profile"}</button>
@@ -292,67 +314,147 @@ export default function VendorProfile() {
         </>
       )}
 
+      {/* ── SHOP TAB ── */}
       {activeTab === "shop" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <h2 style={{ margin: 0 }}>Your Shop</h2>
-            <span style={{ fontSize: 13, color: shopProducts.length >= PRODUCT_LIMIT ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {PRODUCT_LIMIT} products</span>
+          {/* PAYMENT HANDLES — moved here from Profile tab */}
+          <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
+            <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Your Payment Handles</label>
+            <p style={{ fontSize: 12, color: "#888", marginBottom: 10, marginTop: -4 }}>Buyers will send payments directly to these accounts.</p>
+            <input placeholder="CashApp (e.g. $YourHandle)" value={cashappHandle} onChange={e => setCashappHandle(e.target.value)} style={iS} />
+            <input placeholder="Venmo (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
+            <button onClick={async () => {
+              setSaving(true);
+              await supabase.from("profiles").update({
+                cashapp_handle: cashappHandle.replace(/^\$/, "").trim(),
+                venmo_handle: venmoHandle.replace(/^@/, "").trim(),
+              }).eq("id", userId);
+              setSaving(false);
+              setMessage("✅ Payment handles saved!");
+            }} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
+              {saving ? "Saving..." : "Save Handles"}
+            </button>
           </div>
 
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h2 style={{ margin: 0 }}>Your Products</h2>
+            <span style={{ fontSize: 13, color: shopProducts.length >= PRODUCT_LIMIT ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {PRODUCT_LIMIT}</span>
+          </div>
+
+          {/* ADD PRODUCT FORM */}
           {shopProducts.length < PRODUCT_LIMIT && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
               <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
               <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
-              <label style={lS}>Product Image *</label>
-              <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={e => setShopFile(e.target.files[0])} style={{ marginBottom: 12 }} />
+
+              {/* MULTI-IMAGE UPLOAD */}
+              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {MAX_PRODUCT_IMAGES} — first image is the main photo)</span></label>
+              {newProductImages.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
+                  {newProductImages.map((file, i) => (
+                    <div key={i} style={{ position: "relative" }}>
+                      <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                      <button onClick={() => setNewProductImages(newProductImages.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+                      {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {newProductImages.length < MAX_PRODUCT_IMAGES && (
+                <input key={newProductImageKey} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple
+                  onChange={e => {
+                    const remaining = MAX_PRODUCT_IMAGES - newProductImages.length;
+                    const files = Array.from(e.target.files).slice(0, remaining);
+                    setNewProductImages(prev => [...prev, ...files].slice(0, MAX_PRODUCT_IMAGES));
+                  }}
+                  style={{ display: "block", marginBottom: 12 }} />
+              )}
+
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
             </div>
           )}
 
+          {/* PRODUCT LIST */}
           {shopProducts.length === 0 ? (
             <p style={{ color: "#888", textAlign: "center" }}>No products yet. Add your first product above!</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {shopProducts.map(p => (
-                <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
-                  <img src={p.image_url} alt={p.title} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    {editingProduct === p.id ? (
-                      <>
-                        <input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} style={{ ...iS, marginBottom: 6 }} />
-                        <textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
-                        <input type="number" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} style={{ ...iS, marginBottom: 8 }} />
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={saveEditProduct} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Save</button>
-                          <button onClick={() => setEditingProduct(null)} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <p style={{ margin: "0 0 4px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
-                        {p.description && <p style={{ margin: "0 0 4px", fontSize: 12, color: "#666" }}>{p.description}</p>}
-                        <p style={{ margin: "0 0 8px", color: "#701890", fontWeight: "bold", fontSize: 14 }}>${(p.price / 100).toFixed(2)}</p>
-                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, backgroundColor: p.is_active ? "#f0fdf4" : "#fef2f2", color: p.is_active ? "#166534" : "#991b1b", fontWeight: "bold" }}>{p.is_active ? "Active" : "Hidden"}</span>
-                        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                          <button onClick={() => { setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
-                          <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
-                          <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
-                        </div>
-                      </>
+              {shopProducts.map(p => {
+                const productImages = p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
+                return (
+                  <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
+                    {productImages.length > 0 && (
+                      <div style={{ position: "relative", width: 80, height: 80, flexShrink: 0 }}>
+                        <img src={productImages[0]} alt={p.title} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} />
+                        {productImages.length > 1 && <div style={{ position: "absolute", bottom: 2, right: 2, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>+{productImages.length - 1}</div>}
+                      </div>
                     )}
+                    <div style={{ flex: 1 }}>
+                      {editingProduct === p.id ? (
+                        <>
+                          <input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} style={{ ...iS, marginBottom: 6 }} />
+                          <textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
+                          <input type="number" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} style={{ ...iS, marginBottom: 8 }} />
+                          {/* EDIT EXISTING IMAGES */}
+                          {editProductImages.length > 0 && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
+                              {editProductImages.map((url, i) => (
+                                <div key={i} style={{ position: "relative" }}>
+                                  <img src={url} alt="" style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 6 }} />
+                                  <button onClick={() => removeEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
+                                  {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {editProductImages.length < MAX_PRODUCT_IMAGES && (
+                            <div style={{ marginBottom: 8 }}>
+                              <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more images ({editProductImages.length}/{MAX_PRODUCT_IMAGES})</label>
+                              <input key={editProductFileKey} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple
+                                onChange={e => {
+                                  const remaining = MAX_PRODUCT_IMAGES - editProductImages.length;
+                                  setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining));
+                                }} style={{ display: "block" }} />
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={saveEditProduct} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Save</button>
+                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ margin: "0 0 4px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
+                          {p.description && <p style={{ margin: "0 0 4px", fontSize: 12, color: "#666" }}>{p.description}</p>}
+                          <p style={{ margin: "0 0 8px", color: "#701890", fontWeight: "bold", fontSize: 14 }}>${(p.price / 100).toFixed(2)}</p>
+                          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, backgroundColor: p.is_active ? "#f0fdf4" : "#fef2f2", color: p.is_active ? "#166534" : "#991b1b", fontWeight: "bold" }}>{p.is_active ? "Active" : "Hidden"}</span>
+                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <button onClick={() => {
+                              const imgs = p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
+                              setEditingProduct(p.id);
+                              setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) });
+                              setEditProductImages(imgs);
+                              setEditProductNewFiles([]);
+                            }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                            <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
+                            <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
           {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", borderRadius: 6, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
 
-          {/* BACK BUTTON on Shop tab */}
+          {/* BACK goes to Profile tab, not dashboard */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
-            <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
+            <button onClick={() => setActiveTab("profile")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back to Profile</button>
           </div>
         </div>
       )}
