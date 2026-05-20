@@ -13,7 +13,8 @@ export default function ProductPage() {
   const [buying, setBuying] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [user, setUser] = useState(null);
-  const [manualPay, setManualPay] = useState(null); // "cashapp" | "venmo"
+  const [manualPay, setManualPay] = useState(null);
+  const [currentImg, setCurrentImg] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -49,23 +50,24 @@ export default function ProductPage() {
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
   if (!product) return <div style={{ padding: 40, textAlign: "center" }}>Product not found.</div>;
 
+  const images = product.images && product.images.length > 0 ? product.images : (product.image_url ? [product.image_url] : []);
   const price = (product.price / 100).toFixed(2);
-  const productNote = encodeURIComponent(`${product.title} - $${price}`);
-
-  // CashApp & Venmo deep links using vendor's own handles
   const cashappHandle = vendor?.cashapp_handle || "Meta4rikalMindz";
   const venmoHandle = vendor?.venmo_handle || "Meta4rikal-Mindz";
+  const productNote = encodeURIComponent(`${product.title} - $${price}`);
   const cashappUrl = `https://cash.app/$${cashappHandle}/${price}`;
   const venmoUrl = `https://venmo.com/${venmoHandle}?txn=pay&amount=${price}&note=${productNote}`;
 
-  // MANUAL PAYMENT CONFIRMATION SCREEN
+  // Back destination — vendor shop tab
+  const backUrl = vendor?.handle ? `/vendor/${vendor.handle}?tab=shop` : null;
+
+  // MANUAL PAYMENT SCREEN
   if (manualPay) {
     const isCashApp = manualPay === "cashapp";
     const payHandle = isCashApp ? `$${cashappHandle}` : `@${venmoHandle}`;
     const payUrl = isCashApp ? cashappUrl : venmoUrl;
     const color = isCashApp ? "#00D632" : "#008CFF";
     const appName = isCashApp ? "CashApp" : "Venmo";
-
     return (
       <div style={{ maxWidth: 480, margin: "0 auto", padding: 24, fontFamily: "sans-serif", textAlign: "center" }}>
         <div style={{ backgroundColor: "white", border: `2px solid ${color}`, borderRadius: 16, padding: "32px 24px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
@@ -73,20 +75,17 @@ export default function ProductPage() {
           <h2 style={{ color, margin: "0 0 8px" }}>Pay via {appName}</h2>
           <p style={{ color: "#444", fontSize: 15, marginBottom: 4 }}><strong>{product.title}</strong></p>
           <p style={{ color, fontSize: 24, fontWeight: "bold", marginBottom: 20 }}>${price}</p>
-
           <div style={{ backgroundColor: "#f9f9f9", borderRadius: 10, padding: "14px 16px", marginBottom: 20, textAlign: "left" }}>
             <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>Instructions:</p>
             <p style={{ margin: "0 0 4px", fontSize: 13, color: "#444" }}>1. Tap the button below to open {appName}</p>
             <p style={{ margin: "0 0 4px", fontSize: 13, color: "#444" }}>2. Send <strong>${price}</strong> to <strong>{payHandle}</strong></p>
-            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#444" }}>3. Include in the note: <strong>{product.title}</strong></p>
-            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>The vendor will confirm your order after payment is received.</p>
+            <p style={{ margin: "0 0 4px", fontSize: 13, color: "#444" }}>3. Note: <strong>{product.title}</strong></p>
+            <p style={{ margin: 0, fontSize: 13, color: "#888" }}>The vendor will confirm after payment is received.</p>
           </div>
-
           <a href={payUrl} target="_blank" rel="noreferrer"
             style={{ display: "block", padding: "14px 20px", backgroundColor: color, color: "white", borderRadius: 10, fontWeight: "bold", fontSize: 16, textDecoration: "none", marginBottom: 12 }}>
             Open {appName} → {payHandle}
           </a>
-
           <button onClick={() => setManualPay(null)}
             style={{ width: "100%", padding: "12px", backgroundColor: "#eee", border: "none", borderRadius: 10, fontWeight: "bold", cursor: "pointer", fontSize: 14 }}>
             ← Back to Payment Options
@@ -98,15 +97,63 @@ export default function ProductPage() {
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
-      <button onClick={() => router.back()} style={{ marginBottom: 20, padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
 
-      {/* PRODUCT IMAGE — tap to fullscreen */}
-      <div style={{ position: "relative", marginBottom: 24 }}>
-        <img src={product.image_url} alt={product.title}
-          onClick={() => setFullscreen(true)}
-          style={{ width: "100%", maxHeight: 400, objectFit: "cover", borderRadius: 12, cursor: "zoom-in", display: "block" }} />
-        <div style={{ position: "absolute", bottom: 10, right: 12, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
-      </div>
+      {/* BACK — goes to shop tab */}
+      <button onClick={() => backUrl ? router.push(backUrl) : router.back()}
+        style={{ marginBottom: 20, padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>
+        ← Back to Shop
+      </button>
+
+      {/* IMAGE GALLERY */}
+      {images.length > 0 && (
+        <div style={{ position: "relative", marginBottom: 24 }}>
+          <img src={images[currentImg]} alt={product.title}
+            onClick={() => setFullscreen(true)}
+            style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12, cursor: "zoom-in", display: "block" }} />
+
+          {/* Enlarge hint */}
+          <div style={{ position: "absolute", bottom: 10, right: 12, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>
+            Tap to enlarge
+          </div>
+
+          {/* Image counter */}
+          {images.length > 1 && (
+            <div style={{ position: "absolute", bottom: 10, left: 12, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>
+              {currentImg + 1} / {images.length}
+            </div>
+          )}
+
+          {/* Prev / Next arrows */}
+          {images.length > 1 && (
+            <>
+              <button onClick={() => setCurrentImg(i => (i - 1 + images.length) % images.length)}
+                style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", backgroundColor: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
+              <button onClick={() => setCurrentImg(i => (i + 1) % images.length)}
+                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", backgroundColor: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: 36, height: 36, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
+            </>
+          )}
+
+          {/* Dot indicators */}
+          {images.length > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
+              {images.map((_, i) => (
+                <div key={i} onClick={() => setCurrentImg(i)}
+                  style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: i === currentImg ? "#701890" : "#ddd", cursor: "pointer", transition: "background 0.2s" }} />
+              ))}
+            </div>
+          )}
+
+          {/* Thumbnail strip */}
+          {images.length > 1 && (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, overflowX: "auto" }}>
+              {images.map((img, i) => (
+                <img key={i} src={img} alt="" onClick={() => setCurrentImg(i)}
+                  style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, cursor: "pointer", border: i === currentImg ? "2px solid #701890" : "2px solid transparent", flexShrink: 0 }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* VENDOR LINK */}
       {vendor && (
@@ -123,15 +170,12 @@ export default function ProductPage() {
 
       {/* BUY BUTTONS */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-        {/* CARD / GOOGLE PAY via Stripe */}
         <button onClick={handleBuyWithStripe} disabled={buying}
           style={{ padding: "15px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>
           {buying ? "Processing..." : `💳 Pay with Card or Google Pay — $${price}`}
         </button>
-        <p style={{ margin: "-6px 0 6px", fontSize: 11, color: "#aaa", textAlign: "center" }}>Google Pay appears automatically on supported devices inside checkout</p>
+        <p style={{ margin: "-6px 0 6px", fontSize: 11, color: "#aaa", textAlign: "center" }}>Google Pay appears automatically on supported devices</p>
 
-        {/* CASHAPP */}
         {cashappHandle && (
           <button onClick={() => setManualPay("cashapp")}
             style={{ padding: "15px 20px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>
@@ -139,7 +183,6 @@ export default function ProductPage() {
           </button>
         )}
 
-        {/* VENMO */}
         {venmoHandle && (
           <button onClick={() => setManualPay("venmo")}
             style={{ padding: "15px 20px", backgroundColor: "#008CFF", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>
@@ -148,14 +191,20 @@ export default function ProductPage() {
         )}
       </div>
 
-      <p style={{ marginTop: 16, fontSize: 12, color: "#aaa", textAlign: "center" }}>
-        Secure checkout. Card payments are processed by Stripe.
-      </p>
+      <p style={{ marginTop: 16, fontSize: 12, color: "#aaa", textAlign: "center" }}>Secure checkout. Card payments processed by Stripe.</p>
 
-      {/* FULLSCREEN IMAGE */}
+      {/* FULLSCREEN */}
       {fullscreen && (
-        <div onClick={() => setFullscreen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" }}>
-          <img src={product.image_url} alt={product.title} style={{ maxWidth: "95%", maxHeight: "95vh", borderRadius: 8, objectFit: "contain" }} />
+        <div onClick={() => setFullscreen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" }}>
+          <img src={images[currentImg]} alt={product.title} style={{ maxWidth: "95%", maxHeight: "85vh", borderRadius: 8, objectFit: "contain" }} />
+          {images.length > 1 && (
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              {images.map((img, i) => (
+                <img key={i} src={img} onClick={e => { e.stopPropagation(); setCurrentImg(i); }}
+                  style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: i === currentImg ? "2px solid white" : "2px solid transparent" }} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
