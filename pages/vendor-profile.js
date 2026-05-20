@@ -42,7 +42,7 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-const PRODUCT_LIMIT = 10; // all tiers get 10 products for now
+const PRODUCT_LIMIT = 10;
 
 export default function VendorProfile() {
   const router = useRouter();
@@ -63,6 +63,8 @@ export default function VendorProfile() {
   const [tiktok, setTiktok] = useState("");
   const [youtube, setYoutube] = useState("");
   const [xTwitter, setXTwitter] = useState("");
+  const [cashappHandle, setCashappHandle] = useState("");
+  const [venmoHandle, setVenmoHandle] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
@@ -101,6 +103,7 @@ export default function VendorProfile() {
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
         setPortfolioImages(p.portfolio_images || []);
+        setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
       await loadProducts(user.id);
       setLoading(false);
@@ -157,6 +160,8 @@ export default function VendorProfile() {
         tiktok: formatSocialLink("tiktok", tiktok),
         youtube: formatSocialLink("youtube", youtube),
         x_twitter: formatSocialLink("x_twitter", xTwitter),
+        cashapp_handle: cashappHandle.replace(/^\$/, "").trim(),
+        venmo_handle: venmoHandle.replace(/^@/, "").trim(),
         logo_url: logoUrl, portfolio_images: portfolio,
       }).eq("id", user.id);
       if (error) throw error;
@@ -234,6 +239,14 @@ export default function VendorProfile() {
           <input placeholder="TikTok" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
           <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
           <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
+
+          {/* PAYMENT HANDLES */}
+          <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
+            <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Payment Handles (for Shop checkout)</label>
+            <input placeholder="CashApp handle (e.g. $YourHandle)" value={cashappHandle} onChange={e => setCashappHandle(e.target.value)} style={iS} />
+            <input placeholder="Venmo handle (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
+          </div>
+
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo</label>
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => setLogoFile(e.target.files[0])} />
@@ -241,7 +254,7 @@ export default function VendorProfile() {
           <div style={{ marginTop: 20, marginBottom: 8 }}>
             <label style={lS}>Portfolio</label>
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC — convert to JPG first.</div>
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC.</div>
             {portfolioImages.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
@@ -263,12 +276,19 @@ export default function VendorProfile() {
           </div>
           {videoLimit > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <label style={lS}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok URLs</label>
+              <label style={lS}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok</label>
               {Array.from({ length: videoLimit }).map((_, i) => (
                 <input key={i} value={videoUrls[i] || ""} onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }} placeholder={`Video ${i + 1}`} style={iS} />
               ))}
             </div>
           )}
+
+          {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
+            <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>{saving ? "Saving..." : "Save Profile"}</button>
+          </div>
         </>
       )}
 
@@ -279,7 +299,6 @@ export default function VendorProfile() {
             <span style={{ fontSize: 13, color: shopProducts.length >= PRODUCT_LIMIT ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {PRODUCT_LIMIT} products</span>
           </div>
 
-          {/* ADD PRODUCT FORM */}
           {shopProducts.length < PRODUCT_LIMIT && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
@@ -292,7 +311,6 @@ export default function VendorProfile() {
             </div>
           )}
 
-          {/* PRODUCT LIST */}
           {shopProducts.length === 0 ? (
             <p style={{ color: "#888", textAlign: "center" }}>No products yet. Add your first product above!</p>
           ) : (
@@ -329,19 +347,13 @@ export default function VendorProfile() {
               ))}
             </div>
           )}
-        </div>
-      )}
 
-      {message && (
-        <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>
-          {message}
-        </p>
-      )}
+          {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", borderRadius: 6, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
 
-      {activeTab === "profile" && (
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
-          <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>{saving ? "Saving..." : "Save Profile"}</button>
+          {/* BACK BUTTON on Shop tab */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
+            <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
+          </div>
         </div>
       )}
     </div>
