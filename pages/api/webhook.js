@@ -1,6 +1,6 @@
 // pages/api/webhook.js
 // Handles Stripe webhook events and updates Supabase
-// Auto-downgrades users when payments fail or subscriptions cancel
+// Handles BOTH tier upgrades AND product purchases
 
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
@@ -25,12 +25,10 @@ async function getRawBody(req) {
   });
 }
 
-// ── Helper: get default tier when downgrading ──
 function getDefaultTier(role) {
   return role === "organizer" ? "basic" : "free";
 }
 
-// ── Helper: find profile by Stripe customer ID ──
 async function getProfileByCustomerId(customerId) {
   const { data } = await supabaseAdmin
     .from("profiles")
@@ -40,8 +38,8 @@ async function getProfileByCustomerId(customerId) {
   return data;
 }
 
-// ── Helper: save stripe_customer_id to profile ──
 async function saveCustomerId(userId, customerId) {
+  if (!customerId) return;
   await supabaseAdmin
     .from("profiles")
     .update({ stripe_customer_id: customerId })
@@ -62,46 +60,68 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Webhook error: ${err.message}` });
   }
 
-  // ── PAYMENT SUCCESSFUL ──
+  // ── CHECKOUT COMPLETED ──
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const { userId, role, tier } = session.metadata;
+    const metadata = session.metadata || {};
 
-    if (!userId || !role || !tier) {
-      console.error("Missing metadata in session");
-      return res.status(400).json({ error: "Missing metadata" });
+    // ── PRODUCT PURCHASE (has productId in metadata) ──
+    if (metadata.productId) {
+      console.log(`✅ Product purchase: ${metadata.productId} by buyer ${metadata.buyerId}`);
+      // Product orders are handled by verify-product-payment.js on the success page
+      // Optionally record the order here as a backup
+      try {
+        await supabaseAdmin.from("orders").insert({
+          product_id: metadata.productId,
+          buyer_id: metadata.buyerId,
+          vendor_id: metadata.vendorId,
+          amount: session.amount_total,
+          stripe_session_id: session.id,
+          status: "paid",
+        });
+      } catch (_) {
+        // orders table may not exist yet — safe to ignore
+      }
+      return res.status(200).json({ received: true });
     }
 
-    const isSubscription = session.mode === "subscription";
-    const expiresAt = isSubscription
-      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-      : null;
+    // ── TIER UPGRADE (has userId, role, tier in metadata) ──
+    if (metadata.userId && metadata.role && metadata.tier) {
+      const { userId, role, tier } = metadata;
 
-    // Save stripe customer ID so we can look them up on cancellation/failure
-    if (session.customer) {
-      await saveCustomerId(userId, session.customer);
+      const isSubscription = session.mode === "subscription";
+      const expiresAt = isSubscription
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
+      if (session.customer) {
+        await saveCustomerId(userId, session.customer);
+      }
+
+      const { error } = await supabaseAdmin.from("profiles").update({
+        role,
+        account_type: tier,
+        subscription_expires_at: expiresAt,
+        contacts_used_this_month: 0,
+        contacts_reset_date: new Date().toISOString().split("T")[0],
+      }).eq("id", userId);
+
+      if (error) {
+        console.error("Supabase update error:", error);
+        return res.status(500).json({ error: "Failed to update profile" });
+      }
+      console.log(`✅ Upgraded ${userId} to ${role} ${tier}`);
+      return res.status(200).json({ received: true });
     }
 
-    const { error } = await supabaseAdmin.from("profiles").update({
-      role,
-      account_type: tier,
-      subscription_expires_at: expiresAt,
-      contacts_used_this_month: 0,
-      contacts_reset_date: new Date().toISOString().split("T")[0],
-    }).eq("id", userId);
-
-    if (error) {
-      console.error("Supabase update error:", error);
-      return res.status(500).json({ error: "Failed to update profile" });
-    }
-    console.log(`✅ Upgraded ${userId} to ${role} ${tier}`);
+    // ── UNKNOWN SESSION TYPE — return 200 so Stripe doesn't keep retrying ──
+    console.log("checkout.session.completed with unrecognized metadata — ignoring");
+    return res.status(200).json({ received: true });
   }
 
-  // ── SUBSCRIPTION CANCELLED (user cancels manually) ──
+  // ── SUBSCRIPTION CANCELLED ──
   if (event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object;
-    const profile = await getProfileByCustomerId(subscription.customer);
-
+    const profile = await getProfileByCustomerId(event.data.object.customer);
     if (profile) {
       const defaultTier = getDefaultTier(profile.role);
       await supabaseAdmin.from("profiles").update({
@@ -112,13 +132,11 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── PAYMENT FAILED (card declined, expired, etc.) ──
+  // ── PAYMENT FAILED ──
   if (event.type === "invoice.payment_failed") {
     const invoice = event.data.object;
     const profile = await getProfileByCustomerId(invoice.customer);
-
     if (profile) {
-      // Only downgrade after 3 failed attempts (Stripe's default retry count)
       const attemptCount = invoice.attempt_count || 1;
       if (attemptCount >= 3) {
         const defaultTier = getDefaultTier(profile.role);
@@ -127,14 +145,11 @@ export default async function handler(req, res) {
           subscription_expires_at: null,
         }).eq("id", profile.id);
         console.log(`⬇️ Payment failed ${attemptCount}x — downgraded ${profile.id} to ${defaultTier}`);
-      } else {
-        console.log(`⚠️ Payment failed (attempt ${attemptCount}/3) for ${profile.id} — not yet downgrading`);
       }
     }
   }
 
-  // ── SUBSCRIPTION PAYMENT SUCCEEDED (renewal) ──
-  // Extend their expiry date on each successful renewal
+  // ── SUBSCRIPTION RENEWED ──
   if (event.type === "invoice.payment_succeeded") {
     const invoice = event.data.object;
     if (invoice.billing_reason === "subscription_cycle") {
