@@ -6,7 +6,8 @@ import { supabase } from "../lib/supabaseClient";
 export default function MyApp({ Component, pageProps }) {
   const [session, setSession] = useState(null);
   const [installPrompt, setInstallPrompt] = useState(null);
-  const [showBanner, setShowBanner] = useState(false);
+  const [showAndroidBanner, setShowAndroidBanner] = useState(false);
+  const [showIOSBanner, setShowIOSBanner] = useState(false);
 
   useEffect(() => {
     // ── Existing session logic ──
@@ -29,13 +30,28 @@ export default function MyApp({ Component, pageProps }) {
       });
     }
 
-    // ── PWA: Capture install prompt ──
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;
+
+    // ── Detect iOS ──
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isSafari = /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent);
+
+    if (isIOS && isSafari && !isStandalone) {
+      // Show iOS instructions after 3 seconds
+      const timer = setTimeout(() => setShowIOSBanner(true), 3000);
+      return () => {
+        clearTimeout(timer);
+        listener.subscription.unsubscribe();
+      };
+    }
+
+    // ── Android: Capture install prompt ──
     const handler = (e) => {
       e.preventDefault();
       setInstallPrompt(e);
-      if (!window.matchMedia("(display-mode: standalone)").matches) {
-        setShowBanner(true);
-      }
+      if (!isStandalone) setShowAndroidBanner(true);
     };
     window.addEventListener("beforeinstallprompt", handler);
 
@@ -49,7 +65,7 @@ export default function MyApp({ Component, pageProps }) {
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") setShowBanner(false);
+    if (outcome === "accepted") setShowAndroidBanner(false);
     setInstallPrompt(null);
   };
 
@@ -57,8 +73,8 @@ export default function MyApp({ Component, pageProps }) {
     <>
       <Component {...pageProps} session={session} />
 
-      {/* PWA INSTALL BANNER */}
-      {showBanner && (
+      {/* ANDROID INSTALL BANNER */}
+      {showAndroidBanner && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
           backgroundColor: "#701890", color: "white",
@@ -74,7 +90,7 @@ export default function MyApp({ Component, pageProps }) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <button onClick={() => setShowBanner(false)}
+            <button onClick={() => setShowAndroidBanner(false)}
               style={{ padding: "8px 14px", backgroundColor: "rgba(255,255,255,0.2)", color: "white", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>
               Not now
             </button>
@@ -83,6 +99,45 @@ export default function MyApp({ Component, pageProps }) {
               Install
             </button>
           </div>
+        </div>
+      )}
+
+      {/* iOS INSTALL INSTRUCTIONS BANNER */}
+      {showIOSBanner && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0,
+          backgroundColor: "#111", color: "white",
+          padding: "16px 20px", zIndex: 99999,
+          boxShadow: "0 -4px 20px rgba(0,0,0,0.3)",
+          borderRadius: "16px 16px 0 0",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <img src="/icons/icon-192x192.png" alt="EPM" style={{ width: 36, height: 36, borderRadius: 8 }} />
+              <p style={{ margin: 0, fontWeight: "bold", fontSize: 15 }}>Install Entre PRO Market</p>
+            </div>
+            <button onClick={() => setShowIOSBanner(false)}
+              style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", borderRadius: "50%", width: 28, height: 28, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              ×
+            </button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 14px" }}>
+              <span style={{ fontSize: 22 }}>1️⃣</span>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4 }}>Tap the <strong>Share button</strong> <span style={{ fontSize: 16 }}>⬆️</span> at the bottom of your Safari browser</p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 14px" }}>
+              <span style={{ fontSize: 22 }}>2️⃣</span>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4 }}>Scroll down and tap <strong>"Add to Home Screen"</strong></p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 14px" }}>
+              <span style={{ fontSize: 22 }}>3️⃣</span>
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.4 }}>Tap <strong>Add</strong> in the top right corner</p>
+            </div>
+          </div>
+          <p style={{ margin: "12px 0 0", fontSize: 11, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
+            Must be using Safari browser on iPhone or iPad
+          </p>
         </div>
       )}
     </>
