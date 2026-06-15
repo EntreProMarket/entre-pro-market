@@ -1,5 +1,4 @@
 // pages/role.js
-// TEMPORARY DEBUG VERSION — shows alert with email API response
 
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
@@ -18,33 +17,17 @@ export default function RolePage() {
 
     if (error) { alert(error.message); return; }
 
-    // ── DEBUG: send welcome email and show result ──
     try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("business_name")
-        .eq("id", user.id)
-        .single();
-
-      const emailToUse = user.email;
-
-      alert("DEBUG: About to send email to: " + emailToUse);
-
-      const res = await fetch("/api/send-welcome-email", {
+      fetch("/api/send-welcome-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: emailToUse,
-          name: profile?.business_name || null,
+          email: user.email,
+          name: null,
           role,
         }),
-      });
-
-      const result = await res.json();
-      alert("DEBUG: API response status " + res.status + ": " + JSON.stringify(result));
-    } catch (err) {
-      alert("DEBUG: Email send threw error: " + err.message);
-    }
+      }).catch(() => {});
+    } catch (_) {}
 
     if (role === "vendor") {
       router.replace("/vendor-dashboard");
@@ -58,14 +41,12 @@ export default function RolePage() {
       <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
       <h1 style={{ margin: "0 0 8px", color: "#333", fontSize: 24 }}>Welcome to Entre PRO Market!</h1>
       <p style={{ color: "#888", fontSize: 15, marginBottom: 32 }}>How will you be using the platform?</p>
-
       <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", maxWidth: 320 }}>
         <button onClick={() => setRole("vendor")}
           style={{ padding: "18px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 12, fontSize: 16, fontWeight: "bold", cursor: "pointer", textAlign: "left" }}>
           🛒 I'm a Vendor
           <p style={{ margin: "4px 0 0", fontSize: 12, fontWeight: "normal", opacity: 0.85 }}>Sell products & showcase your business</p>
         </button>
-
         <button onClick={() => setRole("organizer")}
           style={{ padding: "18px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 12, fontSize: 16, fontWeight: "bold", cursor: "pointer", textAlign: "left" }}>
           🎪 I'm an Organizer
