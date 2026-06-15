@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
+const VENDOR_PRICE_IDS = {
+  premium: "price_1TORKAIofgLPwGzFG8dd6YQg",
+  featured: "price_1TORKAIofgLPwGzFRhbQup5T",
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -67,6 +72,17 @@ export default function LoginPage() {
     await redirectUser(data.user.id);
   };
 
+  // Fire-and-forget welcome email — doesn't block navigation
+  const sendWelcomeEmail = (userEmail, role) => {
+    try {
+      fetch("/api/send-welcome-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail, name: null, role }),
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
   const handleSignUp = async () => {
     if (!email || !password) {
       setMessage("Please enter your email and password.");
@@ -92,23 +108,61 @@ export default function LoginPage() {
       return;
     }
 
-    // ✅ If coming from vendor-info or organizer-info, set role immediately
+    // ✅ VENDOR SIGNUP
     if (plan === "vendor") {
+      const isPaidTier = tier === "premium" || tier === "featured";
+
+      // Always start on the free tier in the database.
+      // Paid tiers only get activated after Stripe checkout completes
+      // (handled by the webhook / verify-payment).
       await supabase.from("profiles").upsert({
         id: user.id,
         role: "vendor",
-        account_type: tier || "free",
+        account_type: "free",
       });
+
+      sendWelcomeEmail(user.email, "vendor");
+
+      if (isPaidTier) {
+        const priceId = VENDOR_PRICE_IDS[tier];
+        try {
+          const res = await fetch("/api/create-checkout-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              priceId,
+              userId: user.id,
+              role: "vendor",
+              tier,
+              mode: "subscription",
+            }),
+          });
+          const checkoutData = await res.json();
+          if (checkoutData.url) {
+            window.location.href = checkoutData.url;
+            return;
+          } else {
+            alert("Could not start checkout: " + (checkoutData.error || "unknown error") + ". You've been signed up on the Free plan — you can upgrade anytime from your dashboard.");
+          }
+        } catch (err) {
+          alert("Checkout error: " + err.message + ". You've been signed up on the Free plan — you can upgrade anytime from your dashboard.");
+        }
+      }
+
       router.replace("/vendor-profile");
       return;
     }
 
+    // ✅ ORGANIZER SIGNUP
     if (plan === "organizer") {
       await supabase.from("profiles").upsert({
         id: user.id,
         role: "organizer",
         account_type: tier || "basic",
       });
+
+      sendWelcomeEmail(user.email, "organizer");
+
       router.replace("/organizer-profile");
       return;
     }
@@ -119,6 +173,8 @@ export default function LoginPage() {
       role: null,
       account_type: "public",
     });
+
+    sendWelcomeEmail(user.email, "public");
 
     router.replace("/home");
   };
@@ -189,6 +245,11 @@ export default function LoginPage() {
           width: "100%",
         }}>
           {plan === "vendor" ? "🛒" : "🎪"} Signing up as {tier} {plan} — create your account below
+          {plan === "vendor" && (tier === "premium" || tier === "featured") && (
+            <p style={{ margin: "6px 0 0", fontWeight: "normal", fontSize: 12 }}>
+              You'll be taken to secure checkout after creating your account.
+            </p>
+          )}
         </div>
       )}
 
