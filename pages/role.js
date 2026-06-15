@@ -1,4 +1,5 @@
 // pages/role.js
+// TEMPORARY DEBUG VERSION — shows alert with email API response
 
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
@@ -17,27 +18,33 @@ export default function RolePage() {
 
     if (error) { alert(error.message); return; }
 
+    // ── DEBUG: send welcome email and show result ──
     try {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("email, business_name")
+        .select("business_name")
         .eq("id", user.id)
         .single();
 
-      const emailToUse = profile?.email || user.email;
+      const emailToUse = user.email;
 
-      if (emailToUse) {
-        fetch("/api/send-welcome-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: emailToUse,
-            name: profile?.business_name || null,
-            role,
-          }),
-        });
-      }
-    } catch (_) {}
+      alert("DEBUG: About to send email to: " + emailToUse);
+
+      const res = await fetch("/api/send-welcome-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: emailToUse,
+          name: profile?.business_name || null,
+          role,
+        }),
+      });
+
+      const result = await res.json();
+      alert("DEBUG: API response status " + res.status + ": " + JSON.stringify(result));
+    } catch (err) {
+      alert("DEBUG: Email send threw error: " + err.message);
+    }
 
     if (role === "vendor") {
       router.replace("/vendor-dashboard");
