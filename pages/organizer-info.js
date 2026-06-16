@@ -38,9 +38,9 @@ export default function OrganizerInfo() {
   }, []);
 
   const PRICE_IDS = {
-    basic: "price_1TORKAIofgLPwGzFMjSv35Pk",
-    pro:   "price_1TORKBIofgLPwGzF0qle4iMc",
-    elite: "price_1TORKBIofgLPwGzFzJoejEE7",
+    basic: "price_1TipJ9IofgLPwGzFtIXDEV5c",
+    pro:   "price_1TipLiIofgLPwGzFrg7I5pap",
+    elite: "price_1TipMfIofgLPwGzF432mjiJB",
   };
 
   const PRICE_MODES = {
@@ -49,18 +49,14 @@ export default function OrganizerInfo() {
     elite: "subscription",
   };
 
-  // Tier rank for upgrade/downgrade comparison
   const TIER_RANK = { basic: 1, pro: 2, elite: 3 };
 
   const handleChoosePlan = async (tier) => {
-    // Block vendors from becoming organizers
     if (userRole === "vendor") {
       alert("You are already registered as a Vendor and cannot become an Organizer.");
       return;
     }
 
-    // ── FIX: Allow existing organizers to upgrade tiers ──
-    // Only block if they're already on this exact tier
     if (userRole === "organizer" && userTier === tier) {
       alert(`You are already on the ${tier} plan.`);
       router.push("/organizer-dashboard");
@@ -70,7 +66,6 @@ export default function OrganizerInfo() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
-    // Not logged in — send to signup first
     if (!user) {
       router.push(`/?mode=signup&plan=organizer&tier=${tier}`);
       return;
@@ -115,7 +110,6 @@ export default function OrganizerInfo() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
 
-      {/* HEADER */}
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
         <h1 style={{ marginBottom: 8 }}>
@@ -128,7 +122,6 @@ export default function OrganizerInfo() {
         </p>
       </div>
 
-      {/* CURRENT PLAN BANNER — shown to existing organizers */}
       {userRole === "organizer" && userTier && (
         <div style={{
           backgroundColor: "#f3e8ff",
@@ -145,19 +138,16 @@ export default function OrganizerInfo() {
         </div>
       )}
 
-      {/* AD BANNER */}
       <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 20px", marginBottom: 32, textAlign: "center" }}>
         <p style={{ margin: 0, color: "#888B00", fontWeight: "bold" }}>
           🎉 Launch Special — First month free on any plan!
         </p>
       </div>
 
-      {/* PRICING NOTE */}
       <div style={{ backgroundColor: "#f8f9fa", border: "1px solid #eee", borderRadius: 10, padding: "14px 20px", marginBottom: 24, fontSize: 13, color: "#666", textAlign: "center" }}>
         💡 All plans include access to the vendor marketplace. Your plan determines how many vendors you can contact per month.
       </div>
 
-      {/* PLAN CARDS */}
       {loading ? (
         <p style={{ textAlign: "center", color: "#888" }}>Loading plans...</p>
       ) : (
@@ -178,27 +168,23 @@ export default function OrganizerInfo() {
                 flexDirection: "column",
                 position: "relative",
               }}>
-                {/* CURRENT PLAN TAG */}
                 {isCurrentPlan && (
                   <div style={{ position: "absolute", top: -1, right: 16, backgroundColor: "#AABB23", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 10px", borderRadius: "0 0 8px 8px" }}>
                     CURRENT PLAN
                   </div>
                 )}
 
-                {/* TIER BADGE */}
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: style.badgeBg, border: `1px solid ${style.border}`, borderRadius: 20, padding: "4px 12px", marginBottom: 16, alignSelf: "flex-start" }}>
                   <span>{style.icon}</span>
                   <span style={{ color: style.badge, fontWeight: "bold", fontSize: 13 }}>{plan.name}</span>
                 </div>
 
-                {/* PRICE */}
                 <div style={{ marginBottom: 16 }}>
                   <span style={{ fontSize: 32, fontWeight: "bold", color: style.badge }}>${plan.price}</span>
                   <span style={{ color: "#888", fontSize: 14 }}>/month</span>
                   <p style={{ color: "#888", fontSize: 13, margin: "6px 0 0" }}>{plan.description}</p>
                 </div>
 
-                {/* FEATURES */}
                 <ul style={{ padding: 0, margin: "0 0 24px", listStyle: "none", flex: 1 }}>
                   {(Array.isArray(plan.features) ? plan.features : []).map((feature, i) => (
                     <li key={i} style={{ padding: "6px 0", borderBottom: "1px solid #f0f0f0", fontSize: 13, color: "#444", display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -208,7 +194,6 @@ export default function OrganizerInfo() {
                   ))}
                 </ul>
 
-                {/* CTA BUTTON */}
                 <button
                   onClick={() => handleChoosePlan(plan.tier)}
                   disabled={isCurrentPlan}
@@ -232,7 +217,6 @@ export default function OrganizerInfo() {
         </div>
       )}
 
-      {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 40 }}>
         <button onClick={() => router.back()} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
