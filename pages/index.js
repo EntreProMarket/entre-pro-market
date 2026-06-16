@@ -5,8 +5,20 @@ import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 const VENDOR_PRICE_IDS = {
-  premium: "price_1TORKAIofgLPwGzFG8dd6YQg",
-  featured: "price_1TORKAIofgLPwGzFRhbQup5T",
+  premium: "price_1Tip3LIofgLPwGzFexWb2FId",
+  featured: "price_1Tip97IofgLPwGzFE3Dl0bjX",
+};
+
+const ORGANIZER_PRICE_IDS = {
+  basic: "price_1TipJ9IofgLPwGzFtIXDEV5c",
+  pro:   "price_1TipLiIofgLPwGzFrg7I5pap",
+  elite: "price_1TipMfIofgLPwGzF432mjiJB",
+};
+
+const ORGANIZER_PRICE_MODES = {
+  basic: "payment",
+  pro:   "subscription",
+  elite: "subscription",
 };
 
 export default function LoginPage() {
@@ -19,11 +31,9 @@ export default function LoginPage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [mode, setMode] = useState("login");
 
-  // Read plan/tier from URL if coming from vendor-info or organizer-info
   const { plan, tier } = router.query;
 
   useEffect(() => {
-    // If signup mode passed in URL, switch to signup tab
     if (router.query.mode === "signup") setMode("signup");
   }, [router.query]);
 
@@ -72,7 +82,6 @@ export default function LoginPage() {
     await redirectUser(data.user.id);
   };
 
-  // Fire-and-forget welcome email — doesn't block navigation
   const sendWelcomeEmail = (userEmail, role) => {
     try {
       fetch("/api/send-welcome-email", {
@@ -81,6 +90,15 @@ export default function LoginPage() {
         body: JSON.stringify({ email: userEmail, name: null, role }),
       }).catch(() => {});
     } catch (_) {}
+  };
+
+  const startCheckout = async (priceId, userId, role, tier, mode) => {
+    const res = await fetch("/api/create-checkout-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ priceId, userId, role, tier, mode }),
+    });
+    return res.json();
   };
 
   const handleSignUp = async () => {
@@ -112,9 +130,7 @@ export default function LoginPage() {
     if (plan === "vendor") {
       const isPaidTier = tier === "premium" || tier === "featured";
 
-      // Always start on the free tier in the database.
-      // Paid tiers only get activated after Stripe checkout completes
-      // (handled by the webhook / verify-payment).
+      // Always start on free — paid tiers activate only after Stripe checkout completes
       await supabase.from("profiles").upsert({
         id: user.id,
         role: "vendor",
@@ -126,18 +142,7 @@ export default function LoginPage() {
       if (isPaidTier) {
         const priceId = VENDOR_PRICE_IDS[tier];
         try {
-          const res = await fetch("/api/create-checkout-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              priceId,
-              userId: user.id,
-              role: "vendor",
-              tier,
-              mode: "subscription",
-            }),
-          });
-          const checkoutData = await res.json();
+          const checkoutData = await startCheckout(priceId, user.id, "vendor", tier, "subscription");
           if (checkoutData.url) {
             window.location.href = checkoutData.url;
             return;
@@ -153,15 +158,39 @@ export default function LoginPage() {
       return;
     }
 
-    // ✅ ORGANIZER SIGNUP
+    // ✅ ORGANIZER SIGNUP — all tiers are paid, route through Stripe checkout
     if (plan === "organizer") {
+      const selectedTier = tier || "basic";
+
+      // Create a minimal profile first (no account_type granted yet)
       await supabase.from("profiles").upsert({
         id: user.id,
         role: "organizer",
-        account_type: tier || "basic",
+        account_type: null,
       });
 
       sendWelcomeEmail(user.email, "organizer");
+
+      const priceId = ORGANIZER_PRICE_IDS[selectedTier];
+      const checkoutMode = ORGANIZER_PRICE_MODES[selectedTier] || "subscription";
+
+      if (!priceId) {
+        alert("Payment not configured for this plan. Please contact support.");
+        router.replace("/organizer-profile");
+        return;
+      }
+
+      try {
+        const checkoutData = await startCheckout(priceId, user.id, "organizer", selectedTier, checkoutMode);
+        if (checkoutData.url) {
+          window.location.href = checkoutData.url;
+          return;
+        } else {
+          alert("Could not start checkout: " + (checkoutData.error || "unknown error") + ". Please choose a plan again from your dashboard.");
+        }
+      } catch (err) {
+        alert("Checkout error: " + err.message + ". Please choose a plan again from your dashboard.");
+      }
 
       router.replace("/organizer-profile");
       return;
@@ -218,7 +247,6 @@ export default function LoginPage() {
       overflowY: "auto",
     }}>
 
-      {/* LOGO */}
       <img
         src="/logo-transparent.png"
         alt="Entre PRO Market"
@@ -229,7 +257,6 @@ export default function LoginPage() {
         The marketplace for vendors and event organizers
       </p>
 
-      {/* SHOW PLAN CONTEXT if coming from info page */}
       {plan && tier && (
         <div style={{
           backgroundColor: plan === "vendor" ? "#f3e8ff" : "#f9ffe8",
@@ -245,7 +272,7 @@ export default function LoginPage() {
           width: "100%",
         }}>
           {plan === "vendor" ? "🛒" : "🎪"} Signing up as {tier} {plan} — create your account below
-          {plan === "vendor" && (tier === "premium" || tier === "featured") && (
+          {((plan === "vendor" && (tier === "premium" || tier === "featured")) || plan === "organizer") && (
             <p style={{ margin: "6px 0 0", fontWeight: "normal", fontSize: 12 }}>
               You'll be taken to secure checkout after creating your account.
             </p>
@@ -253,7 +280,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* AUTH TABS */}
       <div style={{
         display: "flex", marginBottom: 14,
         borderRadius: 8, overflow: "hidden",
@@ -273,7 +299,6 @@ export default function LoginPage() {
         }}>Sign Up</button>
       </div>
 
-      {/* FORM */}
       <div style={{ width: "100%", maxWidth: 400 }}>
         <input
           type="email"
@@ -342,7 +367,6 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* DIVIDER */}
       <div style={{
         display: "flex", alignItems: "center", gap: 12,
         margin: "16px 0", width: "100%", maxWidth: 400,
@@ -352,7 +376,6 @@ export default function LoginPage() {
         <div style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
       </div>
 
-      {/* ROLE BUTTONS */}
       <div style={{
         width: "100%", maxWidth: 400,
         display: "flex", flexDirection: "column", gap: 10,
