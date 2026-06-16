@@ -38,21 +38,18 @@ export default function VendorInfo() {
   }, []);
 
   const PRICE_IDS = {
-    premium:  "price_1TORKAIofgLPwGzFG8dd6YQg",
-    featured: "price_1TORKAIofgLPwGzFRhbQup5T",
+    premium:  "price_1Tip3LIofgLPwGzFexWb2FId",
+    featured: "price_1Tip97IofgLPwGzFE3Dl0bjX",
   };
 
-  // Tier rank for upgrade comparison
   const TIER_RANK = { free: 0, premium: 1, featured: 2 };
 
   const handleChoosePlan = async (tier) => {
-    // Block organizers from becoming vendors
     if (userRole === "organizer") {
       alert("You are already registered as an Organizer and cannot become a Vendor.");
       return;
     }
 
-    // Block if already on this exact tier
     if (userRole === "vendor" && userTier === tier) {
       alert(`You are already on the ${tier} plan.`);
       router.push("/vendor-dashboard");
@@ -62,13 +59,11 @@ export default function VendorInfo() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
-    // Not logged in — send to signup first
     if (!user) {
       router.push(`/?mode=signup&plan=vendor&tier=${tier}`);
       return;
     }
 
-    // Free tier — no payment needed
     if (tier === "free") {
       await supabase.from("profiles").update({
         role: "vendor",
@@ -78,7 +73,6 @@ export default function VendorInfo() {
       return;
     }
 
-    // Paid tier — go to Stripe
     const priceId = PRICE_IDS[tier];
     if (!priceId) {
       alert("Payment not configured yet. Please contact support.");
@@ -118,7 +112,6 @@ export default function VendorInfo() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
 
-      {/* HEADER */}
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
         <h1 style={{ marginBottom: 8 }}>
@@ -131,7 +124,6 @@ export default function VendorInfo() {
         </p>
       </div>
 
-      {/* CURRENT PLAN BANNER — shown to existing vendors */}
       {userRole === "vendor" && userTier && (
         <div style={{
           backgroundColor: "#f3e8ff",
@@ -148,14 +140,12 @@ export default function VendorInfo() {
         </div>
       )}
 
-      {/* AD BANNER */}
       <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "14px 20px", marginBottom: 32, textAlign: "center" }}>
         <p style={{ margin: 0, color: "#701890", fontWeight: "bold" }}>
           🎉 Launch Special — First month free on any paid plan!
         </p>
       </div>
 
-      {/* PLAN CARDS */}
       {loading ? (
         <p style={{ textAlign: "center", color: "#888" }}>Loading plans...</p>
       ) : (
@@ -176,20 +166,17 @@ export default function VendorInfo() {
                 flexDirection: "column",
                 position: "relative",
               }}>
-                {/* CURRENT PLAN TAG */}
                 {isCurrentPlan && (
                   <div style={{ position: "absolute", top: -1, right: 16, backgroundColor: "#AABB23", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 10px", borderRadius: "0 0 8px 8px" }}>
                     CURRENT PLAN
                   </div>
                 )}
 
-                {/* TIER BADGE */}
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, backgroundColor: style.badgeBg, border: `1px solid ${style.border}`, borderRadius: 20, padding: "4px 12px", marginBottom: 16, alignSelf: "flex-start" }}>
                   <span>{style.icon}</span>
                   <span style={{ color: style.badge, fontWeight: "bold", fontSize: 13 }}>{plan.name}</span>
                 </div>
 
-                {/* PRICE */}
                 <div style={{ marginBottom: 16 }}>
                   {plan.price === 0 ? (
                     <span style={{ fontSize: 32, fontWeight: "bold", color: "#333" }}>Free</span>
@@ -202,7 +189,6 @@ export default function VendorInfo() {
                   <p style={{ color: "#888", fontSize: 13, margin: "6px 0 0" }}>{plan.description}</p>
                 </div>
 
-                {/* FEATURES */}
                 <ul style={{ padding: 0, margin: "0 0 24px", listStyle: "none", flex: 1 }}>
                   {(Array.isArray(plan.features) ? plan.features : []).map((feature, i) => (
                     <li key={i} style={{ padding: "6px 0", borderBottom: "1px solid #f0f0f0", fontSize: 13, color: "#444", display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -212,7 +198,6 @@ export default function VendorInfo() {
                   ))}
                 </ul>
 
-                {/* CTA BUTTON */}
                 <button
                   onClick={() => handleChoosePlan(plan.tier)}
                   disabled={isCurrentPlan}
@@ -242,7 +227,6 @@ export default function VendorInfo() {
         </div>
       )}
 
-      {/* BACK BUTTON */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 40 }}>
         <button onClick={() => router.back()} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
