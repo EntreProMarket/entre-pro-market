@@ -45,7 +45,6 @@ export default function VendorPublicProfile() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
-  // ── Support ?tab=shop query param (used by product page back button) ──
   useEffect(() => {
     if (tab === "shop") setActiveTab("shop");
   }, [tab]);
@@ -158,7 +157,14 @@ export default function VendorPublicProfile() {
           )}
           {!isOwner && (() => {
             const vr = viewerProfile?.role, vt = viewerProfile?.account_type;
-            const canMessage = (vr === "vendor" && (vt === "premium" || vt === "featured")) || vr === "organizer";
+            // ── SECURITY FIX ──
+            // Previously: vr === "organizer" alone granted messaging, with
+            // no check the viewer had a paid tier. Now requires a confirmed
+            // paid organizer tier (basic/pro/elite), matching the vendor-side
+            // tier gate (premium/featured).
+            const canMessage =
+              (vr === "vendor" && (vt === "premium" || vt === "featured")) ||
+              (vr === "organizer" && (vt === "basic" || vt === "pro" || vt === "elite"));
             return canMessage ? (
               <div style={{ marginTop: 20 }}>
                 <button onClick={() => router.push(`/messages?to=${vendor.id}&from=vendor/${vendor.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
