@@ -187,7 +187,14 @@ export default function OrganizerPublicProfile() {
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type;
         const vr = viewerProfile?.role;
-        const canMessage = vr === "featured" || vt === "featured" || vr === "organizer";
+        // ── SECURITY FIX ──
+        // Previously: vr === "organizer" alone granted messaging, with no
+        // check that the viewer actually has a paid organizer tier. Now we
+        // require a valid, confirmed-paid tier (basic/pro/elite) in addition
+        // to the organizer role, matching how vendors are gated by tier.
+        const canMessage =
+          vt === "featured" ||
+          (vr === "organizer" && (vt === "basic" || vt === "pro" || vt === "elite"));
         return canMessage ? (
           <div style={{ marginTop: 20 }}>
             <button onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
