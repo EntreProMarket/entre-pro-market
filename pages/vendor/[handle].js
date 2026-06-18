@@ -44,6 +44,7 @@ export default function VendorPublicProfile() {
   const [viewerProfile, setViewerProfile] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [notFoundIsOwner, setNotFoundIsOwner] = useState(false);
 
   useEffect(() => {
     if (tab === "shop") setActiveTab("shop");
@@ -54,8 +55,31 @@ export default function VendorPublicProfile() {
     const fetchVendor = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
+
+      // If the handle is clearly invalid (undefined/null from a missing profile),
+      // check if this is the logged-in user trying to view their own profile
+      if (!handle || handle === "undefined" || handle === "null") {
+        if (user) {
+          const { data: myProfile } = await supabase
+            .from("profiles").select("role, handle").eq("id", user.id).single();
+          if (myProfile?.role === "vendor") setNotFoundIsOwner(true);
+        }
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.from("profiles").select("*").eq("handle", handle).single();
-      if (error) { setLoading(false); return; }
+      if (error || !data) {
+        // Still check if the logged-in user is a vendor so we can show the right CTA
+        if (user) {
+          const { data: myProfile } = await supabase
+            .from("profiles").select("role, handle").eq("id", user.id).single();
+          if (myProfile?.role === "vendor") setNotFoundIsOwner(true);
+        }
+        setLoading(false);
+        return;
+      }
+
       setVendor(data);
       const ownerViewing = user && data.id === user.id;
       if (ownerViewing) setIsOwner(true);
@@ -74,7 +98,42 @@ export default function VendorPublicProfile() {
   }, [handle]);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
-  if (!vendor) return <div style={{ padding: 20 }}>Vendor not found</div>;
+
+  // ── NOT FOUND / NO PROFILE YET ──
+  if (!vendor) {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center",
+      }}>
+        <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🏗️</div>
+        <h2 style={{ color: "#333", marginBottom: 8 }}>
+          {notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Vendor Not Found"}
+        </h2>
+        <p style={{ color: "#888", fontSize: 14, maxWidth: 300, lineHeight: 1.6, marginBottom: 28 }}>
+          {notFoundIsOwner
+            ? "Complete your vendor profile so organizers and buyers can find you on the marketplace."
+            : "This vendor profile doesn't exist or may have been removed."}
+        </p>
+        {notFoundIsOwner ? (
+          <button
+            onClick={() => router.replace("/vendor-profile")}
+            style={{ padding: "13px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}
+          >
+            ✏️ Set Up My Profile
+          </button>
+        ) : null}
+        <button
+          onClick={() => router.replace(notFoundIsOwner ? "/vendor-dashboard" : "/marketplace")}
+          style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}
+        >
+          {notFoundIsOwner ? "← Back to Dashboard" : "← Back to Marketplace"}
+        </button>
+      </div>
+    );
+  }
 
   const iL = { display: "flex", opacity: 1, transition: "opacity 0.2s" };
 
@@ -157,11 +216,6 @@ export default function VendorPublicProfile() {
           )}
           {!isOwner && (() => {
             const vr = viewerProfile?.role, vt = viewerProfile?.account_type;
-            // ── SECURITY FIX ──
-            // Previously: vr === "organizer" alone granted messaging, with
-            // no check the viewer had a paid tier. Now requires a confirmed
-            // paid organizer tier (basic/pro/elite), matching the vendor-side
-            // tier gate (premium/featured).
             const canMessage =
               (vr === "vendor" && (vt === "premium" || vt === "featured")) ||
               (vr === "organizer" && (vt === "basic" || vt === "pro" || vt === "elite"));
