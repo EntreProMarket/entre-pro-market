@@ -42,12 +42,23 @@ export default function DashboardLayout({ children }) {
   const goToProfile = async () => {
     setMenuOpen(false);
     if (!user) return;
+
     const { data: profile } = await supabase
       .from("profiles")
-      .select("handle, role")
+      .select("handle, role, account_type")
       .eq("id", user.id)
       .single();
+
     if (!profile?.role) { router.push("/upgrade-required"); return; }
+
+    // No handle means profile hasn't been set up yet — show the interstitial
+    // screen so the user can complete payment or set up a free profile,
+    // rather than landing on /vendor/undefined or /organizer/undefined.
+    if (!profile.handle) {
+      router.push("/complete-profile");
+      return;
+    }
+
     if (profile.role === "vendor") router.push(`/vendor/${profile.handle}`);
     else if (profile.role === "organizer") router.push(`/organizer/${profile.handle}`);
   };
@@ -132,7 +143,6 @@ export default function DashboardLayout({ children }) {
         {navItem("🏠 Dashboard", goToDashboard)}
         {navItem("👤 Profile", goToProfile)}
         {navItem("🛒 Marketplace", () => navigate("/marketplace"))}
-        {/* Saved Contacts and Messages: locked for no-role users */}
         {navItem("✉️ Messages", () => navigate(role ? "/messages" : "/messaging-locked"))}
         {navItem("💾 Saved Contacts", () => navigate(role ? "/saved-contacts" : "/saved-contacts-locked"))}
         {navItem("⚙️ Settings", () => navigate("/settings"))}
