@@ -52,7 +52,7 @@ function getMessagingRules(role, tier) {
       canSaveContacts: true,
       label: "Elite Organizer",
     };
-    // legacy premium organizer
+    // legacy premium organizer (old tier name from before the basic/pro/elite rename)
     if (tier === "premium") return {
       canMessage: true,
       canMessageVendors: true,
@@ -61,16 +61,14 @@ function getMessagingRules(role, tier) {
       canSaveContacts: false,
       label: "Pro Organizer",
     };
-    // FIX: "public" or any unrecognized organizer tier
-    // treated as basic so paid organizers are never locked out
-    return {
-      canMessage: true,
-      canMessageVendors: true,
-      vendorLimit: 5,
-      canMessageOrganizers: true,
-      canSaveContacts: false,
-      label: "Basic Organizer",
-    };
+    // ── SECURITY FIX ──
+    // Previously: any unrecognized organizer tier (including null/undefined,
+    // which is exactly what an organizer has before completing Stripe
+    // payment) silently fell through to full "Basic Organizer" access.
+    // That meant anyone who backed out of checkout could still message for
+    // free. A missing/unrecognized tier now means NOT a confirmed paid
+    // organizer, so messaging is locked just like an unpaid vendor.
+    return { canMessage: false, label: "Organizer (Unpaid)" };
   }
 
   return { canMessage: false, label: "Free" };
@@ -236,7 +234,7 @@ export default function Messages() {
 
   if (loading) return <DashboardLayout><div style={{ padding: 20 }}>Loading...</div></DashboardLayout>;
 
-  // ── LOCKED SCREEN — only for free vendors and users with no role ──
+  // ── LOCKED SCREEN — free vendors, unpaid organizers, and users with no role ──
   if (!rules?.canMessage) {
     return (
       <DashboardLayout>
