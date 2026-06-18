@@ -39,6 +39,19 @@ export default function LoginPage() {
     if (router.query.mode === "signup") setMode("signup");
   }, [router.query]);
 
+  // ── Restore email/password if the person typed them in before choosing
+  // a plan, so they don't have to re-type on the dedicated signup screen.
+  // Cleared immediately after reading — never persists beyond this handoff.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedEmail = sessionStorage.getItem("epm_temp_email");
+    const savedPassword = sessionStorage.getItem("epm_temp_password");
+    if (savedEmail) setEmail(savedEmail);
+    if (savedPassword) setPassword(savedPassword);
+    sessionStorage.removeItem("epm_temp_email");
+    sessionStorage.removeItem("epm_temp_password");
+  }, []);
+
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getUser();
@@ -164,7 +177,6 @@ export default function LoginPage() {
     // ✅ ORGANIZER SIGNUP — every organizer tier is paid.
     // SECURITY: do NOT grant the "organizer" role here. Role + tier are only
     // set after Stripe confirms payment (via webhook or verify-payment).
-    // This prevents anyone from backing out of checkout and keeping free access.
     if (plan === "organizer") {
       const chosenTier = tier || "basic";
 
@@ -214,6 +226,13 @@ export default function LoginPage() {
   };
 
   const checkRoleAndRedirect = async (target) => {
+    // Preserve whatever email/password the person already typed on this
+    // screen so it can be restored on the dedicated plan signup screen.
+    if (typeof window !== "undefined") {
+      if (email) sessionStorage.setItem("epm_temp_email", email);
+      if (password) sessionStorage.setItem("epm_temp_password", password);
+    }
+
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
 
