@@ -52,6 +52,8 @@ export default function OrganizerPublicProfile() {
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [viewerProfile, setViewerProfile] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notFoundIsOwner, setNotFoundIsOwner] = useState(false);
+  const [notFoundIsPaid, setNotFoundIsPaid] = useState(false);
 
   useEffect(() => {
     if (!handle) return;
@@ -59,12 +61,41 @@ export default function OrganizerPublicProfile() {
       const { data: userData } = await supabase.auth.getUser();
       const currentUser = userData?.user || null;
       setUser(currentUser);
+
+      // Handle is clearly invalid (undefined/null from a missing profile)
+      if (!handle || handle === "undefined" || handle === "null") {
+        if (currentUser) {
+          const { data: myProfile } = await supabase
+            .from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
+          if (myProfile?.role === "organizer") {
+            setNotFoundIsOwner(true);
+            setNotFoundIsPaid(["basic", "pro", "elite"].includes(myProfile?.account_type));
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.from("profiles").select("*").eq("handle", handle).single();
+
       if (currentUser) {
         const { data: vp } = await supabase.from("profiles").select("role, account_type, id").eq("id", currentUser.id).single();
         setViewerProfile(vp);
       }
-      if (error) { setLoading(false); return; }
+
+      if (error || !data) {
+        if (currentUser) {
+          const { data: myProfile } = await supabase
+            .from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
+          if (myProfile?.role === "organizer") {
+            setNotFoundIsOwner(true);
+            setNotFoundIsPaid(["basic", "pro", "elite"].includes(myProfile?.account_type));
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
       setOrganizer(data);
       if (data.account_type === "elite") {
         const { data: evData } = await supabase.from("organizer_events").select("*").eq("organizer_id", data.id).order("event_date", { ascending: true });
@@ -80,7 +111,59 @@ export default function OrganizerPublicProfile() {
   }, [handle]);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
-  if (!organizer) return <div style={{ padding: 20 }}>Organizer not found</div>;
+
+  // ── NOT FOUND / NO PROFILE YET ──
+  if (!organizer) {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center",
+      }}>
+        <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
+        <div style={{ fontSize: 64, marginBottom: 16 }}>
+          {notFoundIsOwner && !notFoundIsPaid ? "⚠️" : "🏗️"}
+        </div>
+        <h2 style={{ color: "#333", marginBottom: 8 }}>
+          {notFoundIsOwner
+            ? notFoundIsPaid
+              ? "Your Profile Isn't Set Up Yet"
+              : "Your Profile Isn't Set Up Yet"
+            : "Organizer Not Found"}
+        </h2>
+        <p style={{ color: "#888", fontSize: 14, maxWidth: 320, lineHeight: 1.6, marginBottom: 28 }}>
+          {notFoundIsOwner
+            ? notFoundIsPaid
+              ? "Complete your organizer profile so vendors can find and connect with you."
+              : "It looks like your plan payment wasn't completed. Organizer accounts require an active plan to contact vendors and post events."
+            : "This organizer profile doesn't exist or may have been removed."}
+        </p>
+        {notFoundIsOwner ? (
+          notFoundIsPaid ? (
+            <button
+              onClick={() => router.replace("/organizer-profile")}
+              style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}
+            >
+              ✏️ Set Up My Profile
+            </button>
+          ) : (
+            <button
+              onClick={() => router.replace("/organizer-info")}
+              style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}
+            >
+              🎪 Complete My Organizer Signup
+            </button>
+          )
+        ) : null}
+        <button
+          onClick={() => router.replace(notFoundIsOwner ? (notFoundIsPaid ? "/organizer-dashboard" : "/home") : "/marketplace")}
+          style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}
+        >
+          {notFoundIsOwner ? "← Back to Dashboard" : "← Back to Marketplace"}
+        </button>
+      </div>
+    );
+  }
 
   const isOwner = user && user.id === organizer.id;
   const iL = { display: "flex", opacity: 1, transition: "opacity 0.2s" };
@@ -187,11 +270,6 @@ export default function OrganizerPublicProfile() {
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type;
         const vr = viewerProfile?.role;
-        // ── SECURITY FIX ──
-        // Previously: vr === "organizer" alone granted messaging, with no
-        // check that the viewer actually has a paid organizer tier. Now we
-        // require a valid, confirmed-paid tier (basic/pro/elite) in addition
-        // to the organizer role, matching how vendors are gated by tier.
         const canMessage =
           vt === "featured" ||
           (vr === "organizer" && (vt === "basic" || vt === "pro" || vt === "elite"));
