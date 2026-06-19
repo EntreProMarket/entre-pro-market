@@ -25,8 +25,12 @@ async function getRawBody(req) {
   });
 }
 
-function getDefaultTier(role) {
-  return role === "organizer" ? "basic" : "free";
+// ── SECURITY FIX: organizers have no free tier.
+// When their subscription lapses, account_type goes to null (locked out)
+// rather than "basic" (which is a paid tier).
+// Vendors correctly fall back to "free" since free vendor is a real tier.
+function getDowngradedAccountType(role) {
+  return role === "organizer" ? null : "free";
 }
 
 async function getProfileByCustomerId(customerId) {
@@ -68,17 +72,17 @@ export default async function handler(req, res) {
     // ── PRODUCT PURCHASE (has productId in metadata) ──
     if (metadata.productId) {
       console.log(`✅ Product purchase: ${metadata.productId} by buyer ${metadata.buyerId}`);
-      // Product orders are handled by verify-product-payment.js on the success page
-      // Optionally record the order here as a backup
       try {
-        await supabaseAdmin.from("orders").insert({
-          product_id: metadata.productId,
-          buyer_id: metadata.buyerId,
-          vendor_id: metadata.vendorId,
-          amount: session.amount_total,
-          stripe_session_id: session.id,
-          status: "paid",
-        });
+        if (metadata.productId && metadata.buyerId && metadata.vendorId) {
+          await supabaseAdmin.from("orders").insert({
+            product_id: metadata.productId,
+            buyer_id: metadata.buyerId,
+            vendor_id: metadata.vendorId,
+            amount: session.amount_total,
+            stripe_session_id: session.id,
+            status: "paid",
+          });
+        }
       } catch (_) {
         // orders table may not exist yet — safe to ignore
       }
@@ -98,70 +102,131 @@ export default async function handler(req, res) {
         await saveCustomerId(userId, session.customer);
       }
 
-      const { error } = await supabaseAdmin.from("profiles").update({
-        role,
-        account_type: tier,
-        subscription_expires_at: expiresAt,
-        contacts_used_this_month: 0,
-        contacts_reset_date: new Date().toISOString().split("T")[0],
-      }).eq("id", userId);
+      try {
+        const updateData = {
+          role,
+          account_type: tier,
+          subscription_expires_at: expiresAt,
+        };
 
-      if (error) {
-        console.error("Supabase update error:", error);
-        return res.status(500).json({ error: "Failed to update profile" });
+        // Only reset contacts if those columns exist in your profiles table.
+        // If they don't, remove these two lines to avoid update errors.
+        updateData.contacts_used_this_month = 0;
+        updateData.contacts_reset_date = new Date().toISOString().split("T")[0];
+
+        const { error } = await supabaseAdmin
+          .from("profiles")
+          .update(updateData)
+          .eq("id", userId);
+
+        if (error) {
+          console.error("Supabase update error on tier upgrade:", error);
+          return res.status(500).json({ error: "Failed to update profile" });
+        }
+
+        console.log(`✅ Upgraded ${userId} to ${role} ${tier}`);
+      } catch (err) {
+        console.error("Unexpected error on tier upgrade:", err);
+        return res.status(500).json({ error: "Unexpected error" });
       }
-      console.log(`✅ Upgraded ${userId} to ${role} ${tier}`);
+
       return res.status(200).json({ received: true });
     }
 
-    // ── UNKNOWN SESSION TYPE — return 200 so Stripe doesn't keep retrying ──
+    // ── UNKNOWN SESSION TYPE ──
     console.log("checkout.session.completed with unrecognized metadata — ignoring");
     return res.status(200).json({ received: true });
   }
 
   // ── SUBSCRIPTION CANCELLED ──
   if (event.type === "customer.subscription.deleted") {
-    const profile = await getProfileByCustomerId(event.data.object.customer);
-    if (profile) {
-      const defaultTier = getDefaultTier(profile.role);
-      await supabaseAdmin.from("profiles").update({
-        account_type: defaultTier,
-        subscription_expires_at: null,
-      }).eq("id", profile.id);
-      console.log(`⬇️ Subscription cancelled — downgraded ${profile.id} to ${defaultTier}`);
+    try {
+      const profile = await getProfileByCustomerId(event.data.object.customer);
+      if (profile) {
+        const downgradedType = getDowngradedAccountType(profile.role);
+        const { error } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            account_type: downgradedType,
+            subscription_expires_at: null,
+          })
+          .eq("id", profile.id);
+
+        if (error) {
+          console.error("Supabase error on subscription cancellation:", error);
+        } else {
+          console.log(`⬇️ Subscription cancelled — downgraded ${profile.id} (${profile.role}) to account_type: ${downgradedType}`);
+        }
+      } else {
+        console.warn("customer.subscription.deleted: no profile found for customer", event.data.object.customer);
+      }
+    } catch (err) {
+      console.error("Unexpected error on subscription cancellation:", err);
     }
   }
 
   // ── PAYMENT FAILED ──
   if (event.type === "invoice.payment_failed") {
-    const invoice = event.data.object;
-    const profile = await getProfileByCustomerId(invoice.customer);
-    if (profile) {
-      const attemptCount = invoice.attempt_count || 1;
-      if (attemptCount >= 3) {
-        const defaultTier = getDefaultTier(profile.role);
-        await supabaseAdmin.from("profiles").update({
-          account_type: defaultTier,
-          subscription_expires_at: null,
-        }).eq("id", profile.id);
-        console.log(`⬇️ Payment failed ${attemptCount}x — downgraded ${profile.id} to ${defaultTier}`);
+    try {
+      const invoice = event.data.object;
+      const profile = await getProfileByCustomerId(invoice.customer);
+      if (profile) {
+        const attemptCount = invoice.attempt_count || 1;
+        if (attemptCount >= 3) {
+          const downgradedType = getDowngradedAccountType(profile.role);
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .update({
+              account_type: downgradedType,
+              subscription_expires_at: null,
+            })
+            .eq("id", profile.id);
+
+          if (error) {
+            console.error("Supabase error on payment failure downgrade:", error);
+          } else {
+            console.log(`⬇️ Payment failed ${attemptCount}x — downgraded ${profile.id} (${profile.role}) to account_type: ${downgradedType}`);
+          }
+        }
+      } else {
+        console.warn("invoice.payment_failed: no profile found for customer", invoice.customer);
       }
+    } catch (err) {
+      console.error("Unexpected error on payment failure:", err);
     }
   }
 
   // ── SUBSCRIPTION RENEWED ──
   if (event.type === "invoice.payment_succeeded") {
-    const invoice = event.data.object;
-    if (invoice.billing_reason === "subscription_cycle") {
-      const profile = await getProfileByCustomerId(invoice.customer);
-      if (profile) {
-        await supabaseAdmin.from("profiles").update({
-          subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          contacts_used_this_month: 0,
-          contacts_reset_date: new Date().toISOString().split("T")[0],
-        }).eq("id", profile.id);
-        console.log(`🔄 Subscription renewed for ${profile.id}`);
+    try {
+      const invoice = event.data.object;
+      if (invoice.billing_reason === "subscription_cycle") {
+        const profile = await getProfileByCustomerId(invoice.customer);
+        if (profile) {
+          const updateData = {
+            subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          };
+
+          // Only reset contacts if those columns exist in your profiles table.
+          updateData.contacts_used_this_month = 0;
+          updateData.contacts_reset_date = new Date().toISOString().split("T")[0];
+
+          const { error } = await supabaseAdmin
+            .from("profiles")
+            .update(updateData)
+            .eq("id", profile.id);
+
+          if (error) {
+            console.error("Supabase error on subscription renewal:", error);
+          } else {
+            console.log(`🔄 Subscription renewed for ${profile.id}`);
+          }
+        } else {
+          console.warn("invoice.payment_succeeded: no profile found for customer", invoice.customer);
+        }
       }
+    } catch (err) {
+      console.error("Unexpected error on subscription renewal:", err);
     }
   }
 
