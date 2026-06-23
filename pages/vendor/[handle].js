@@ -56,12 +56,9 @@ export default function VendorPublicProfile() {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
 
-      // If the handle is clearly invalid (undefined/null from a missing profile),
-      // check if this is the logged-in user trying to view their own profile
       if (!handle || handle === "undefined" || handle === "null") {
         if (user) {
-          const { data: myProfile } = await supabase
-            .from("profiles").select("role, handle").eq("id", user.id).single();
+          const { data: myProfile } = await supabase.from("profiles").select("role, handle").eq("id", user.id).single();
           if (myProfile?.role === "vendor") setNotFoundIsOwner(true);
         }
         setLoading(false);
@@ -69,11 +66,10 @@ export default function VendorPublicProfile() {
       }
 
       const { data, error } = await supabase.from("profiles").select("*").eq("handle", handle).single();
+
       if (error || !data) {
-        // Still check if the logged-in user is a vendor so we can show the right CTA
         if (user) {
-          const { data: myProfile } = await supabase
-            .from("profiles").select("role, handle").eq("id", user.id).single();
+          const { data: myProfile } = await supabase.from("profiles").select("role, handle").eq("id", user.id).single();
           if (myProfile?.role === "vendor") setNotFoundIsOwner(true);
         }
         setLoading(false);
@@ -99,36 +95,22 @@ export default function VendorPublicProfile() {
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
-  // ── NOT FOUND / NO PROFILE YET ──
+  // ── NOT FOUND ──
   if (!vendor) {
     return (
-      <div style={{
-        minHeight: "100vh", display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center",
-      }}>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center" }}>
         <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
         <div style={{ fontSize: 64, marginBottom: 16 }}>🏗️</div>
-        <h2 style={{ color: "#333", marginBottom: 8 }}>
-          {notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Vendor Not Found"}
-        </h2>
+        <h2 style={{ color: "#333", marginBottom: 8 }}>{notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Vendor Not Found"}</h2>
         <p style={{ color: "#888", fontSize: 14, maxWidth: 300, lineHeight: 1.6, marginBottom: 28 }}>
-          {notFoundIsOwner
-            ? "Complete your vendor profile so organizers and buyers can find you on the marketplace."
-            : "This vendor profile doesn't exist or may have been removed."}
+          {notFoundIsOwner ? "Complete your vendor profile so organizers and buyers can find you on the marketplace." : "This vendor profile doesn't exist or may have been removed."}
         </p>
-        {notFoundIsOwner ? (
-          <button
-            onClick={() => router.replace("/vendor-profile")}
-            style={{ padding: "13px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}
-          >
+        {notFoundIsOwner && (
+          <button onClick={() => router.replace("/vendor-profile")} style={{ padding: "13px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}>
             ✏️ Set Up My Profile
           </button>
-        ) : null}
-        <button
-          onClick={() => router.replace(notFoundIsOwner ? "/vendor-dashboard" : "/marketplace")}
-          style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}
-        >
+        )}
+        <button onClick={() => router.replace(notFoundIsOwner ? "/vendor-dashboard" : "/marketplace")} style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}>
           {notFoundIsOwner ? "← Back to Dashboard" : "← Back to Marketplace"}
         </button>
       </div>
@@ -173,7 +155,12 @@ export default function VendorPublicProfile() {
       {/* PROFILE TAB */}
       {activeTab === "profile" && (
         <>
-          {vendor.logo_url && <img src={vendor.logo_url} alt="logo" onClick={() => setSelectedImage(vendor.logo_url)} style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12, marginBottom: 20, cursor: "pointer" }} />}
+          {/* ── LOGO: use "contain" so full logo shows without cropping ── */}
+          {vendor.logo_url && (
+            <div onClick={() => setSelectedImage(vendor.logo_url)} style={{ width: 160, height: 160, borderRadius: 12, marginBottom: 20, cursor: "pointer", backgroundColor: "#f9f9f9", border: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <img src={vendor.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 12 }} />
+            </div>
+          )}
           <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
           <p><strong>Location:</strong> {vendor.city}, {vendor.state}</p>
           <p style={{ marginTop: 20 }}>{vendor.description}</p>
@@ -195,7 +182,12 @@ export default function VendorPublicProfile() {
             <h3>Portfolio</h3>
             {vendor.portfolio_images && vendor.portfolio_images.length > 0 ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-                {vendor.portfolio_images.map((img, i) => <img key={i} src={img} alt="portfolio" onClick={() => setSelectedImage(img)} style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 8, cursor: "pointer" }} />)}
+                {vendor.portfolio_images.map((img, i) => (
+                  <div key={i} onClick={() => setSelectedImage(img)} style={{ cursor: "pointer", borderRadius: 8, overflow: "hidden", backgroundColor: "#f9f9f9", border: "1px solid #eee" }}>
+                    {/* Portfolio images use "cover" to fill the grid nicely — clicking enlarges them */}
+                    <img src={img} alt="portfolio" style={{ width: "100%", height: 150, objectFit: "cover", display: "block" }} />
+                  </div>
+                ))}
               </div>
             ) : <p>No portfolio images yet.</p>}
           </div>
@@ -270,9 +262,10 @@ export default function VendorPublicProfile() {
         <button onClick={() => router.push("/marketplace")} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
 
+      {/* FULLSCREEN IMAGE */}
       {selectedImage && (
-        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
-          <img src={selectedImage} alt="enlarged" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 10 }} />
+        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.9)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
+          <img src={selectedImage} alt="enlarged" style={{ maxWidth: "95%", maxHeight: "90vh", borderRadius: 10, objectFit: "contain" }} />
         </div>
       )}
     </div>
