@@ -24,27 +24,41 @@ export default async function handler(req, res) {
 
     const { productId, buyerId, vendorId } = session.metadata;
 
+    // ── Get product details ──
     const { data: product } = await supabaseAdmin
       .from("vendor_products")
       .select("title, price, image_url")
       .eq("id", productId)
       .single();
 
-    const { data: buyer } = await supabaseAdmin
+    // ── Get profile display names ──
+    const { data: buyerProfile } = await supabaseAdmin
       .from("profiles")
-      .select("email, business_name")
+      .select("business_name, handle")
       .eq("id", buyerId)
       .single();
 
-    const { data: vendor } = await supabaseAdmin
+    const { data: vendorProfile } = await supabaseAdmin
       .from("profiles")
-      .select("email, business_name, handle")
+      .select("business_name, handle")
       .eq("id", vendorId)
       .single();
 
-    const buyerEmail = buyer?.email || session.customer_details?.email;
-    const buyerName = buyer?.business_name || session.customer_details?.name;
+    // ── Get emails from Supabase Auth (profiles.email column does not exist) ──
+    let buyerEmail = session.customer_details?.email || null;
+    let vendorEmail = null;
 
+    try {
+      const { data: buyerAuth } = await supabaseAdmin.auth.admin.getUserById(buyerId);
+      if (buyerAuth?.user?.email) buyerEmail = buyerAuth.user.email;
+    } catch (_) {}
+
+    try {
+      const { data: vendorAuth } = await supabaseAdmin.auth.admin.getUserById(vendorId);
+      if (vendorAuth?.user?.email) vendorEmail = vendorAuth.user.email;
+    } catch (_) {}
+
+    // ── Record the order ──
     try {
       await supabaseAdmin.from("orders").insert({
         product_id: productId,
@@ -55,7 +69,7 @@ export default async function handler(req, res) {
         status: "paid",
       });
     } catch (_) {
-      // orders table may not exist yet
+      // orders table may not exist yet — safe to ignore
     }
 
     return res.status(200).json({
@@ -63,10 +77,10 @@ export default async function handler(req, res) {
       product: product || null,
       amount: session.amount_total,
       buyerEmail,
-      buyerName,
-      vendorEmail: vendor?.email || null,
-      vendorName: vendor?.business_name || null,
-      vendorHandle: vendor?.handle || null,
+      buyerName: buyerProfile?.business_name || session.customer_details?.name || null,
+      vendorEmail,
+      vendorName: vendorProfile?.business_name || null,
+      vendorHandle: vendorProfile?.handle || null,
     });
   } catch (err) {
     console.error("verify-product-payment error:", err);
