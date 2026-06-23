@@ -37,12 +37,16 @@ export default async function handler(req, res) {
                     <h2 style="color:#333;margin:0 0 16px;font-size:22px;">Welcome${name ? `, ${name}` : ""}! 👋</h2>
                     <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 20px;">You've successfully joined Entre PRO Market as a <strong>${roleLabel}</strong>. We're excited to have you in our community!</p>
                     <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 28px;">Start by setting up your profile so others can discover you on the marketplace.</p>
-                    <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+                    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
                       <tr><td style="background:#AABB23;border-radius:8px;padding:14px 32px;text-align:center;">
                         <a href="https://app.entrepromarket.com${dashboardPath}" style="color:white;text-decoration:none;font-weight:bold;font-size:15px;">Go to My Dashboard →</a>
                       </td></tr>
                     </table>
-                    <hr style="border:none;border-top:1px solid #eee;margin:28px 0;">
+                    <!-- SPAM WARNING -->
+                    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#92400e;">
+                      ⚠️ <strong>Check your spam folder</strong> if you don't receive future emails from us. Add <strong>hello@entrepromarket.com</strong> to your contacts to make sure our emails reach you.
+                    </div>
+                    <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
                     <p style="color:#888;font-size:13px;line-height:1.6;margin:0;">Need help? Reply to this email or visit <a href="https://app.entrepromarket.com" style="color:#701890;">app.entrepromarket.com</a></p>
                   </td></tr>
                   <tr><td style="background:#f9f9f9;padding:20px 32px;text-align:center;border-top:1px solid #eee;">
