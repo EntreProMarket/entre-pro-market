@@ -1,4 +1,6 @@
 // pages/vendor-info.js
+// 🧪 TEST VERSION — Premium is $0.01 for testing
+// When done testing, replace with the LIVE version
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
@@ -35,26 +37,10 @@ export default function VendorInfo() {
     load();
   }, []);
 
-  // ── PRICE IDs ──────────────────────────────────────────────────────────────
-  // LIVE (real money — use in production):
-  //   premium:  price_1Tip3LIofgLPwGzFexWb2FId  ($75/mo)
-  //   featured: price_1Tip97IofgLPwGzFE3Dl0bjX  ($125/mo)
-  //
-  // TEST (swap in to test upgrade flow for $0.01, then swap back):
-  //   premium:  price_1Tli3WIofgLPwGzF2bgLcjgT  ($0.01/mo)
-  // ──────────────────────────────────────────────────────────────────────────
-
-  // ✅ LIVE — comment these out when testing
   const PRICE_IDS = {
-    premium:  "price_1Tip3LIofgLPwGzFexWb2FId",
+    premium:  "price_1Tli3WIofgLPwGzF2bgLcjgT",
     featured: "price_1Tip97IofgLPwGzFE3Dl0bjX",
   };
-
-  // 🧪 TEST — uncomment below and comment out LIVE block above to test
-  // const PRICE_IDS = {
-  //   premium:  "price_1Tli3WIofgLPwGzF2bgLcjgT",
-  //   featured: "price_1Tip97IofgLPwGzFE3Dl0bjX",
-  // };
 
   const TIER_RANK = { free: 0, premium: 1, featured: 2 };
 
@@ -109,7 +95,6 @@ export default function VendorInfo() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
-
       <div style={{ textAlign: "center", marginBottom: 32 }}>
         <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 100, marginBottom: 16 }} />
         <h1 style={{ marginBottom: 8 }}>
@@ -196,7 +181,6 @@ export default function VendorInfo() {
           ← Back
         </button>
       </div>
-
     </div>
   );
 }
