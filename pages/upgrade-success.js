@@ -33,32 +33,44 @@ export default function UpgradeSuccess() {
         setRole(resolvedRole);
         setStatus("success");
 
-        // ── Send upgrade confirmation email ──
-        // Fetch email from Supabase Auth (profiles.email column does not exist)
+        // ── Get user email from Supabase Auth ──
         try {
           const { data: userData } = await supabase.auth.getUser();
           if (userData?.user) {
-            const userId = userData.user.id;
             const userEmail = userData.user.email;
-
             const { data: profile } = await supabase
               .from("profiles")
               .select("business_name")
-              .eq("id", userId)
+              .eq("id", userData.user.id)
               .single();
+            const userName = profile?.business_name || null;
 
+            // Send upgrade confirmation to user
             if (userEmail) {
               fetch("/api/send-upgrade-confirmation", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   email: userEmail,
-                  name: profile?.business_name || null,
+                  name: userName,
                   role: resolvedRole,
                   tier: resolvedTier,
                 }),
               }).catch(() => {});
             }
+
+            // Send owner notification
+            fetch("/api/send-owner-notification", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "upgrade",
+                userEmail,
+                userName,
+                role: resolvedRole,
+                tier: resolvedTier,
+              }),
+            }).catch(() => {});
           }
         } catch (_) {}
 
@@ -100,13 +112,10 @@ export default function UpgradeSuccess() {
         <p style={{ fontSize: 60, margin: "0 0 12px" }}>🚀</p>
         <h1 style={{ margin: "0 0 8px", color: "#701890", fontSize: 22 }}>You're on {tierLabel}!</h1>
         <p style={{ margin: "0 0 20px", color: "#666", fontSize: 15 }}>Your plan has been upgraded successfully. A confirmation email has been sent to you.</p>
-        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#166534", fontWeight: "bold" }}>✅ Plan activated</div>
-
-        {/* SPAM WARNING */}
+        <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#166534", fontWeight: "bold" }}>✅ Plan activated</div>
         <div style={{ backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "10px 14px", marginBottom: 24, fontSize: 12, color: "#92400e" }}>
           ⚠️ Confirmation emails sometimes land in your <strong>spam or junk folder</strong>. Please check there if you don't see it.
         </div>
-
         <button onClick={() => router.replace(dashboardPath)} style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer" }}>Go to My Dashboard →</button>
       </div>
     </div>
