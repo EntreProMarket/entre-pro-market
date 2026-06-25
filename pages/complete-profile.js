@@ -1,6 +1,5 @@
 // pages/complete-profile.js
 // Shown when a user clicks "Profile" before completing their profile setup.
-// Detects role + account_type and shows the appropriate prompt.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
@@ -23,7 +22,7 @@ export default function CompleteProfile() {
         .eq("id", user.id)
         .single();
 
-      // If they already have a handle, send them straight to their profile
+      // If they already have a handle, send straight to their profile
       if (data?.handle) {
         if (data.role === "vendor") router.replace(`/vendor/${data.handle}`);
         else if (data.role === "organizer") router.replace(`/organizer/${data.handle}`);
@@ -31,7 +30,15 @@ export default function CompleteProfile() {
         return;
       }
 
-      // If organizer with a valid paid tier but no handle, just go to profile setup
+      // ── VENDOR: if they already have a paid tier, skip the warning and
+      // send them straight to profile setup — they paid, just need to fill it in
+      const paidVendorTiers = ["premium", "featured"];
+      if (data?.role === "vendor" && paidVendorTiers.includes(data?.account_type)) {
+        router.replace("/vendor-profile");
+        return;
+      }
+
+      // ── ORGANIZER: if they have a valid paid tier, send to profile setup
       const paidOrgTiers = ["basic", "pro", "elite"];
       if (data?.role === "organizer" && paidOrgTiers.includes(data?.account_type)) {
         router.replace("/organizer-profile");
@@ -62,17 +69,14 @@ export default function CompleteProfile() {
     }}>
       <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
 
-      {/* VENDOR — backed out of paid plan or on free */}
+      {/* VENDOR — on free tier, prompt to upgrade or continue free */}
       {isVendor && (
         <>
           <div style={{ fontSize: 52, marginBottom: 12 }}>⚠️</div>
-          <h2 style={{ color: "#333", margin: "0 0 10px", fontSize: 22 }}>
-            Your profile isn't set up yet
-          </h2>
+          <h2 style={{ color: "#333", margin: "0 0 10px", fontSize: 22 }}>Your profile isn't set up yet</h2>
           <p style={{ color: "#666", fontSize: 14, maxWidth: 320, lineHeight: 1.6, marginBottom: 28 }}>
             It looks like you may have left before completing your signup. You can finish your Premium or Featured plan to unlock full benefits, or set up a free vendor profile now and upgrade anytime.
           </p>
-
           <div style={{ width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 12 }}>
             <button
               onClick={() => router.push("/vendor-info")}
@@ -80,20 +84,17 @@ export default function CompleteProfile() {
             >
               🚀 Complete Premium / Featured Signup
             </button>
-
             <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0" }}>
               <div style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
               <span style={{ color: "#aaa", fontSize: 12 }}>or</span>
               <div style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
             </div>
-
             <button
               onClick={() => router.push("/vendor-profile")}
               style={{ padding: "14px 20px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer" }}
             >
               🆓 Continue as Free Vendor
             </button>
-
             <p style={{ color: "#aaa", fontSize: 11, margin: "4px 0 0", lineHeight: 1.5 }}>
               Free Vendors get a basic marketplace listing. Upgrade to Premium or Featured anytime from your dashboard.
             </p>
@@ -105,13 +106,10 @@ export default function CompleteProfile() {
       {isOrganizer && (
         <>
           <div style={{ fontSize: 52, marginBottom: 12 }}>⚠️</div>
-          <h2 style={{ color: "#333", margin: "0 0 10px", fontSize: 22 }}>
-            Your profile isn't set up yet
-          </h2>
+          <h2 style={{ color: "#333", margin: "0 0 10px", fontSize: 22 }}>Your profile isn't set up yet</h2>
           <p style={{ color: "#666", fontSize: 14, maxWidth: 320, lineHeight: 1.6, marginBottom: 28 }}>
             It looks like your plan payment wasn't completed. Organizer accounts require an active plan to contact vendors and post events. Complete your signup to get started.
           </p>
-
           <div style={{ width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 12 }}>
             <button
               onClick={() => router.push("/organizer-info")}
@@ -123,7 +121,7 @@ export default function CompleteProfile() {
         </>
       )}
 
-      {/* NO ROLE — shouldn't normally land here */}
+      {/* NO ROLE */}
       {!isVendor && !isOrganizer && (
         <>
           <div style={{ fontSize: 52, marginBottom: 12 }}>🔒</div>
