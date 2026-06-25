@@ -25,10 +25,12 @@ export default function ProductSuccess() {
         body: JSON.stringify({ sessionId }),
       });
       const data = await res.json();
+
       if (data.success) {
         setProduct(data.product);
         setStatus("success");
 
+        // Send order confirmation to buyer
         if (data.buyerEmail) {
           fetch("/api/send-order-confirmation", {
             method: "POST",
@@ -42,8 +44,10 @@ export default function ProductSuccess() {
               vendorName: data.vendorName,
               vendorHandle: data.vendorHandle,
             }),
-          });
+          }).catch(() => {});
         }
+
+        // Send payment received to vendor
         if (data.vendorEmail) {
           fetch("/api/send-payment-received", {
             method: "POST",
@@ -56,8 +60,21 @@ export default function ProductSuccess() {
               buyerName: data.buyerName,
               buyerEmail: data.buyerEmail,
             }),
-          });
+          }).catch(() => {});
         }
+
+        // Send owner notification
+        fetch("/api/send-owner-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "purchase",
+            userEmail: data.buyerEmail,
+            userName: data.buyerName,
+            productTitle: data.product?.title,
+            amount: data.amount,
+          }),
+        }).catch(() => {});
 
         let count = 8;
         const timer = setInterval(() => {
@@ -104,19 +121,16 @@ export default function ProductSuccess() {
         <h1 style={{ margin: "0 0 8px", color: "#AABB23", fontSize: 22 }}>Order Confirmed!</h1>
         {product && (
           <div style={{ margin: "16px 0", padding: "12px 16px", backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8 }}>
-            {product.image_url && <img src={product.image_url} alt={product.title} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, marginBottom: 8, display: "block", margin: "0 auto 8px" }} />}
+            {product.image_url && <img src={product.image_url} alt={product.title} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, display: "block", margin: "0 auto 8px" }} />}
             <p style={{ margin: 0, fontWeight: "bold", fontSize: 15, color: "#333" }}>{product.title}</p>
             <p style={{ margin: "4px 0 0", color: "#AABB23", fontWeight: "bold", fontSize: 16 }}>${(product.price / 100).toFixed(2)}</p>
           </div>
         )}
         <p style={{ margin: "16px 0", color: "#666", fontSize: 14 }}>Thank you for your purchase! A confirmation email has been sent to you. The vendor will be in touch shortly.</p>
         <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#166534", fontWeight: "bold" }}>✅ Payment verified and secured by Stripe</div>
-
-        {/* ── SPAM WARNING ── */}
         <div style={{ backgroundColor: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 12, color: "#92400e" }}>
-          ⚠️ Confirmation emails sometimes land in your <strong>spam or junk folder</strong>. Please check there if you don't see it in your inbox.
+          ⚠️ Confirmation emails sometimes land in your <strong>spam or junk folder</strong>. Please check there if you don't see it.
         </div>
-
         <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>{countdown > 0 ? `Returning to Marketplace in ${countdown}...` : "Redirecting..."}</p>
         <button onClick={() => window.location.replace("/marketplace")} style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer" }}>Continue Shopping →</button>
       </div>
