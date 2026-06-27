@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
+// For social link formatting only
 function cleanHandle(v) { return v.trim().replace(/^@/, "").replace(/\s+/g, ""); }
+
+// For the profile handle field — only allow letters, numbers, hyphens, underscores
+function sanitizeHandle(value) {
+  return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, "");
+}
+function isValidHandle(value) {
+  return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
 function formatSocialLink(platform, value) {
   if (!value || !value.trim()) return "";
   const v = value.trim();
@@ -38,9 +48,7 @@ function formatTime(t) {
 
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
-
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Venue","Other"];
-
 const BLANK_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "" };
 
 export default function OrganizerProfile() {
@@ -119,6 +127,14 @@ export default function OrganizerProfile() {
 
   const handleSave = async () => {
     if (!logoUrl && !logoFile) { setMessage("⚠️ Please upload a logo or choose a placeholder before saving."); return; }
+
+    // ── HANDLE VALIDATION ──
+    if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
+    if (!isValidHandle(handle)) {
+      setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces or special characters.");
+      return;
+    }
+
     if (!user) return;
     setSaving(true); setMessage("");
     try {
@@ -197,8 +213,37 @@ export default function OrganizerProfile() {
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
       <h1 style={{ marginBottom: 20 }}>Edit Organizer Profile</h1>
+
       <input placeholder="Organizer Name" value={organizerName} onChange={e => setOrganizerName(e.target.value)} style={iS} />
-      <input placeholder="Handle" value={handle} onChange={e => setHandle(e.target.value)} style={iS} />
+
+      {/* ── HANDLE FIELD WITH VALIDATION ── */}
+      <div style={{ marginBottom: 12 }}>
+        <input
+          placeholder="Handle (e.g. MyEvents)"
+          value={handle}
+          onChange={e => setHandle(sanitizeHandle(e.target.value))}
+          style={{
+            ...iS, marginBottom: 4,
+            borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db",
+          }}
+        />
+        {handle ? (
+          isValidHandle(handle) ? (
+            <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
+              ✅ Your profile URL: <strong>app.entrepromarket.com/organizer/{handle}</strong>
+            </p>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>
+              ❌ Only letters, numbers, hyphens (-) and underscores (_) allowed. No spaces.
+            </p>
+          )
+        ) : (
+          <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+            Your profile URL will be: app.entrepromarket.com/organizer/YourHandle
+          </p>
+        )}
+      </div>
+
       <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
         <option value="">Select a Category...</option>
         {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -259,43 +304,31 @@ export default function OrganizerProfile() {
       {accountType === "elite" && (
         <div style={{ marginTop: 20, marginBottom: 20, backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: 16 }}>
           <label style={{ ...lS, color: "#888B00" }}>👑 Events (Elite — Create & Manage)</label>
-
           <div style={{ backgroundColor: "white", borderRadius: 8, padding: 16, marginBottom: 16, border: "1px solid #eee" }}>
             <p style={{ fontWeight: "bold", marginBottom: 10, fontSize: 14 }}>{editingEvent ? "✏️ Edit Event" : "➕ Add New Event"}</p>
             <input placeholder="Event Name *" value={eventForm.event_name} onChange={e => setEventForm({ ...eventForm, event_name: e.target.value })} style={iS} />
-
-            {/* EVENT CATEGORY */}
             <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category</label>
             <select value={eventForm.category} onChange={e => setEventForm({ ...eventForm, category: e.target.value })} style={iS}>
               <option value="">Select a Category...</option>
               {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-
-            {/* DATE RANGE */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Date</label><input type="date" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date <span style={{ fontWeight: "normal", color: "#888" }}>(multi-day)</span></label><input type="date" value={eventForm.event_end_date} onChange={e => setEventForm({ ...eventForm, event_end_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
-
-            {/* TIME RANGE */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => setEventForm({ ...eventForm, event_start_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => setEventForm({ ...eventForm, event_end_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
-
             <input placeholder="Venue" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
             <input placeholder="Event Type (e.g. Concert, Pop Up)" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(https:// auto-added)</span></label>
             <input placeholder="e.g. eventbrite.com/your-event" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
-
-            {/* FLYER — mandatory, with fullscreen double-click */}
-            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(required — tap twice to view full size)</span></label>
+            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(required — tap to view full size)</span></label>
             {flyerPreviewSrc ? (
               <div style={{ marginBottom: 10 }}>
-                <img src={flyerPreviewSrc} alt="flyer"
-                  onClick={() => setFlyerFullscreen(true)}
-                  style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "2px solid #AABB23", cursor: "zoom-in", display: "block" }} />
+                <img src={flyerPreviewSrc} alt="flyer" onClick={() => setFlyerFullscreen(true)} style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "2px solid #AABB23", cursor: "zoom-in", display: "block" }} />
                 <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); }} style={{ marginTop: 4, fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer" }}>✕ Remove flyer</button>
               </div>
             ) : (
@@ -310,13 +343,11 @@ export default function OrganizerProfile() {
                 {FLYER_PLACEHOLDERS.map((src, i) => <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setShowFlyerPicker(false); }} style={{ cursor: "pointer", border: eventForm.flyer_url === src ? "3px solid #AABB23" : "2px solid transparent", borderRadius: 8, overflow: "hidden" }}><img src={src} style={{ width: "100%", height: 80, objectFit: "cover", display: "block" }} /></div>)}
               </div>
             )}
-
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setShowFlyerPicker(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
               <button onClick={saveEvent} disabled={savingEvent} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEvent ? "Saving..." : editingEvent ? "Update Event" : "Add Event"}</button>
             </div>
           </div>
-
           {events.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {events.map(ev => (
@@ -354,7 +385,6 @@ export default function OrganizerProfile() {
         <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>{saving ? "Saving..." : "Save Profile"}</button>
       </div>
 
-      {/* FLYER FULLSCREEN */}
       {flyerFullscreen && flyerPreviewSrc && (
         <div onClick={() => setFlyerFullscreen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" }}>
           <img src={flyerPreviewSrc} style={{ maxWidth: "95%", maxHeight: "95vh", borderRadius: 8, objectFit: "contain" }} />
