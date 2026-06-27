@@ -3,7 +3,17 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
+// For social link formatting only
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
+
+// For the profile handle field — only allow letters, numbers, hyphens, underscores
+function sanitizeHandle(value) {
+  return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, "");
+}
+function isValidHandle(value) {
+  return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
 function formatSocialLink(platform, value) {
   if (!value || !value.trim()) return "";
   const v = value.trim();
@@ -77,11 +87,11 @@ export default function VendorProfile() {
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
-  const [newProductImages, setNewProductImages] = useState([]); // up to 6 files
-  const [newProductImageKey, setNewProductImageKey] = useState(0); // reset file input
+  const [newProductImages, setNewProductImages] = useState([]);
+  const [newProductImageKey, setNewProductImageKey] = useState(0);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({ title: "", description: "", price: "" });
-  const [editProductImages, setEditProductImages] = useState([]); // existing urls
+  const [editProductImages, setEditProductImages] = useState([]);
   const [editProductNewFiles, setEditProductNewFiles] = useState([]);
   const [editProductFileKey, setEditProductFileKey] = useState(0);
   const [userId, setUserId] = useState(null);
@@ -129,6 +139,13 @@ export default function VendorProfile() {
   };
 
   const handleSave = async () => {
+    // ── HANDLE VALIDATION ──
+    if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
+    if (!isValidHandle(handle)) {
+      setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces or special characters.");
+      return;
+    }
+
     setSaving(true); setMessage("");
     const { data } = await supabase.auth.getUser();
     const user = data.user;
@@ -191,7 +208,7 @@ export default function VendorProfile() {
     const { error } = await supabase.from("vendor_products").insert({
       vendor_id: userId, title: newProduct.title, description: newProduct.description,
       price: Math.round(parseFloat(newProduct.price) * 100),
-      image_url: uploadedUrls[0], // first image as primary
+      image_url: uploadedUrls[0],
       images: uploadedUrls,
       is_active: true,
     });
@@ -199,7 +216,7 @@ export default function VendorProfile() {
     setMessage("✅ Product added!");
     setNewProduct({ title: "", description: "", price: "" });
     setNewProductImages([]);
-    setNewProductImageKey(k => k + 1); // reset file input
+    setNewProductImageKey(k => k + 1);
     await loadProducts(userId);
   };
 
@@ -226,20 +243,9 @@ export default function VendorProfile() {
     await loadProducts(userId);
   };
 
-  const removeEditImage = (url) => {
-    setEditProductImages(editProductImages.filter(u => u !== url));
-  };
-
-  const toggleProduct = async (id, current) => {
-    await supabase.from("vendor_products").update({ is_active: !current }).eq("id", id);
-    await loadProducts(userId);
-  };
-
-  const deleteProduct = async (id) => {
-    if (!confirm("Delete this product?")) return;
-    await supabase.from("vendor_products").delete().eq("id", id);
-    await loadProducts(userId);
-  };
+  const removeEditImage = (url) => setEditProductImages(editProductImages.filter(u => u !== url));
+  const toggleProduct = async (id, current) => { await supabase.from("vendor_products").update({ is_active: !current }).eq("id", id); await loadProducts(userId); };
+  const deleteProduct = async (id) => { if (!confirm("Delete this product?")) return; await supabase.from("vendor_products").delete().eq("id", id); await loadProducts(userId); };
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
@@ -251,11 +257,38 @@ export default function VendorProfile() {
         <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "none", background: "none", border: "none", cursor: "pointer" }}>🛒 Shop / Products</button>
       </div>
 
-      {/* ── PROFILE TAB ── */}
       {activeTab === "profile" && (
         <>
           <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
-          <input placeholder="Handle" value={handle} onChange={e => setHandle(e.target.value)} style={iS} />
+
+          {/* ── HANDLE FIELD WITH VALIDATION ── */}
+          <div style={{ marginBottom: 12 }}>
+            <input
+              placeholder="Handle (e.g. MyBakery)"
+              value={handle}
+              onChange={e => setHandle(sanitizeHandle(e.target.value))}
+              style={{
+                ...iS, marginBottom: 4,
+                borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db",
+              }}
+            />
+            {handle ? (
+              isValidHandle(handle) ? (
+                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
+                  ✅ Your profile URL: <strong>app.entrepromarket.com/vendor/{handle}</strong>
+                </p>
+              ) : (
+                <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>
+                  ❌ Only letters, numbers, hyphens (-) and underscores (_) allowed. No spaces.
+                </p>
+              )
+            ) : (
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
+                Your profile URL will be: app.entrepromarket.com/vendor/YourHandle
+              </p>
+            )}
+          </div>
+
           <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
             <option value="">Select a Category...</option>
             {["DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"].map(c => <option key={c} value={c}>{c}</option>)}
@@ -314,10 +347,8 @@ export default function VendorProfile() {
         </>
       )}
 
-      {/* ── SHOP TAB ── */}
       {activeTab === "shop" && (
         <div>
-          {/* PAYMENT HANDLES — moved here from Profile tab */}
           <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
             <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Your Payment Handles</label>
             <p style={{ fontSize: 12, color: "#888", marginBottom: 10, marginTop: -4 }}>Buyers will send payments directly to these accounts.</p>
@@ -341,15 +372,12 @@ export default function VendorProfile() {
             <span style={{ fontSize: 13, color: shopProducts.length >= PRODUCT_LIMIT ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {PRODUCT_LIMIT}</span>
           </div>
 
-          {/* ADD PRODUCT FORM */}
           {shopProducts.length < PRODUCT_LIMIT && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
               <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
               <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
-
-              {/* MULTI-IMAGE UPLOAD */}
               <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {MAX_PRODUCT_IMAGES} — first image is the main photo)</span></label>
               {newProductImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
@@ -371,12 +399,10 @@ export default function VendorProfile() {
                   }}
                   style={{ display: "block", marginBottom: 12 }} />
               )}
-
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
             </div>
           )}
 
-          {/* PRODUCT LIST */}
           {shopProducts.length === 0 ? (
             <p style={{ color: "#888", textAlign: "center" }}>No products yet. Add your first product above!</p>
           ) : (
@@ -397,7 +423,6 @@ export default function VendorProfile() {
                           <input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} style={{ ...iS, marginBottom: 6 }} />
                           <textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
                           <input type="number" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} style={{ ...iS, marginBottom: 8 }} />
-                          {/* EDIT EXISTING IMAGES */}
                           {editProductImages.length > 0 && (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
                               {editProductImages.map((url, i) => (
@@ -413,10 +438,7 @@ export default function VendorProfile() {
                             <div style={{ marginBottom: 8 }}>
                               <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more images ({editProductImages.length}/{MAX_PRODUCT_IMAGES})</label>
                               <input key={editProductFileKey} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple
-                                onChange={e => {
-                                  const remaining = MAX_PRODUCT_IMAGES - editProductImages.length;
-                                  setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining));
-                                }} style={{ display: "block" }} />
+                                onChange={e => { const remaining = MAX_PRODUCT_IMAGES - editProductImages.length; setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining)); }} style={{ display: "block" }} />
                             </div>
                           )}
                           <div style={{ display: "flex", gap: 8 }}>
@@ -431,13 +453,7 @@ export default function VendorProfile() {
                           <p style={{ margin: "0 0 8px", color: "#701890", fontWeight: "bold", fontSize: 14 }}>${(p.price / 100).toFixed(2)}</p>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, backgroundColor: p.is_active ? "#f0fdf4" : "#fef2f2", color: p.is_active ? "#166534" : "#991b1b", fontWeight: "bold" }}>{p.is_active ? "Active" : "Hidden"}</span>
                           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <button onClick={() => {
-                              const imgs = p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
-                              setEditingProduct(p.id);
-                              setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) });
-                              setEditProductImages(imgs);
-                              setEditProductNewFiles([]);
-                            }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                            <button onClick={() => { const imgs = p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                             <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                             <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                           </div>
@@ -452,7 +468,6 @@ export default function VendorProfile() {
 
           {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", borderRadius: 6, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
 
-          {/* BACK goes to Profile tab, not dashboard */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
             <button onClick={() => setActiveTab("profile")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back to Profile</button>
           </div>
