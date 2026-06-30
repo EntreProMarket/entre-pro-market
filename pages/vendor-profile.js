@@ -3,16 +3,9 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-// For social link formatting only
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
-
-// For the profile handle field — only allow letters, numbers, hyphens, underscores
-function sanitizeHandle(value) {
-  return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, "");
-}
-function isValidHandle(value) {
-  return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
-}
+function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
+function isValidHandle(value) { return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value); }
 
 function formatSocialLink(platform, value) {
   if (!value || !value.trim()) return "";
@@ -52,8 +45,9 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-const PRODUCT_LIMIT = 10;
-const MAX_PRODUCT_IMAGES = 6;
+// ── TIER-BASED SHOP LIMITS ──
+const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
+const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
 
 export default function VendorProfile() {
   const router = useRouter();
@@ -86,6 +80,11 @@ export default function VendorProfile() {
   const [videoLimits, setVideoLimits] = useState({ free: 0, premium: 5, featured: 10 });
   const photoLimit = photoLimits[accountType] ?? photoLimits.free;
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
+
+  // ── tier-based shop limits ──
+  const productLimit = PRODUCT_LIMITS[accountType] ?? PRODUCT_LIMITS.free;
+  const productImageLimit = PRODUCT_IMAGE_LIMITS[accountType] ?? PRODUCT_IMAGE_LIMITS.free;
+
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
   const [newProductImages, setNewProductImages] = useState([]);
@@ -141,14 +140,11 @@ export default function VendorProfile() {
   };
 
   const handleSave = async () => {
-    // ── HANDLE VALIDATION ──
     if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
     if (!isValidHandle(handle)) {
       setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces or special characters.");
       return;
     }
-
-    // ── LOGO VALIDATION (NEW) ──
     if (!logoFile && !logoUrl) {
       setMessage("❌ Please upload a logo image before saving your profile.");
       return;
@@ -205,7 +201,7 @@ export default function VendorProfile() {
   const addProduct = async () => {
     if (!newProduct.title || !newProduct.price) { alert("Title and price are required."); return; }
     if (newProductImages.length === 0) { alert("At least one product image is required."); return; }
-    if (shopProducts.length >= PRODUCT_LIMIT) { alert(`You've reached the ${PRODUCT_LIMIT} product limit.`); return; }
+    if (shopProducts.length >= productLimit) { alert(`Your ${accountType} plan allows up to ${productLimit} products. Upgrade to add more.`); return; }
     setMessage("⏳ Uploading product images...");
     const uploadedUrls = [];
     for (const file of newProductImages) {
@@ -232,7 +228,7 @@ export default function VendorProfile() {
     if (!editForm.title || !editForm.price) { alert("Title and price are required."); return; }
     let updatedImages = [...editProductImages];
     if (editProductNewFiles.length > 0) {
-      const remaining = MAX_PRODUCT_IMAGES - updatedImages.length;
+      const remaining = productImageLimit - updatedImages.length;
       setMessage("⏳ Uploading new images...");
       for (const file of editProductNewFiles.slice(0, remaining)) {
         const url = await uploadFile(file, "vendor-portfolio");
@@ -268,32 +264,21 @@ export default function VendorProfile() {
       {activeTab === "profile" && (
         <>
           <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
-
-          {/* ── HANDLE FIELD WITH VALIDATION ── */}
           <div style={{ marginBottom: 12 }}>
             <input
               placeholder="Handle (e.g. MyBakery)"
               value={handle}
               onChange={e => setHandle(sanitizeHandle(e.target.value))}
-              style={{
-                ...iS, marginBottom: 4,
-                borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db",
-              }}
+              style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }}
             />
             {handle ? (
               isValidHandle(handle) ? (
-                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-                  ✅ Your profile URL: <strong>app.entrepromarket.com/vendor/{handle}</strong>
-                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ Your profile URL: <strong>app.entrepromarket.com/vendor/{handle}</strong></p>
               ) : (
-                <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>
-                  ❌ Only letters, numbers, hyphens (-) and underscores (_) allowed. No spaces.
-                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens (-) and underscores (_) allowed. No spaces.</p>
               )
             ) : (
-              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
-                Your profile URL will be: app.entrepromarket.com/vendor/YourHandle
-              </p>
+              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL will be: app.entrepromarket.com/vendor/YourHandle</p>
             )}
           </div>
 
@@ -313,12 +298,9 @@ export default function VendorProfile() {
           <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
           <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
 
-          {/* ── LOGO FIELD — now shows required marker and current logo ── */}
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
-            {logoUrl && !logoFile && (
-              <img src={logoUrl} alt="current logo" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8, border: "1px solid #eee" }} />
-            )}
+            {logoUrl && !logoFile && <img src={logoUrl} alt="current logo" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8, border: "1px solid #eee" }} />}
             {!logoUrl && !logoFile && (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
                 <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p>
@@ -386,18 +368,21 @@ export default function VendorProfile() {
             </button>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <h2 style={{ margin: 0 }}>Your Products</h2>
-            <span style={{ fontSize: 13, color: shopProducts.length >= PRODUCT_LIMIT ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {PRODUCT_LIMIT}</span>
+            <span style={{ fontSize: 13, color: shopProducts.length >= productLimit ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {productLimit}</span>
           </div>
+          <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>
+            Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan allows up to <strong>{productLimit} products</strong>, each with up to <strong>{productImageLimit} images</strong>.
+          </p>
 
-          {shopProducts.length < PRODUCT_LIMIT && (
+          {shopProducts.length < productLimit && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
               <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
               <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
-              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {MAX_PRODUCT_IMAGES} — first image is the main photo)</span></label>
+              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first image is the main photo)</span></label>
               {newProductImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
                   {newProductImages.map((file, i) => (
@@ -409,16 +394,21 @@ export default function VendorProfile() {
                   ))}
                 </div>
               )}
-              {newProductImages.length < MAX_PRODUCT_IMAGES && (
+              {newProductImages.length < productImageLimit && (
                 <input key={newProductImageKey} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple
                   onChange={e => {
-                    const remaining = MAX_PRODUCT_IMAGES - newProductImages.length;
+                    const remaining = productImageLimit - newProductImages.length;
                     const files = Array.from(e.target.files).slice(0, remaining);
-                    setNewProductImages(prev => [...prev, ...files].slice(0, MAX_PRODUCT_IMAGES));
+                    setNewProductImages(prev => [...prev, ...files].slice(0, productImageLimit));
                   }}
                   style={{ display: "block", marginBottom: 12 }} />
               )}
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
+            </div>
+          )}
+          {shopProducts.length >= productLimit && (
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>
+              ⚠️ You've reached your {productLimit}-product limit for the {accountType} plan. Upgrade to add more products.
             </div>
           )}
 
@@ -453,11 +443,11 @@ export default function VendorProfile() {
                               ))}
                             </div>
                           )}
-                          {editProductImages.length < MAX_PRODUCT_IMAGES && (
+                          {editProductImages.length < productImageLimit && (
                             <div style={{ marginBottom: 8 }}>
-                              <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more images ({editProductImages.length}/{MAX_PRODUCT_IMAGES})</label>
+                              <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more images ({editProductImages.length}/{productImageLimit})</label>
                               <input key={editProductFileKey} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple
-                                onChange={e => { const remaining = MAX_PRODUCT_IMAGES - editProductImages.length; setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining)); }} style={{ display: "block" }} />
+                                onChange={e => { const remaining = productImageLimit - editProductImages.length; setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining)); }} style={{ display: "block" }} />
                             </div>
                           )}
                           <div style={{ display: "flex", gap: 8 }}>
