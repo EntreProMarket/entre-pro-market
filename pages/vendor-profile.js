@@ -77,6 +77,7 @@ export default function VendorProfile() {
   const [cashappHandle, setCashappHandle] = useState("");
   const [venmoHandle, setVenmoHandle] = useState("");
   const [logoFile, setLogoFile] = useState(null);
+  const [logoUrl, setLogoUrl] = useState("");
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [accountType, setAccountType] = useState("free");
@@ -118,6 +119,7 @@ export default function VendorProfile() {
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
         setPortfolioImages(p.portfolio_images || []);
+        setLogoUrl(p.logo_url || "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
       await loadProducts(user.id);
@@ -146,19 +148,25 @@ export default function VendorProfile() {
       return;
     }
 
+    // ── LOGO VALIDATION (NEW) ──
+    if (!logoFile && !logoUrl) {
+      setMessage("❌ Please upload a logo image before saving your profile.");
+      return;
+    }
+
     setSaving(true); setMessage("");
     const { data } = await supabase.auth.getUser();
     const user = data.user;
     if (!user) return;
     try {
       const { data: ex } = await supabase.from("profiles").select("logo_url").eq("id", user.id).single();
-      let logoUrl = ex?.logo_url || null;
+      let finalLogoUrl = ex?.logo_url || logoUrl || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
         const comp = await compressImage(logoFile, 800, 0.85);
         setMessage("⏳ Uploading logo...");
         const up = await uploadFile(comp, "vendor-logos");
-        if (up) logoUrl = up;
+        if (up) finalLogoUrl = up;
       }
       let portfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
@@ -184,10 +192,10 @@ export default function VendorProfile() {
         x_twitter: formatSocialLink("x_twitter", xTwitter),
         cashapp_handle: cashappHandle.replace(/^\$/, "").trim(),
         venmo_handle: venmoHandle.replace(/^@/, "").trim(),
-        logo_url: logoUrl, portfolio_images: portfolio,
+        logo_url: finalLogoUrl, portfolio_images: portfolio,
       }).eq("id", user.id);
       if (error) throw error;
-      setPortfolioImages(portfolio); setPortfolioFiles([]);
+      setPortfolioImages(portfolio); setPortfolioFiles([]); setLogoUrl(finalLogoUrl);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace("/vendor-dashboard"), 1200);
     } catch (err) { setMessage("❌ Error: " + err.message); }
@@ -304,10 +312,21 @@ export default function VendorProfile() {
           <input placeholder="TikTok" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
           <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
           <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
+
+          {/* ── LOGO FIELD — now shows required marker and current logo ── */}
           <div style={{ marginTop: 16, marginBottom: 8 }}>
-            <label style={lS}>Logo</label>
+            <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
+            {logoUrl && !logoFile && (
+              <img src={logoUrl} alt="current logo" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8, border: "1px solid #eee" }} />
+            )}
+            {!logoUrl && !logoFile && (
+              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p>
+              </div>
+            )}
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => setLogoFile(e.target.files[0])} />
           </div>
+
           <div style={{ marginTop: 20, marginBottom: 8 }}>
             <label style={lS}>Portfolio</label>
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
