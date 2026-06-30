@@ -16,7 +16,6 @@ export default async function handler(req, res) {
   if (!userId || !newTier) return res.status(400).json({ error: "Missing userId or newTier" });
 
   try {
-    // Get current profile
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("id, role, account_type, stripe_customer_id, business_name, organizer_name, handle")
@@ -25,7 +24,6 @@ export default async function handler(req, res) {
 
     if (!profile) return res.status(404).json({ error: "User not found" });
 
-    // Cancel active Stripe subscriptions if downgrading from a paid tier
     const paidTiers = ["premium", "featured", "pro", "elite"];
     const wasPaid = paidTiers.includes(profile.account_type);
     const isDowngrade = wasPaid && !paidTiers.includes(newTier);
@@ -50,39 +48,54 @@ export default async function handler(req, res) {
       }
     }
 
-    // Update profile tier in Supabase
     const { error: updateError } = await supabaseAdmin
       .from("profiles")
-      .update({
-        account_type: newTier,
-        subscription_expires_at: null,
-      })
+      .update({ account_type: newTier, subscription_expires_at: null })
       .eq("id", userId);
 
     if (updateError) throw updateError;
 
-    // Log the downgrade
+    // Log the change
     try {
       await supabaseAdmin.from("admin_actions").insert({
         admin_id: adminId || null,
         target_user_id: userId,
         action: "manual_tier_change",
         details: JSON.stringify({
-          from: profile.account_type,
-          to: newTier,
-          reason: reason || "No reason provided",
-          stripe_cancelled: stripeCancelled,
-          stripe_error: stripeError,
+          from: profile.account_type, to: newTier, reason: reason || "No reason provided",
+          stripe_cancelled: stripeCancelled, stripe_error: stripeError,
         }),
       });
-    } catch (_) {
-      // admin_actions table may not exist yet — non-blocking
+    } catch (_) {}
+
+    // ── Notify the user via email ──
+    let emailSent = false;
+    try {
+      const { data: userAuth } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const userEmail = userAuth?.user?.email;
+      if (userEmail) {
+        await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "https://app.entrepromarket.com"}/api/send-downgrade-notification`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: userEmail,
+            name: profile.business_name || profile.organizer_name || null,
+            fromTier: profile.account_type,
+            toTier: newTier,
+            role: profile.role,
+          }),
+        });
+        emailSent = true;
+      }
+    } catch (err) {
+      console.error("Downgrade email error:", err.message);
     }
 
     return res.status(200).json({
       success: true,
       stripeCancelled,
       stripeError,
+      emailSent,
       previousTier: profile.account_type,
       newTier,
     });
