@@ -83,10 +83,10 @@ export default function AdminDashboard() {
   };
 
   const PAID_TIERS = ["premium", "featured", "pro", "elite"];
+
   const handleTierChange = (user, newTier) => {
     const isDowngrade = PAID_TIERS.includes(user.account_type) && !PAID_TIERS.includes(newTier);
-    const isSameTier = user.account_type === newTier;
-    if (isSameTier) return;
+    if (user.account_type === newTier) return;
     if (isDowngrade) {
       setDowngradeModal({ userId: user.id, userName: user.business_name || user.organizer_name || user.handle, fromTier: user.account_type, toTier: newTier });
       setDowngradeReason("");
@@ -102,12 +102,7 @@ export default function AdminDashboard() {
       const res = await fetch("/api/admin-downgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: downgradeModal.userId,
-          newTier: downgradeModal.toTier,
-          reason: downgradeReason,
-          adminId,
-        }),
+        body: JSON.stringify({ userId: downgradeModal.userId, newTier: downgradeModal.toTier, reason: downgradeReason, adminId }),
       });
       const data = await res.json();
       if (data.success) {
@@ -124,7 +119,6 @@ export default function AdminDashboard() {
     setDowngradeReason("");
   };
 
-  // ── FIXED: uses service-role API instead of client-side update (RLS was blocking it) ──
   const updateUserTier = async (userId, newAccountType) => {
     try {
       const res = await fetch("/api/admin-update-tier", {
@@ -144,9 +138,24 @@ export default function AdminDashboard() {
     }
   };
 
+  // ── FIXED: uses service-role API to bypass RLS ──
   const suspendUser = async (userId, suspended) => {
-    const { error } = await supabase.from("profiles").update({ suspended }).eq("id", userId);
-    if (!error) { setUsers(users.map(u => u.id === userId ? { ...u, suspended } : u)); setMessage(suspended ? "✅ User suspended" : "✅ User reinstated"); }
+    try {
+      const res = await fetch("/api/admin-suspend-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, suspended }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUsers(users.map(u => u.id === userId ? { ...u, suspended } : u));
+        setMessage(suspended ? "✅ User suspended" : "✅ User reinstated");
+      } else {
+        setMessage("❌ Error: " + data.error);
+      }
+    } catch (err) {
+      setMessage("❌ Error: " + err.message);
+    }
   };
 
   const saveLimits = async () => {
@@ -175,7 +184,6 @@ export default function AdminDashboard() {
   };
 
   const logout = async () => { await supabase.auth.signOut(); router.replace("/"); };
-
   const tierColor = (t) => ({ premium: "#701890", featured: "#AABB23", pro: "#701890", elite: "#AABB23", basic: "#888", free: "#aaa" }[t] || "#aaa");
 
   const OrganizerTierCard = ({ user, targetTier, color, label, icon }) => {
@@ -192,11 +200,9 @@ export default function AdminDashboard() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 12, color: isTier ? color : "#888", fontWeight: "bold" }}>{isTier ? `${icon} ${label}` : user.account_type}</span>
-          <button
-            onClick={() => handleTierChange(user, isTier ? "basic" : targetTier)}
-            style={{ padding: "8px 14px", backgroundColor: isTier ? "#cc0000" : color, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}
-          >
-            {isTier ? `⬇️ Downgrade` : `${icon} Make ${label}`}
+          <button onClick={() => handleTierChange(user, isTier ? "basic" : targetTier)}
+            style={{ padding: "8px 14px", backgroundColor: isTier ? "#cc0000" : color, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+            {isTier ? "⬇️ Downgrade" : `${icon} Make ${label}`}
           </button>
         </div>
       </div>
@@ -208,26 +214,22 @@ export default function AdminDashboard() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", fontFamily: "sans-serif" }}>
 
+      {/* DOWNGRADE MODAL */}
       {downgradeModal && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
             <h3 style={{ margin: "0 0 8px", color: "#cc0000" }}>⚠️ Confirm Downgrade</h3>
             <p style={{ color: "#555", fontSize: 14, margin: "0 0 16px" }}>
-              You are about to downgrade <strong>{downgradeModal.userName}</strong> from{" "}
-              <strong style={{ color: tierColor(downgradeModal.fromTier) }}>{downgradeModal.fromTier}</strong>{" "}
-              to <strong style={{ color: tierColor(downgradeModal.toTier) }}>{downgradeModal.toTier}</strong>.
+              Downgrading <strong>{downgradeModal.userName}</strong> from{" "}
+              <strong style={{ color: tierColor(downgradeModal.fromTier) }}>{downgradeModal.fromTier}</strong> to{" "}
+              <strong style={{ color: tierColor(downgradeModal.toTier) }}>{downgradeModal.toTier}</strong>.
             </p>
             <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#991b1b" }}>
-              🔴 This will also <strong>cancel their active Stripe subscription</strong> immediately.
+              🔴 This will <strong>cancel their active Stripe subscription</strong> and send them a notification email.
             </div>
-            <label style={{ display: "block", fontWeight: "bold", fontSize: 13, marginBottom: 6 }}>Reason for downgrade <span style={{ color: "#888", fontWeight: "normal" }}>(optional)</span></label>
-            <textarea
-              value={downgradeReason}
-              onChange={e => setDowngradeReason(e.target.value)}
-              placeholder="e.g. Chargeback, violation of terms, manual adjustment..."
-              rows={3}
-              style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box", resize: "vertical", marginBottom: 20 }}
-            />
+            <label style={{ display: "block", fontWeight: "bold", fontSize: 13, marginBottom: 6 }}>Reason <span style={{ color: "#888", fontWeight: "normal" }}>(optional)</span></label>
+            <textarea value={downgradeReason} onChange={e => setDowngradeReason(e.target.value)} placeholder="e.g. Chargeback, terms violation..." rows={3}
+              style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box", resize: "vertical", marginBottom: 20 }} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setDowngradeModal(null); setDowngradeReason(""); }} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
               <button onClick={confirmDowngrade} disabled={downgrading} style={{ padding: "10px 20px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", opacity: downgrading ? 0.7 : 1 }}>
@@ -238,6 +240,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* TOP BAR */}
       <div style={{ backgroundColor: "#111", color: "white", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => window.location.replace('/home')} style={{ background: "none", border: "1px solid #555", color: "white", padding: "6px 12px", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>← Home</button>
@@ -247,6 +250,7 @@ export default function AdminDashboard() {
         <button onClick={logout} style={{ padding: "6px 14px", backgroundColor: "#ff6b6b", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Log Out</button>
       </div>
 
+      {/* TABS */}
       <div style={{ backgroundColor: "white", borderBottom: "1px solid #eee", display: "flex", overflowX: "auto", padding: "0 24px" }}>
         {TABS.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "14px 16px", border: "none", borderBottom: activeTab === tab ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === tab ? "#701890" : "#666", fontWeight: activeTab === tab ? "bold" : "normal", cursor: "pointer", fontSize: 13, whiteSpace: "nowrap" }}>
@@ -263,6 +267,7 @@ export default function AdminDashboard() {
 
       <div style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
 
+        {/* OVERVIEW */}
         {activeTab === "Overview" && (
           <div>
             <h2 style={{ marginBottom: 20 }}>📊 Overview</h2>
@@ -284,6 +289,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* PLANS & PRICING */}
         {activeTab === "Plans & Pricing" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>💰 Plans & Pricing</h2>
@@ -302,7 +308,7 @@ export default function AdminDashboard() {
                     <label style={labelStyle}>Description</label>
                     <input value={plan.description || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, description: e.target.value } : p))} style={inputStyle} />
                     <label style={labelStyle}>Features (one per line)</label>
-                    <textarea value={Array.isArray(plan.features) ? plan.features.join("\n") : plan.features || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, features: e.target.value.split("\n") } : p))} rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+                    <textarea value={Array.isArray(plan.features) ? plan.features.join("\n") : plan.features || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, features: e.target.value.split("\n") } : p))} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                       <button onClick={() => savePlan(plan)} disabled={saving} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>{saving ? "Saving..." : "Save Plan"}</button>
                     </div>
@@ -313,10 +319,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* USERS */}
         {activeTab === "Users" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>👥 Users</h2>
-            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Downgrading a paid tier will cancel their Stripe subscription.</p>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Downgrading a paid tier will cancel their Stripe subscription and notify them by email.</p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -352,6 +359,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* FEATURED VENDORS */}
         {activeTab === "Featured Vendors" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>🔥 Featured Vendors</h2>
@@ -372,6 +380,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* PREMIUM VENDORS */}
         {activeTab === "Premium Vendors" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>💜 Premium Vendors</h2>
@@ -392,6 +401,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* PRO ORGANIZERS */}
         {activeTab === "Pro Organizers" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>🚀 Pro Organizers</h2>
@@ -403,6 +413,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ELITE ORGANIZERS */}
         {activeTab === "Elite Organizers" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>👑 Elite Organizers</h2>
@@ -414,6 +425,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ADS */}
         {activeTab === "Ads" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>📢 Ad Management</h2>
@@ -441,6 +453,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* REPORTS */}
         {activeTab === "Reports" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>🚩 Reports</h2>
@@ -467,6 +480,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* SETTINGS */}
         {activeTab === "Settings" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>⚙️ Settings</h2>
