@@ -17,11 +17,11 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [adminId, setAdminId] = useState(null);
-
   const [downgradeModal, setDowngradeModal] = useState(null);
   const [downgradeReason, setDowngradeReason] = useState("");
   const [downgrading, setDowngrading] = useState(false);
-
+  const [userInfoModal, setUserInfoModal] = useState(null);
+  const [userInfoLoading, setUserInfoLoading] = useState(false);
   const [limits, setLimits] = useState({
     vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
     vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
@@ -60,102 +60,64 @@ export default function AdminDashboard() {
     const { count: proOrganizers } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "organizer").eq("account_type", "pro");
     const { count: eliteOrganizers } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "organizer").eq("account_type", "elite");
     setStats({ totalVendors: totalVendors || 0, totalOrganizers: totalOrganizers || 0, premiumVendors: premiumVendors || 0, featuredVendors: featuredVendors || 0, proOrganizers: proOrganizers || 0, eliteOrganizers: eliteOrganizers || 0 });
-
     const { data: plansData } = await supabase.from("plans").select("*").order("role", { ascending: true }).order("sort_order", { ascending: true });
     setPlans(plansData || []);
-
-    const { data: usersData, error: usersError } = await supabase.rpc("get_all_profiles");
-    if (usersError) console.log("Users error:", usersError);
+    const { data: usersData } = await supabase.rpc("get_all_profiles");
     setUsers(usersData || []);
-
     const { data: adsData } = await supabase.from("ads").select("*").order("created_at", { ascending: false });
     setAds(adsData || []);
-
     const { data: reportsData } = await supabase.from("reports").select("*, reporter:reporter_id(business_name, organizer_name, handle), message:message_id(content, sender_id, recipient_id)").order("created_at", { ascending: false });
     setReports(reportsData || []);
-
     const { data: settingsData } = await supabase.from("app_settings").select("*");
-    if (settingsData && settingsData.length > 0) {
-      const settingsMap = {};
-      settingsData.forEach(s => { settingsMap[s.key] = s.value; });
-      setLimits(prev => ({ ...prev, ...settingsMap }));
-    }
+    if (settingsData?.length) { const m = {}; settingsData.forEach(s => { m[s.key] = s.value; }); setLimits(prev => ({ ...prev, ...m })); }
   };
 
   const PAID_TIERS = ["premium", "featured", "pro", "elite"];
-
   const handleTierChange = (user, newTier) => {
-    const isDowngrade = PAID_TIERS.includes(user.account_type) && !PAID_TIERS.includes(newTier);
     if (user.account_type === newTier) return;
-    if (isDowngrade) {
-      setDowngradeModal({ userId: user.id, userName: user.business_name || user.organizer_name || user.handle, fromTier: user.account_type, toTier: newTier });
-      setDowngradeReason("");
-    } else {
-      updateUserTier(user.id, newTier);
-    }
+    const isDowngrade = PAID_TIERS.includes(user.account_type) && !PAID_TIERS.includes(newTier);
+    if (isDowngrade) { setDowngradeModal({ userId: user.id, userName: user.business_name || user.organizer_name || user.handle, fromTier: user.account_type, toTier: newTier }); setDowngradeReason(""); }
+    else updateUserTier(user.id, newTier);
   };
 
   const confirmDowngrade = async () => {
     if (!downgradeModal) return;
     setDowngrading(true);
     try {
-      const res = await fetch("/api/admin-downgrade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: downgradeModal.userId, newTier: downgradeModal.toTier, reason: downgradeReason, adminId }),
-      });
+      const res = await fetch("/api/admin-downgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: downgradeModal.userId, newTier: downgradeModal.toTier, reason: downgradeReason, adminId }) });
       const data = await res.json();
-      if (data.success) {
-        setUsers(users.map(u => u.id === downgradeModal.userId ? { ...u, account_type: downgradeModal.toTier } : u));
-        setMessage(`✅ ${downgradeModal.userName} downgraded from ${downgradeModal.fromTier} → ${downgradeModal.toTier}${data.stripeCancelled ? " · Stripe subscription cancelled" : ""}`);
-      } else {
-        setMessage("❌ Error: " + data.error);
-      }
-    } catch (err) {
-      setMessage("❌ Error: " + err.message);
-    }
-    setDowngrading(false);
-    setDowngradeModal(null);
-    setDowngradeReason("");
+      if (data.success) { setUsers(users.map(u => u.id === downgradeModal.userId ? { ...u, account_type: downgradeModal.toTier } : u)); setMessage(`✅ ${downgradeModal.userName} downgraded → ${downgradeModal.toTier}${data.stripeCancelled ? " · Stripe cancelled" : ""}`); }
+      else setMessage("❌ Error: " + data.error);
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+    setDowngrading(false); setDowngradeModal(null); setDowngradeReason("");
   };
 
   const updateUserTier = async (userId, newAccountType) => {
     try {
-      const res = await fetch("/api/admin-update-tier", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, newTier: newAccountType }),
-      });
+      const res = await fetch("/api/admin-update-tier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, newTier: newAccountType }) });
       const data = await res.json();
-      if (data.success) {
-        setUsers(users.map(u => u.id === userId ? { ...u, account_type: newAccountType } : u));
-        setMessage("✅ User tier updated!");
-      } else {
-        setMessage("❌ Error: " + data.error);
-      }
-    } catch (err) {
-      setMessage("❌ Error: " + err.message);
-    }
+      if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, account_type: newAccountType } : u)); setMessage("✅ User tier updated!"); }
+      else setMessage("❌ Error: " + data.error);
+    } catch (err) { setMessage("❌ Error: " + err.message); }
   };
 
-  // ── FIXED: uses service-role API to bypass RLS ──
   const suspendUser = async (userId, suspended) => {
     try {
-      const res = await fetch("/api/admin-suspend-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, suspended }),
-      });
+      const res = await fetch("/api/admin-suspend-user", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, suspended }) });
       const data = await res.json();
-      if (data.success) {
-        setUsers(users.map(u => u.id === userId ? { ...u, suspended } : u));
-        setMessage(suspended ? "✅ User suspended" : "✅ User reinstated");
-      } else {
-        setMessage("❌ Error: " + data.error);
-      }
-    } catch (err) {
-      setMessage("❌ Error: " + err.message);
-    }
+      if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, suspended } : u)); setMessage(suspended ? "✅ User suspended" : "✅ User reinstated"); }
+      else setMessage("❌ Error: " + data.error);
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+  };
+
+  const viewUserInfo = async (userId) => {
+    setUserInfoLoading(true); setUserInfoModal({ loading: true });
+    try {
+      const res = await fetch("/api/admin-get-user-info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
+      const data = await res.json();
+      setUserInfoModal(data.success ? data : { error: data.error });
+    } catch (err) { setUserInfoModal({ error: err.message }); }
+    setUserInfoLoading(false);
   };
 
   const saveLimits = async () => {
@@ -165,22 +127,19 @@ export default function AdminDashboard() {
       const { error } = await supabase.from("app_settings").update({ value: String(value) }).eq("key", key);
       if (error) hasError = true;
     }
-    setMessage(hasError ? "❌ Some limits failed to save." : "✅ Limits saved!");
-    setSaving(false);
+    setMessage(hasError ? "❌ Some limits failed." : "✅ Limits saved!"); setSaving(false);
   };
 
   const savePlan = async (plan) => {
     setSaving(true); setMessage("");
     const { error } = await supabase.from("plans").update({ name: plan.name, price: plan.price, description: plan.description, features: plan.features }).eq("id", plan.id);
-    setMessage(error ? "❌ Error: " + error.message : "✅ Plan saved!");
-    setSaving(false);
+    setMessage(error ? "❌ " + error.message : "✅ Plan saved!"); setSaving(false);
   };
 
   const saveAd = async (ad) => {
     setSaving(true);
     const { error } = await supabase.from("ads").update({ title: ad.title, body: ad.body, link: ad.link, active: ad.active }).eq("id", ad.id);
-    setMessage(!error ? "✅ Ad saved!" : "❌ Error: " + error.message);
-    setSaving(false);
+    setMessage(!error ? "✅ Ad saved!" : "❌ " + error.message); setSaving(false);
   };
 
   const logout = async () => { await supabase.auth.signOut(); router.replace("/"); };
@@ -198,10 +157,9 @@ export default function AdminDashboard() {
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Current: {user.account_type || "basic"}</p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 12, color: isTier ? color : "#888", fontWeight: "bold" }}>{isTier ? `${icon} ${label}` : user.account_type}</span>
-          <button onClick={() => handleTierChange(user, isTier ? "basic" : targetTier)}
-            style={{ padding: "8px 14px", backgroundColor: isTier ? "#cc0000" : color, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => viewUserInfo(user.id)} style={{ padding: "6px 12px", backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 11 }}>ℹ️ Info</button>
+          <button onClick={() => handleTierChange(user, isTier ? "basic" : targetTier)} style={{ padding: "8px 14px", backgroundColor: isTier ? "#cc0000" : color, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
             {isTier ? "⬇️ Downgrade" : `${icon} Make ${label}`}
           </button>
         </div>
@@ -214,27 +172,55 @@ export default function AdminDashboard() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", fontFamily: "sans-serif" }}>
 
+      {/* USER INFO MODAL */}
+      {userInfoModal && (
+        <div onClick={() => setUserInfoModal(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", maxHeight: "80vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0 }}>👤 User Info</h3>
+              <button onClick={() => setUserInfoModal(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
+            </div>
+            {userInfoModal.loading ? <p style={{ color: "#888" }}>Loading...</p> : userInfoModal.error ? <p style={{ color: "#cc0000" }}>❌ {userInfoModal.error}</p> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {userInfoModal.profile?.logo_url && <img src={userInfoModal.profile.logo_url} alt="logo" style={{ width: 70, height: 70, borderRadius: 10, objectFit: "cover" }} />}
+                {[
+                  ["Name", userInfoModal.profile?.business_name || userInfoModal.profile?.organizer_name || "—"],
+                  ["Handle", "@" + (userInfoModal.profile?.handle || "—")],
+                  ["Email", userInfoModal.email || "—"],
+                  ["Role", userInfoModal.profile?.role || "—"],
+                  ["Tier", userInfoModal.profile?.account_type || "—"],
+                  ["City", userInfoModal.profile?.city || "—"],
+                  ["State", userInfoModal.profile?.state || "—"],
+                  ["Category", userInfoModal.profile?.category || "—"],
+                  ["Suspended", userInfoModal.profile?.suspended ? "Yes" : "No"],
+                  ["Email Verified", userInfoModal.emailConfirmed ? "Yes ✅" : "Not verified ❌"],
+                  ["Signed Up", userInfoModal.createdAt ? new Date(userInfoModal.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
+                  ["Last Login", userInfoModal.lastSignIn ? new Date(userInfoModal.lastSignIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
+                  ["Stripe Customer", userInfoModal.profile?.stripe_customer_id || "—"],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
+                    <span style={{ fontSize: 13, color: "#888", fontWeight: "bold", flexShrink: 0 }}>{label}</span>
+                    <span style={{ fontSize: 13, color: "#333", textAlign: "right", wordBreak: "break-all" }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* DOWNGRADE MODAL */}
       {downgradeModal && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.3)" }}>
+          <div style={{ backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%" }}>
             <h3 style={{ margin: "0 0 8px", color: "#cc0000" }}>⚠️ Confirm Downgrade</h3>
-            <p style={{ color: "#555", fontSize: 14, margin: "0 0 16px" }}>
-              Downgrading <strong>{downgradeModal.userName}</strong> from{" "}
-              <strong style={{ color: tierColor(downgradeModal.fromTier) }}>{downgradeModal.fromTier}</strong> to{" "}
-              <strong style={{ color: tierColor(downgradeModal.toTier) }}>{downgradeModal.toTier}</strong>.
-            </p>
-            <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#991b1b" }}>
-              🔴 This will <strong>cancel their active Stripe subscription</strong> and send them a notification email.
-            </div>
+            <p style={{ color: "#555", fontSize: 14, margin: "0 0 16px" }}>Downgrading <strong>{downgradeModal.userName}</strong> from <strong style={{ color: tierColor(downgradeModal.fromTier) }}>{downgradeModal.fromTier}</strong> to <strong style={{ color: tierColor(downgradeModal.toTier) }}>{downgradeModal.toTier}</strong>.</p>
+            <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#991b1b" }}>🔴 This will <strong>cancel their Stripe subscription</strong> and send a notification email.</div>
             <label style={{ display: "block", fontWeight: "bold", fontSize: 13, marginBottom: 6 }}>Reason <span style={{ color: "#888", fontWeight: "normal" }}>(optional)</span></label>
-            <textarea value={downgradeReason} onChange={e => setDowngradeReason(e.target.value)} placeholder="e.g. Chargeback, terms violation..." rows={3}
-              style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box", resize: "vertical", marginBottom: 20 }} />
+            <textarea value={downgradeReason} onChange={e => setDowngradeReason(e.target.value)} placeholder="e.g. Chargeback, terms violation..." rows={3} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box", resize: "vertical", marginBottom: 20 }} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => { setDowngradeModal(null); setDowngradeReason(""); }} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
-              <button onClick={confirmDowngrade} disabled={downgrading} style={{ padding: "10px 20px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", opacity: downgrading ? 0.7 : 1 }}>
-                {downgrading ? "Processing..." : "⬇️ Confirm Downgrade"}
-              </button>
+              <button onClick={confirmDowngrade} disabled={downgrading} style={{ padding: "10px 20px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", opacity: downgrading ? 0.7 : 1 }}>{downgrading ? "Processing..." : "⬇️ Confirm Downgrade"}</button>
             </div>
           </div>
         </div>
@@ -267,19 +253,11 @@ export default function AdminDashboard() {
 
       <div style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
 
-        {/* OVERVIEW */}
         {activeTab === "Overview" && (
           <div>
             <h2 style={{ marginBottom: 20 }}>📊 Overview</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16, marginBottom: 32 }}>
-              {[
-                { label: "Total Vendors", value: stats.totalVendors, color: "#701890" },
-                { label: "Total Organizers", value: stats.totalOrganizers, color: "#AABB23" },
-                { label: "Premium Vendors", value: stats.premiumVendors, color: "#701890" },
-                { label: "Featured Vendors", value: stats.featuredVendors, color: "#AABB23" },
-                { label: "Pro Organizers", value: stats.proOrganizers, color: "#701890" },
-                { label: "Elite Organizers", value: stats.eliteOrganizers, color: "#AABB23" },
-              ].map(stat => (
+              {[{ label: "Total Vendors", value: stats.totalVendors, color: "#701890" }, { label: "Total Organizers", value: stats.totalOrganizers, color: "#AABB23" }, { label: "Premium Vendors", value: stats.premiumVendors, color: "#701890" }, { label: "Featured Vendors", value: stats.featuredVendors, color: "#AABB23" }, { label: "Pro Organizers", value: stats.proOrganizers, color: "#701890" }, { label: "Elite Organizers", value: stats.eliteOrganizers, color: "#AABB23" }].map(stat => (
                 <div key={stat.label} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "20px 16px", textAlign: "center" }}>
                   <p style={{ fontSize: 32, fontWeight: "bold", color: stat.color, margin: 0 }}>{stat.value}</p>
                   <p style={{ fontSize: 13, color: "#888", margin: "6px 0 0" }}>{stat.label}</p>
@@ -289,7 +267,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* PLANS & PRICING */}
         {activeTab === "Plans & Pricing" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>💰 Plans & Pricing</h2>
@@ -319,16 +296,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* USERS */}
         {activeTab === "Users" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>👥 Users</h2>
-            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Downgrading a paid tier will cancel their Stripe subscription and notify them by email.</p>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Tap ℹ️ Info to view a user's full signup details including email.</p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ backgroundColor: "#111", color: "white" }}>
-                    <th style={thStyle}>Name</th><th style={thStyle}>Role</th><th style={thStyle}>Current Tier</th><th style={thStyle}>Change Tier</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th>
+                    <th style={thStyle}>Name</th><th style={thStyle}>Role</th><th style={thStyle}>Tier</th><th style={thStyle}>Change Tier</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -339,17 +315,14 @@ export default function AdminDashboard() {
                       <td style={tdStyle}><span style={{ fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type || "free"}</span></td>
                       <td style={tdStyle}>
                         <select value={user.account_type || "free"} onChange={e => handleTierChange(user, e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>
-                          {user.role === "vendor" ? (
-                            <><option value="free">Free</option><option value="premium">Premium</option><option value="featured">Featured</option></>
-                          ) : (
-                            <><option value="basic">Basic</option><option value="pro">Pro</option><option value="elite">Elite</option></>
-                          )}
+                          {user.role === "vendor" ? (<><option value="free">Free</option><option value="premium">Premium</option><option value="featured">Featured</option></>) : (<><option value="basic">Basic</option><option value="pro">Pro</option><option value="elite">Elite</option></>)}
                         </select>
                       </td>
                       <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
                       <td style={tdStyle}>
-                        <button onClick={() => window.location.assign(`/${user.role}/${user.handle}`)} style={smallBtnStyle}>View</button>
-                        <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000", marginLeft: 6 }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
+                        <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️ Info</button>
+                        <button onClick={() => window.open(`/${user.role}/${user.handle}`, "_blank")} style={{ ...smallBtnStyle, marginLeft: 4 }}>View</button>
+                        <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000", marginLeft: 4 }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
                       </td>
                     </tr>
                   ))}
@@ -359,7 +332,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* FEATURED VENDORS */}
         {activeTab === "Featured Vendors" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>🔥 Featured Vendors</h2>
@@ -371,6 +343,7 @@ export default function AdminDashboard() {
                     <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><span style={{ fontSize: 11, fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type}</span></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
                     {user.account_type !== "featured" && <button onClick={() => handleTierChange(user, "featured")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🔥 Make Featured</button>}
                     {user.account_type === "featured" && <button onClick={() => handleTierChange(user, "free")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>}
                   </div>
@@ -380,7 +353,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* PREMIUM VENDORS */}
         {activeTab === "Premium Vendors" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>💜 Premium Vendors</h2>
@@ -392,6 +364,7 @@ export default function AdminDashboard() {
                     <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><span style={{ fontSize: 11, fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type}</span></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
                     {user.account_type !== "premium" && <button onClick={() => handleTierChange(user, "premium")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>💜 Make Premium</button>}
                     {user.account_type === "premium" && <button onClick={() => handleTierChange(user, "free")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>}
                   </div>
@@ -401,31 +374,24 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* PRO ORGANIZERS */}
         {activeTab === "Pro Organizers" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>🚀 Pro Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer").map(user => (
-                <OrganizerTierCard key={user.id} user={user} targetTier="pro" color="#701890" label="Pro" icon="🚀" />
-              ))}
+              {users.filter(u => u.role === "organizer").map(user => <OrganizerTierCard key={user.id} user={user} targetTier="pro" color="#701890" label="Pro" icon="🚀" />)}
             </div>
           </div>
         )}
 
-        {/* ELITE ORGANIZERS */}
         {activeTab === "Elite Organizers" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>👑 Elite Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer").map(user => (
-                <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />
-              ))}
+              {users.filter(u => u.role === "organizer").map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
             </div>
           </div>
         )}
 
-        {/* ADS */}
         {activeTab === "Ads" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>📢 Ad Management</h2>
@@ -437,12 +403,9 @@ export default function AdminDashboard() {
                       <strong>Ad Slot: {ad.slot || `#${i + 1}`}</strong>
                       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><input type="checkbox" checked={ad.active || false} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, active: e.target.checked } : a))} />Active</label>
                     </div>
-                    <label style={labelStyle}>Headline</label>
-                    <input value={ad.title || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, title: e.target.value } : a))} style={inputStyle} />
-                    <label style={labelStyle}>Body Text</label>
-                    <input value={ad.body || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, body: e.target.value } : a))} style={inputStyle} />
-                    <label style={labelStyle}>Link URL</label>
-                    <input value={ad.link || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, link: e.target.value } : a))} style={inputStyle} />
+                    <label style={labelStyle}>Headline</label><input value={ad.title || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, title: e.target.value } : a))} style={inputStyle} />
+                    <label style={labelStyle}>Body Text</label><input value={ad.body || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, body: e.target.value } : a))} style={inputStyle} />
+                    <label style={labelStyle}>Link URL</label><input value={ad.link || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, link: e.target.value } : a))} style={inputStyle} />
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
                       <button onClick={() => saveAd(ad)} disabled={saving} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>{saving ? "Saving..." : "Save Ad"}</button>
                     </div>
@@ -453,7 +416,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* REPORTS */}
         {activeTab === "Reports" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>🚩 Reports</h2>
@@ -471,7 +433,7 @@ export default function AdminDashboard() {
                     </div>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button onClick={async () => { await supabase.from("reports").update({ status: "reviewed" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "reviewed" } : r)); setMessage("✅ Marked as reviewed"); }} style={{ padding: "7px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Mark Reviewed</button>
-                      <button onClick={async () => { await supabase.from("reports").update({ status: "resolved" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "resolved" } : r)); setMessage("✅ Marked as resolved"); }} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Resolve</button>
+                      <button onClick={async () => { await supabase.from("reports").update({ status: "resolved" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "resolved" } : r)); setMessage("✅ Resolved"); }} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Resolve</button>
                     </div>
                   </div>
                 ))}
@@ -480,7 +442,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* SETTINGS */}
         {activeTab === "Settings" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>⚙️ Settings</h2>
@@ -488,24 +449,13 @@ export default function AdminDashboard() {
               <h3 style={{ marginTop: 0, marginBottom: 4 }}>📸 Photo & Video Upload Limits</h3>
               <h4 style={{ color: "#701890", marginBottom: 12, marginTop: 16 }}>💜 Vendor Limits</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-                {[
-                  { key: "vendor_free_photos", label: "Free Photos" },
-                  { key: "vendor_premium_photos", label: "Premium Photos" },
-                  { key: "vendor_featured_photos", label: "Featured Photos" },
-                  { key: "vendor_free_videos", label: "Free Videos" },
-                  { key: "vendor_premium_videos", label: "Premium Videos" },
-                  { key: "vendor_featured_videos", label: "Featured Videos" },
-                ].map(({ key, label }) => (
+                {[{ key: "vendor_free_photos", label: "Free Photos" }, { key: "vendor_premium_photos", label: "Premium Photos" }, { key: "vendor_featured_photos", label: "Featured Photos" }, { key: "vendor_free_videos", label: "Free Videos" }, { key: "vendor_premium_videos", label: "Premium Videos" }, { key: "vendor_featured_videos", label: "Featured Videos" }].map(({ key, label }) => (
                   <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
                 ))}
               </div>
               <h4 style={{ color: "#AABB23", marginBottom: 12, marginTop: 0 }}>🏆 Organizer Limits</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-                {[
-                  { key: "organizer_basic_photos", label: "Basic Photos" },
-                  { key: "organizer_pro_photos", label: "Pro Photos" },
-                  { key: "organizer_elite_photos", label: "Elite Photos" },
-                ].map(({ key, label }) => (
+                {[{ key: "organizer_basic_photos", label: "Basic Photos" }, { key: "organizer_pro_photos", label: "Pro Photos" }, { key: "organizer_elite_photos", label: "Elite Photos" }].map(({ key, label }) => (
                   <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
                 ))}
               </div>
@@ -515,16 +465,18 @@ export default function AdminDashboard() {
             </div>
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 20, marginBottom: 16 }}>
               <h3 style={{ marginTop: 0 }}>App Links</h3>
+              <p style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>Opens in a new tab so the Admin panel stays open.</p>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => window.location.replace('/home')} style={smallBtnStyle}>Homepage</button>
-                <button onClick={() => window.location.assign('/marketplace')} style={smallBtnStyle}>Marketplace</button>
-                <button onClick={() => window.location.assign('/vendor-info')} style={smallBtnStyle}>Vendor Info</button>
-                <button onClick={() => window.location.assign('/organizer-info')} style={smallBtnStyle}>Organizer Info</button>
+                {/* ── FIXED: open in new tab so back button returns to admin ── */}
+                <button onClick={() => window.open('/home', '_blank')} style={smallBtnStyle}>Homepage</button>
+                <button onClick={() => window.open('/marketplace', '_blank')} style={smallBtnStyle}>Marketplace</button>
+                <button onClick={() => window.open('/vendor-info', '_blank')} style={smallBtnStyle}>Vendor Info</button>
+                <button onClick={() => window.open('/organizer-info', '_blank')} style={smallBtnStyle}>Organizer Info</button>
               </div>
             </div>
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 10, padding: 20 }}>
               <h3 style={{ marginTop: 0, color: "#856404" }}>⚠️ Danger Zone</h3>
-              <button onClick={async () => { if (confirm("Delete all NULL profiles? This cannot be undone.")) { await supabase.from("profiles").delete().is("business_name", null).eq("role", "vendor"); setMessage("✅ Null vendor profiles deleted"); await loadAllData(); } }} style={{ padding: "10px 18px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🗑️ Delete Incomplete Profiles</button>
+              <button onClick={async () => { if (confirm("Delete all NULL profiles? Cannot be undone.")) { await supabase.from("profiles").delete().is("business_name", null).eq("role", "vendor"); setMessage("✅ Null profiles deleted"); await loadAllData(); } }} style={{ padding: "10px 18px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🗑️ Delete Incomplete Profiles</button>
             </div>
           </div>
         )}
