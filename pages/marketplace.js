@@ -25,14 +25,12 @@ export default function Marketplace() {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
       setUser(userData?.user || null);
-
       const { data } = await supabase
         .from("profiles")
         .select("id, business_name, category, city, state, description, logo_url, account_type, handle, tags, portfolio_images")
         .eq("role", "vendor")
         .not("handle", "is", null)
         .not("business_name", "is", null);
-
       if (data) {
         const featured = shuffle(data.filter(v => v.account_type === "featured"));
         const premium = shuffle(data.filter(v => v.account_type === "premium"));
@@ -67,7 +65,7 @@ export default function Marketplace() {
     router.push(`/vendor/${vendor.handle}`);
   };
 
-  const handleGateSubmit = async () => {
+  const handleGateSubmit = () => {
     if (!gateEmail.includes("@")) return;
     setGateSubmitted(true);
     setTimeout(() => { setEmailGateOpen(false); setGateSubmitted(false); setGateEmail(""); }, 2000);
@@ -77,6 +75,12 @@ export default function Marketplace() {
     if (tier === "featured") return <span style={{ fontSize: 10, backgroundColor: "#AABB23", color: "white", padding: "2px 7px", borderRadius: 10, fontWeight: "bold", position: "absolute", top: 8, left: 8 }}>🔥 Featured</span>;
     if (tier === "premium") return <span style={{ fontSize: 10, backgroundColor: "#701890", color: "white", padding: "2px 7px", borderRadius: 10, fontWeight: "bold", position: "absolute", top: 8, left: 8 }}>💜 Premium</span>;
     return null;
+  };
+
+  const tierBorder = (tier) => {
+    if (tier === "featured") return "1px solid #AABB23";
+    if (tier === "premium") return "1px solid #701890";
+    return "1px solid #e5e7eb";
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>Loading marketplace...</div>;
@@ -97,39 +101,36 @@ export default function Marketplace() {
         </div>
       </div>
 
-      <div style={{ padding: "20px 20px 0" }}>
+      <div style={{ padding: "20px 16px 0" }}>
 
-        {/* ANNOUNCEMENT BANNER */}
         <AnnouncementBanner />
 
-        <h1 style={{ margin: "0 0 6px", fontSize: 22 }}>🛒 Vendor Marketplace</h1>
-        <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>{filtered.length} vendor{filtered.length !== 1 ? "s" : ""} found</p>
+        <h1 style={{ margin: "0 0 4px", fontSize: 20 }}>🛒 Vendor Marketplace</h1>
+        <p style={{ color: "#888", fontSize: 13, marginBottom: 16 }}>{filtered.length} vendor{filtered.length !== 1 ? "s" : ""} found</p>
 
         {/* SEARCH */}
-        <div style={{ position: "relative", marginBottom: 16 }}>
+        <div style={{ position: "relative", marginBottom: 14 }}>
           <input
             type="text"
-            placeholder="Search by name, category, city, or tag..."
+            placeholder="Search by name, category, city..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            style={{ display: "block", width: "100%", padding: "12px 16px 12px 40px", borderRadius: 30, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box", backgroundColor: "white" }}
+            style={{ display: "block", width: "100%", padding: "11px 16px 11px 38px", borderRadius: 30, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box" }}
           />
-          <span style={{ position: "absolute", left: 14, top: 13, color: "#aaa", fontSize: 16 }}>🔍</span>
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 14, top: 10, background: "none", border: "none", color: "#aaa", fontSize: 18, cursor: "pointer" }}>✕</button>
-          )}
+          <span style={{ position: "absolute", left: 13, top: 12, color: "#aaa", fontSize: 15 }}>🔍</span>
+          {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 13, top: 9, background: "none", border: "none", color: "#aaa", fontSize: 18, cursor: "pointer" }}>✕</button>}
         </div>
 
         {/* CATEGORY FILTER */}
         <div style={{ marginBottom: 20 }}>
-          <button onClick={() => setShowFilters(!showFilters)} style={{ padding: "8px 16px", backgroundColor: showFilters ? "#701890" : "white", color: showFilters ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13, marginBottom: 10 }}>
+          <button onClick={() => setShowFilters(!showFilters)} style={{ padding: "7px 16px", backgroundColor: showFilters ? "#701890" : "white", color: showFilters ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13, marginBottom: 10 }}>
             🏷️ {selectedCategory === "All" ? "Filter by Category" : selectedCategory} {showFilters ? "▲" : "▼"}
           </button>
           {showFilters && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {CATEGORIES.map(cat => (
                 <button key={cat} onClick={() => { setSelectedCategory(cat); setShowFilters(false); }}
-                  style={{ padding: "6px 14px", borderRadius: 20, border: `1px solid ${selectedCategory === cat ? "#701890" : "#ddd"}`, backgroundColor: selectedCategory === cat ? "#701890" : "white", color: selectedCategory === cat ? "white" : "#555", fontSize: 13, cursor: "pointer", fontWeight: selectedCategory === cat ? "bold" : "normal" }}>
+                  style={{ padding: "5px 13px", borderRadius: 20, border: `1px solid ${selectedCategory === cat ? "#701890" : "#ddd"}`, backgroundColor: selectedCategory === cat ? "#701890" : "white", color: selectedCategory === cat ? "white" : "#555", fontSize: 12, cursor: "pointer", fontWeight: selectedCategory === cat ? "bold" : "normal" }}>
                   {cat}
                 </button>
               ))}
@@ -141,27 +142,28 @@ export default function Marketplace() {
         {filtered.length === 0 ? (
           <div style={{ textAlign: "center", padding: 60, color: "#aaa" }}>
             <p style={{ fontSize: 48, margin: 0 }}>🔍</p>
-            <p style={{ fontSize: 15, marginTop: 12 }}>No vendors found for your search.</p>
+            <p style={{ fontSize: 15, marginTop: 12 }}>No vendors found.</p>
             <button onClick={() => { setSearchQuery(""); setSelectedCategory("All"); }} style={{ marginTop: 16, padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Clear Filters</button>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 14 }}>
             {filtered.map(vendor => (
               <div key={vendor.id} onClick={() => handleVendorClick(vendor)}
-                style={{ border: `2px solid ${vendor.account_type === "featured" ? "#AABB23" : vendor.account_type === "premium" ? "#701890" : "#eee"}`, borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", transition: "box-shadow 0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)"}
+                style={{ border: tierBorder(vendor.account_type), borderRadius: 10, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.1)"}
                 onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                <div style={{ height: 130, backgroundColor: "#f5f5f5", position: "relative" }}>
+                {/* IMAGE fills full width, objectFit cover */}
+                <div style={{ height: 140, backgroundColor: "#f5f5f5", position: "relative", overflow: "hidden" }}>
                   {vendor.logo_url ? (
-                    <img src={vendor.logo_url} alt={vendor.business_name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    <img src={vendor.logo_url} alt={vendor.business_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Image</div>
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 13 }}>No Image</div>
                   )}
                   {tierBadge(vendor.account_type)}
                 </div>
-                <div style={{ padding: 12 }}>
-                  <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: "bold" }}>{vendor.business_name}</h3>
-                  <p style={{ margin: "0 0 4px", color: "#701890", fontSize: 12, fontWeight: "bold" }}>{vendor.category}</p>
+                <div style={{ padding: "10px 12px 12px" }}>
+                  <p style={{ margin: "0 0 3px", fontWeight: "bold", fontSize: 14, color: "#111" }}>{vendor.business_name}</p>
+                  <p style={{ margin: "0 0 3px", color: "#701890", fontSize: 12, fontWeight: "bold" }}>{vendor.category}</p>
                   <p style={{ margin: 0, color: "#888", fontSize: 12 }}>{vendor.city}{vendor.state ? `, ${vendor.state}` : ""}</p>
                   {vendor.tags?.length > 0 && (
                     <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -183,8 +185,8 @@ export default function Marketplace() {
             <h2 style={{ margin: "0 0 8px" }}>Join to View Vendor Profiles</h2>
             {!gateSubmitted ? (
               <>
-                <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>Sign up for free to access the full marketplace and contact vendors.</p>
-                <input type="email" placeholder="Your email address" value={gateEmail} onChange={e => setGateEmail(e.target.value)} style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
+                <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>Sign up free to access the full marketplace and contact vendors.</p>
+                <input type="email" placeholder="Your email address" value={gateEmail} onChange={e => setGateEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleGateSubmit()} style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
                 <button onClick={handleGateSubmit} style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12 }}>Get Free Access</button>
                 <button onClick={() => { setEmailGateOpen(false); router.push("/"); }} style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Already have an account? Log in</button>
               </>
