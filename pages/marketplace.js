@@ -1,410 +1,202 @@
 // pages/marketplace.js
-
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
+import { supabase } from "../lib/supabaseClient";
+import AnnouncementBanner from "../components/AnnouncementBanner";
 
-const CATEGORIES = [
-  "All", "DJ", "Photographer", "Videographer", "Caterer", "Decorator",
-  "Florist", "Hair & Makeup", "Music", "Bakery",
-  "Clothing & Apparel", "Jewelry", "Crafts & Art", "Food & Beverage",
-  "Health & Wellness", "Entertainment", "Security", "Transportation",
-  "Poetry & Literature", "Performing Arts", "Theater & Acting", "Other"
-];
+const CATEGORIES = ["All", "DJ", "Photographer", "Videographer", "Caterer", "Decorator", "Florist", "Hair & Makeup", "Music", "Bakery", "Clothing & Apparel", "Jewelry", "Crafts & Art", "Food & Beverage", "Health & Wellness", "Entertainment", "Security", "Transportation", "Poetry & Literature", "Performing Arts", "Theater & Acting", "Other"];
+
+function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
 export default function Marketplace() {
   const router = useRouter();
   const [vendors, setVendors] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [user, setUser] = useState(null);
+  const [emailGateOpen, setEmailGateOpen] = useState(false);
   const [gateEmail, setGateEmail] = useState("");
-  const [showGate, setShowGate] = useState(false);
-  const [gateLoading, setGateLoading] = useState(false);
-  const [loggedInProfile, setLoggedInProfile] = useState(null);
-  const [viewMode, setViewMode] = useState("card");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [gateSubmitted, setGateSubmitted] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    const checkAccess = async () => {
+    const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user) {
-        setShowGate(false);
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("role, account_type, is_admin, handle")
-          .eq("id", userData.user.id)
-          .single();
-        setLoggedInProfile(prof);
-      } else {
-        const hasEmail = typeof window !== "undefined" && localStorage.getItem("epm_visitor_email");
-        setShowGate(!hasEmail);
+      setUser(userData?.user || null);
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, business_name, category, city, state, description, logo_url, account_type, handle, tags, portfolio_images")
+        .eq("role", "vendor")
+        .not("handle", "is", null)
+        .not("business_name", "is", null);
+
+      if (data) {
+        const featured = shuffle(data.filter(v => v.account_type === "featured"));
+        const premium = shuffle(data.filter(v => v.account_type === "premium"));
+        const free = shuffle(data.filter(v => !["featured", "premium"].includes(v.account_type)));
+        const sorted = [...featured, ...premium, ...free];
+        setVendors(sorted);
+        setFiltered(sorted);
       }
+      setLoading(false);
     };
-    checkAccess();
-    fetchVendors();
+    load();
   }, []);
 
-  const handleGateSubmit = async () => {
-    if (!gateEmail || !gateEmail.includes("@")) return;
-    setGateLoading(true);
-    await supabase.from("visitor_emails").insert([{ email: gateEmail }]).select();
-    if (typeof window !== "undefined") {
-      localStorage.setItem("epm_visitor_email", gateEmail);
-    }
-    setShowGate(false);
-    setGateLoading(false);
-  };
-
   useEffect(() => {
-    let results = [...vendors];
-    if (category !== "All") {
-      results = results.filter(v => v.category === category);
-    }
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      results = results.filter(v =>
+    let result = vendors;
+    if (selectedCategory !== "All") result = result.filter(v => v.category === selectedCategory);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(v =>
         v.business_name?.toLowerCase().includes(q) ||
-        v.city?.toLowerCase().includes(q) ||
         v.category?.toLowerCase().includes(q) ||
+        v.city?.toLowerCase().includes(q) ||
+        v.description?.toLowerCase().includes(q) ||
         v.tags?.some(t => t.toLowerCase().includes(q))
       );
     }
-    setFiltered(results);
-  }, [vendors, category, query]);
+    setFiltered(result);
+  }, [selectedCategory, searchQuery, vendors]);
 
-  const fetchVendors = async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "vendor")
-      .not("business_name", "is", null);
-    if (error) { console.log(error); setLoading(false); return; }
-    const shuffle = (arr) => {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    };
-    const featured = shuffle((data || []).filter(v => v.account_type === "featured"));
-    const premium  = shuffle((data || []).filter(v => v.account_type === "premium"));
-    const free     = shuffle((data || []).filter(v => v.account_type !== "featured" && v.account_type !== "premium"));
-    const sorted   = [...featured, ...premium, ...free];
-    setVendors(sorted);
-    setFiltered(sorted);
-    setLoading(false);
+  const handleVendorClick = (vendor) => {
+    if (!user) { setEmailGateOpen(true); return; }
+    router.push(`/vendor/${vendor.handle}`);
   };
 
-  const featuredVendors = filtered.filter(v => v.account_type === "featured");
-  const premiumVendors  = filtered.filter(v => v.account_type === "premium");
-  const regularVendors  = filtered.filter(v => v.account_type !== "featured" && v.account_type !== "premium");
-
-  const VendorCard = ({ vendor }) => {
-    const isFeatured = vendor.account_type === "featured";
-    const isPremium  = vendor.account_type === "premium";
-
-    if (viewMode === "grid") {
-      return (
-        <div onClick={() => router.push(`/vendor/${vendor.handle}`)}
-          style={{
-            border: `2px solid ${isFeatured ? "#AABB23" : isPremium ? "#701890" : "#eee"}`,
-            borderRadius: 10, overflow: "hidden", cursor: "pointer",
-            backgroundColor: "white", position: "relative",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            padding: 8, textAlign: "center",
-          }}>
-          <div style={{ width: 60, height: 60, borderRadius: 8, overflow: "hidden", backgroundColor: "#f4f4f4", marginBottom: 6 }}>
-            {vendor.logo_url
-              ? <img src={vendor.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#bbb" }}>No img</div>
-            }
-          </div>
-          <p style={{ margin: 0, fontSize: 11, fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>
-            {vendor.business_name}
-          </p>
-          <p style={{ margin: 0, fontSize: 10, color: "#888" }}>{vendor.category}</p>
-        </div>
-      );
-    }
-
-    return (
-      <div onClick={() => router.push(`/vendor/${vendor.handle}`)}
-        style={{
-          border: `2px solid ${isFeatured ? "#AABB23" : isPremium ? "#701890" : "#eee"}`,
-          borderRadius: 12, overflow: "hidden", cursor: "pointer",
-          backgroundColor: "white",
-          boxShadow: isFeatured ? "0 2px 12px rgba(170,187,35,0.2)" : "0 2px 8px rgba(0,0,0,0.07)",
-          position: "relative",
-        }}>
-        {isFeatured && (
-          <div style={{ position: "absolute", top: 10, right: 10, backgroundColor: "#AABB23", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>
-            🔥 FEATURED
-          </div>
-        )}
-        {isPremium && (
-          <div style={{ position: "absolute", top: 10, right: 10, backgroundColor: "#701890", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>
-            💜 PREMIUM
-          </div>
-        )}
-        <div style={{ height: 160, backgroundColor: "#f4f4f4", overflow: "hidden" }}>
-          {vendor.logo_url
-            ? <img src={vendor.logo_url} alt={vendor.business_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Image</div>
-          }
-        </div>
-        <div style={{ padding: 14 }}>
-          <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>{vendor.business_name}</h3>
-          <p style={{ margin: 0, color: "#777", fontSize: 13 }}>{vendor.category}</p>
-          <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#999" }}>
-            📍 {vendor.city}{vendor.state ? `, ${vendor.state}` : ""}
-          </p>
-          <div>
-            {vendor.tags?.slice(0, 3).map(tag => (
-              <span key={tag} style={{ fontSize: 11, background: "#f0e8ff", color: "#701890", padding: "3px 8px", borderRadius: 10, marginRight: 4, display: "inline-block", marginBottom: 4 }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+  const handleGateSubmit = async () => {
+    if (!gateEmail.includes("@")) return;
+    setGateSubmitted(true);
+    setTimeout(() => { setEmailGateOpen(false); setGateSubmitted(false); setGateEmail(""); }, 2000);
   };
 
-  // EMAIL GATE
-  if (showGate) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fafafa", fontFamily: "sans-serif", padding: 20 }}>
-        <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 16, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-          <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 90, borderRadius: "50%", marginBottom: 16 }} />
-          <h2 style={{ marginBottom: 8 }}>Browse Our Vendors</h2>
-          <p style={{ color: "#666", fontSize: 14, marginBottom: 24 }}>
-            Enter your email to browse thousands of vendors — free, no account needed.
-          </p>
-          <input type="email" placeholder="your@email.com" value={gateEmail}
-            onChange={e => setGateEmail(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleGateSubmit()}
-            style={{ display: "block", width: "100%", padding: "12px 14px", marginBottom: 12, borderRadius: 6, border: "1px solid #ddd", fontSize: 15, boxSizing: "border-box" }}
-          />
-          <button onClick={handleGateSubmit} disabled={gateLoading || !gateEmail.includes("@")}
-            style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 16, opacity: !gateEmail.includes("@") ? 0.6 : 1 }}>
-            {gateLoading ? "Please wait..." : "Browse Vendors →"}
-          </button>
-          <p style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>No spam. We respect your privacy.</p>
-          <div style={{ borderTop: "1px solid #eee", paddingTop: 16 }}>
-            <p style={{ fontSize: 13, color: "#666", marginBottom: 10 }}>Already have an account?</p>
-            <button onClick={() => router.push("/")}
-              style={{ padding: "10px 20px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 13, cursor: "pointer" }}>
-              Log In
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const tierBadge = (tier) => {
+    if (tier === "featured") return <span style={{ fontSize: 10, backgroundColor: "#AABB23", color: "white", padding: "2px 7px", borderRadius: 10, fontWeight: "bold", position: "absolute", top: 8, left: 8 }}>🔥 Featured</span>;
+    if (tier === "premium") return <span style={{ fontSize: 10, backgroundColor: "#701890", color: "white", padding: "2px 7px", borderRadius: 10, fontWeight: "bold", position: "absolute", top: 8, left: 8 }}>💜 Premium</span>;
+    return null;
+  };
 
-  // ── SIDEBAR ITEMS with locked redirects for no-role users ──
-  const sidebarItems = loggedInProfile?.is_admin ? [
-    { label: "🏡 Home",         path: "/home" },
-    { label: "🔴 Admin Panel",  path: "/admin" },
-    { label: "🛒 Marketplace",  path: "/marketplace" },
-  ] : [
-    { label: "🏡 Home", path: "/home" },
-    {
-      label: "📊 Dashboard",
-      path: !loggedInProfile?.role ? "/upgrade-required"
-        : loggedInProfile.role === "organizer" ? "/organizer-dashboard"
-        : "/vendor-dashboard",
-    },
-    {
-      label: "👤 My Profile",
-      path: !loggedInProfile?.role ? "/upgrade-required"
-        : loggedInProfile.role === "organizer" ? `/organizer/${loggedInProfile?.handle}`
-        : `/vendor/${loggedInProfile?.handle}`,
-    },
-    { label: "🛒 Marketplace",    path: "/marketplace" },
-    { label: "✉️ Messages",       path: loggedInProfile?.role ? "/messages"        : "/messaging-locked" },
-    { label: "💾 Saved Contacts", path: loggedInProfile?.role ? "/saved-contacts"  : "/saved-contacts-locked" },
-  ];
+  if (loading) return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>Loading marketplace...</div>;
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif", padding: "0 0 40px" }}>
 
-      {/* TOP BAR */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 100,
-        backgroundColor: "#111", color: "white",
-        padding: "12px 20px",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {loggedInProfile && (
-            <button onClick={() => setMenuOpen(!menuOpen)}
-              style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer", padding: "0 4px" }}>
-              ☰
-            </button>
-          )}
-        </div>
-        <span style={{ fontWeight: "bold", fontSize: 16, position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
-          Entre PRO Market
-        </span>
-        <div style={{ display: "flex", gap: 8 }}>
-          {loggedInProfile ? (
-            <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
-              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-              Log Out
-            </button>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
+        <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 80, objectFit: "contain" }} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={() => router.push("/home")} style={{ padding: "7px 14px", backgroundColor: "white", color: "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🏡 Home</button>
+          {user ? (
+            <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>📊 Dashboard</button>
           ) : (
-            <button onClick={() => window.location.href = "/"}
-              style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-              Log In
-            </button>
+            <button onClick={() => router.push("/")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>Log In</button>
           )}
         </div>
       </div>
 
-      {/* SIDEBAR */}
-      {menuOpen && loggedInProfile && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", zIndex: 200 }}
-          onClick={() => setMenuOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{
-            position: "absolute", top: 0, left: 0,
-            width: 240, height: "100%",
-            backgroundColor: "white", boxShadow: "4px 0 16px rgba(0,0,0,0.2)",
-            display: "flex", flexDirection: "column",
-          }}>
-            <div style={{ backgroundColor: "#111", padding: "16px 20px", color: "white", fontWeight: "bold", fontSize: 16 }}>
-              Entre PRO Market
+      <div style={{ padding: "20px 20px 0" }}>
+
+        {/* ANNOUNCEMENT BANNER */}
+        <AnnouncementBanner />
+
+        <h1 style={{ margin: "0 0 6px", fontSize: 22 }}>🛒 Vendor Marketplace</h1>
+        <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>{filtered.length} vendor{filtered.length !== 1 ? "s" : ""} found</p>
+
+        {/* SEARCH */}
+        <div style={{ position: "relative", marginBottom: 16 }}>
+          <input
+            type="text"
+            placeholder="Search by name, category, city, or tag..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ display: "block", width: "100%", padding: "12px 16px 12px 40px", borderRadius: 30, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box", backgroundColor: "white" }}
+          />
+          <span style={{ position: "absolute", left: 14, top: 13, color: "#aaa", fontSize: 16 }}>🔍</span>
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: 14, top: 10, background: "none", border: "none", color: "#aaa", fontSize: 18, cursor: "pointer" }}>✕</button>
+          )}
+        </div>
+
+        {/* CATEGORY FILTER */}
+        <div style={{ marginBottom: 20 }}>
+          <button onClick={() => setShowFilters(!showFilters)} style={{ padding: "8px 16px", backgroundColor: showFilters ? "#701890" : "white", color: showFilters ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13, marginBottom: 10 }}>
+            🏷️ {selectedCategory === "All" ? "Filter by Category" : selectedCategory} {showFilters ? "▲" : "▼"}
+          </button>
+          {showFilters && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {CATEGORIES.map(cat => (
+                <button key={cat} onClick={() => { setSelectedCategory(cat); setShowFilters(false); }}
+                  style={{ padding: "6px 14px", borderRadius: 20, border: `1px solid ${selectedCategory === cat ? "#701890" : "#ddd"}`, backgroundColor: selectedCategory === cat ? "#701890" : "white", color: selectedCategory === cat ? "white" : "#555", fontSize: 13, cursor: "pointer", fontWeight: selectedCategory === cat ? "bold" : "normal" }}>
+                  {cat}
+                </button>
+              ))}
             </div>
-            {sidebarItems.map(item => (
-              <button key={item.label}
-                onClick={() => { setMenuOpen(false); window.location.href = item.path; }}
-                style={{ padding: "14px 20px", backgroundColor: "white", border: "none", borderBottom: "1px solid #f0f0f0", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#333" }}>
-                {item.label}
-              </button>
+          )}
+        </div>
+
+        {/* VENDOR GRID */}
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, color: "#aaa" }}>
+            <p style={{ fontSize: 48, margin: 0 }}>🔍</p>
+            <p style={{ fontSize: 15, marginTop: 12 }}>No vendors found for your search.</p>
+            <button onClick={() => { setSearchQuery(""); setSelectedCategory("All"); }} style={{ marginTop: 16, padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Clear Filters</button>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+            {filtered.map(vendor => (
+              <div key={vendor.id} onClick={() => handleVendorClick(vendor)}
+                style={{ border: `2px solid ${vendor.account_type === "featured" ? "#AABB23" : vendor.account_type === "premium" ? "#701890" : "#eee"}`, borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", transition: "box-shadow 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)"}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                <div style={{ height: 130, backgroundColor: "#f5f5f5", position: "relative" }}>
+                  {vendor.logo_url ? (
+                    <img src={vendor.logo_url} alt={vendor.business_name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Image</div>
+                  )}
+                  {tierBadge(vendor.account_type)}
+                </div>
+                <div style={{ padding: 12 }}>
+                  <h3 style={{ margin: "0 0 4px", fontSize: 14, fontWeight: "bold" }}>{vendor.business_name}</h3>
+                  <p style={{ margin: "0 0 4px", color: "#701890", fontSize: 12, fontWeight: "bold" }}>{vendor.category}</p>
+                  <p style={{ margin: 0, color: "#888", fontSize: 12 }}>{vendor.city}{vendor.state ? `, ${vendor.state}` : ""}</p>
+                  {vendor.tags?.length > 0 && (
+                    <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {vendor.tags.slice(0, 2).map(tag => <span key={tag} style={{ fontSize: 10, backgroundColor: "#f0f0f0", padding: "2px 6px", borderRadius: 8, color: "#666" }}>{tag}</span>)}
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
-            <button onClick={async () => { await supabase.auth.signOut(); window.location.href = "/"; }}
-              style={{ marginTop: "auto", padding: "14px 20px", backgroundColor: "white", border: "none", borderTop: "1px solid #eee", cursor: "pointer", textAlign: "left", fontSize: 15, fontWeight: "bold", color: "#cc0000" }}>
-              🚪 Log Out
-            </button>
+          </div>
+        )}
+      </div>
+
+      {/* EMAIL GATE MODAL */}
+      {emailGateOpen && (
+        <div onClick={() => setEmailGateOpen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", textAlign: "center" }}>
+            <img src="/logo-transparent.png" alt="EntreProMarket" style={{ width: 80, marginBottom: 20 }} />
+            <h2 style={{ margin: "0 0 8px" }}>Join to View Vendor Profiles</h2>
+            {!gateSubmitted ? (
+              <>
+                <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>Sign up for free to access the full marketplace and contact vendors.</p>
+                <input type="email" placeholder="Your email address" value={gateEmail} onChange={e => setGateEmail(e.target.value)} style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
+                <button onClick={handleGateSubmit} style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12 }}>Get Free Access</button>
+                <button onClick={() => { setEmailGateOpen(false); router.push("/"); }} style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Already have an account? Log in</button>
+              </>
+            ) : (
+              <div style={{ padding: 20 }}>
+                <p style={{ fontSize: 40, margin: 0 }}>🎉</p>
+                <p style={{ fontWeight: "bold", fontSize: 16, color: "#701890" }}>You're in! Redirecting...</p>
+              </div>
+            )}
           </div>
         </div>
       )}
-
-      <div style={{ padding: 20 }}>
-        <h1 style={{ marginBottom: 4 }}>Vendor Marketplace</h1>
-        <p style={{ color: "#888", fontSize: 14, marginBottom: 20 }}>
-          Browse and connect with vendors for your next event
-        </p>
-
-        {/* AD BANNER */}
-        <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "14px 20px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>📢 Advertise Here</p>
-            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Reach thousands of event organizers and shoppers</p>
-          </div>
-          <button onClick={() => router.push("/contact")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-            Learn More
-          </button>
-        </div>
-
-        {/* SEARCH */}
-        <input type="text" placeholder="🔍 Search by name, city, category or tag..."
-          value={query} onChange={e => setQuery(e.target.value)}
-          style={{ width: "100%", padding: "12px 16px", marginBottom: 16, borderRadius: 8, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box" }}
-        />
-
-        {/* CATEGORY FILTERS */}
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 24, paddingBottom: 4 }}>
-          {CATEGORIES.map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)} style={{
-              padding: "7px 14px", borderRadius: 20, border: "1px solid #ddd",
-              backgroundColor: category === cat ? "#701890" : "#fff",
-              color: category === cat ? "#fff" : "#333",
-              cursor: "pointer", fontSize: 13, whiteSpace: "nowrap",
-              fontWeight: category === cat ? "bold" : "normal",
-            }}>
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {loading && <p style={{ color: "#888" }}>Loading vendors...</p>}
-        {!loading && filtered.length === 0 && (
-          <p style={{ color: "#888", textAlign: "center", marginTop: 40 }}>
-            No vendors found. Try a different search or category.
-          </p>
-        )}
-
-        {/* VIEW TOGGLE */}
-        {!loading && filtered.length >= 50 && (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16, gap: 8 }}>
-            <button onClick={() => setViewMode("card")}
-              style={{ padding: "7px 14px", backgroundColor: viewMode === "card" ? "#701890" : "#eee", color: viewMode === "card" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-              ▦ Cards
-            </button>
-            <button onClick={() => setViewMode("grid")}
-              style={{ padding: "7px 14px", backgroundColor: viewMode === "grid" ? "#701890" : "#eee", color: viewMode === "grid" ? "white" : "#333", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-              ⊞ Grid
-            </button>
-          </div>
-        )}
-
-        {/* FEATURED */}
-        {!loading && featuredVendors.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 18, marginBottom: 14, color: "#AABB23" }}>🔥 Featured Vendors</h2>
-            <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
-              {featuredVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
-            </div>
-          </div>
-        )}
-
-        {/* PREMIUM */}
-        {!loading && premiumVendors.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 18, marginBottom: 14, color: "#701890" }}>💜 Premium Vendors</h2>
-            <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
-              {premiumVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
-            </div>
-          </div>
-        )}
-
-        {/* ALL VENDORS */}
-        {!loading && regularVendors.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 18, marginBottom: 14 }}>All Vendors</h2>
-            <div style={{ display: "grid", gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(100px, 1fr))" : "repeat(auto-fill, minmax(220px, 1fr))", gap: viewMode === "grid" ? 8 : 16 }}>
-              {regularVendors.map(v => <VendorCard key={v.id} vendor={v} />)}
-            </div>
-          </div>
-        )}
-
-        {/* BOTTOM BANNERS */}
-        <div style={{ marginTop: 40, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <div>
-              <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>🛒 Are you a Vendor?</p>
-              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Join EntreProMarket and get discovered by event organizers</p>
-            </div>
-            <button onClick={() => router.push("/vendor-info")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-              Become a Vendor
-            </button>
-          </div>
-          <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <div>
-              <p style={{ margin: 0, fontWeight: "bold", color: "#701890", fontSize: 14 }}>🎪 Are you an Event Organizer?</p>
-              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Find and connect with the best vendors for your events</p>
-            </div>
-            <button onClick={() => router.push("/organizer-info")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
-              Become an Organizer
-            </button>
-          </div>
-        </div>
-
-      </div>
     </div>
   );
 }
