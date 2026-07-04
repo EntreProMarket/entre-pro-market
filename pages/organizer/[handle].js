@@ -1,5 +1,4 @@
 // pages/organizer/[handle].js
-
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
@@ -16,29 +15,36 @@ function formatSocialLink(platform, value) {
   const handle = cleanHandle(v);
   switch (platform) {
     case "instagram": return `https://instagram.com/${handle}`;
-    case "facebook":  return `https://facebook.com/${handle}`;
-    case "tiktok":    return `https://tiktok.com/@${handle}`;
-    case "youtube":   return `https://youtube.com/@${handle}`;
+    case "facebook": return `https://facebook.com/${handle}`;
+    case "tiktok": return `https://tiktok.com/@${handle}`;
+    case "youtube": return `https://youtube.com/@${handle}`;
     case "x_twitter": return `https://x.com/${handle}`;
-    case "website":   return `https://${handle}`;
-    default:          return `https://${handle}`;
+    case "website": return `https://${handle}`;
+    default: return `https://${handle}`;
   }
 }
-
 function formatTime(t) {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-const IC = "#AABB23";
-const IS = 32;
+const IC = "#AABB23", IS = 32;
 function WebsiteIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill="none" stroke={IC} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>; }
 function InstagramIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill="none" stroke={IC} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>; }
 function MetaIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>; }
 function TikTokIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z"/></svg>; }
 function YouTubeIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>; }
 function XIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>; }
+
+// ── Universal image thumbnail style ──
+const thumbStyle = (w, h, radius = 12) => ({
+  width: w, height: h, borderRadius: radius,
+  border: "1px solid #e5e7eb",
+  overflow: "hidden", cursor: "pointer",
+  flexShrink: 0, display: "block",
+});
+const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 
 export default function OrganizerPublicProfile() {
   const router = useRouter();
@@ -62,18 +68,15 @@ export default function OrganizerPublicProfile() {
       const currentUser = userData?.user || null;
       setUser(currentUser);
 
-      // Handle is clearly invalid (undefined/null from a missing profile)
       if (!handle || handle === "undefined" || handle === "null") {
         if (currentUser) {
-          const { data: myProfile } = await supabase
-            .from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
+          const { data: myProfile } = await supabase.from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
           if (myProfile?.role === "organizer") {
             setNotFoundIsOwner(true);
-            setNotFoundIsPaid(["basic", "pro", "elite"].includes(myProfile?.account_type));
+            setNotFoundIsPaid(["basic","pro","elite"].includes(myProfile?.account_type));
           }
         }
-        setLoading(false);
-        return;
+        setLoading(false); return;
       }
 
       const { data, error } = await supabase.from("profiles").select("*").eq("handle", handle).single();
@@ -85,15 +88,13 @@ export default function OrganizerPublicProfile() {
 
       if (error || !data) {
         if (currentUser) {
-          const { data: myProfile } = await supabase
-            .from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
+          const { data: myProfile } = await supabase.from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
           if (myProfile?.role === "organizer") {
             setNotFoundIsOwner(true);
-            setNotFoundIsPaid(["basic", "pro", "elite"].includes(myProfile?.account_type));
+            setNotFoundIsPaid(["basic","pro","elite"].includes(myProfile?.account_type));
           }
         }
-        setLoading(false);
-        return;
+        setLoading(false); return;
       }
 
       setOrganizer(data);
@@ -102,9 +103,7 @@ export default function OrganizerPublicProfile() {
         setEvents(evData || []);
       }
       const ownerViewing = currentUser && data.id === currentUser.id;
-      if (!ownerViewing) {
-        await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: currentUser?.id || null }]);
-      }
+      if (!ownerViewing) await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: currentUser?.id || null }]);
       setLoading(false);
     };
     load();
@@ -112,53 +111,25 @@ export default function OrganizerPublicProfile() {
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
-  // ── NOT FOUND / NO PROFILE YET ──
   if (!organizer) {
     return (
-      <div style={{
-        minHeight: "100vh", display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center",
-      }}>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center" }}>
         <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
-        <div style={{ fontSize: 64, marginBottom: 16 }}>
-          {notFoundIsOwner && !notFoundIsPaid ? "⚠️" : "🏗️"}
-        </div>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>{notFoundIsOwner && !notFoundIsPaid ? "⚠️" : "🏗️"}</div>
         <h2 style={{ color: "#333", marginBottom: 8 }}>
-          {notFoundIsOwner
-            ? notFoundIsPaid
-              ? "Your Profile Isn't Set Up Yet"
-              : "Your Profile Isn't Set Up Yet"
-            : "Organizer Not Found"}
+          {notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Organizer Not Found"}
         </h2>
         <p style={{ color: "#888", fontSize: 14, maxWidth: 320, lineHeight: 1.6, marginBottom: 28 }}>
           {notFoundIsOwner
-            ? notFoundIsPaid
-              ? "Complete your organizer profile so vendors can find and connect with you."
-              : "It looks like your plan payment wasn't completed. Organizer accounts require an active plan to contact vendors and post events."
+            ? notFoundIsPaid ? "Complete your organizer profile so vendors can find you." : "Your plan payment wasn't completed. Organizer accounts require an active plan."
             : "This organizer profile doesn't exist or may have been removed."}
         </p>
-        {notFoundIsOwner ? (
-          notFoundIsPaid ? (
-            <button
-              onClick={() => router.replace("/organizer-profile")}
-              style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}
-            >
-              ✏️ Set Up My Profile
-            </button>
-          ) : (
-            <button
-              onClick={() => router.replace("/organizer-info")}
-              style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}
-            >
-              🎪 Complete My Organizer Signup
-            </button>
-          )
-        ) : null}
-        <button
-          onClick={() => router.replace(notFoundIsOwner ? (notFoundIsPaid ? "/organizer-dashboard" : "/home") : "/marketplace")}
-          style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}
-        >
+        {notFoundIsOwner && (
+          <button onClick={() => router.replace(notFoundIsPaid ? "/organizer-profile" : "/organizer-info")} style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}>
+            {notFoundIsPaid ? "✏️ Set Up My Profile" : "🎪 Complete My Organizer Signup"}
+          </button>
+        )}
+        <button onClick={() => router.replace(notFoundIsOwner ? (notFoundIsPaid ? "/organizer-dashboard" : "/home") : "/marketplace")} style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}>
           {notFoundIsOwner ? "← Back to Dashboard" : "← Back to Marketplace"}
         </button>
       </div>
@@ -169,7 +140,7 @@ export default function OrganizerPublicProfile() {
   const iL = { display: "flex", opacity: 1, transition: "opacity 0.2s" };
 
   return (
-    <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative" }}>
+    <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative", fontFamily: "sans-serif" }}>
 
       {isOwner && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -190,17 +161,26 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      <h1 style={{ marginBottom: 5 }}>{organizer.organizer_name || "Organizer"}</h1>
+      <h1 style={{ marginBottom: 4 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
-      {organizer.logo_url && <img src={organizer.logo_url} onClick={() => setSelectedImage(organizer.logo_url)} style={{ width: 160, height: 160, objectFit: "cover", borderRadius: 12, marginBottom: 20, cursor: "pointer" }} />}
-      <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
-      <p><strong>Location:</strong> {organizer.city}{organizer.state ? `, ${organizer.state}` : ""}</p>
-      <p style={{ marginTop: 20 }}>{organizer.description}</p>
-      <div style={{ marginTop: 15 }}>
-        {organizer.tags?.map(tag => <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>{tag}</span>)}
+
+      {/* LOGO — fills square, cover crop, thin border */}
+      {organizer.logo_url && (
+        <div onClick={() => setSelectedImage(organizer.logo_url)} style={thumbStyle(160, 160, 12)}>
+          <img src={organizer.logo_url} alt="logo" style={thumbImg} />
+        </div>
+      )}
+
+      <div style={{ marginTop: 16 }}>
+        <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
+        <p><strong>Location:</strong> {organizer.city}{organizer.state ? `, ${organizer.state}` : ""}</p>
+        {organizer.description && <p style={{ marginTop: 16, lineHeight: 1.6 }}>{organizer.description}</p>}
+        <div style={{ marginTop: 12 }}>
+          {organizer.tags?.map(tag => <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>{tag}</span>)}
+        </div>
       </div>
 
-      <div style={{ marginTop: 25 }}>
+      <div style={{ marginTop: 20 }}>
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
           {organizer.website   && <a href={formatSocialLink("website",   organizer.website)}   target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><WebsiteIcon /></a>}
@@ -212,17 +192,23 @@ export default function OrganizerPublicProfile() {
         </div>
       </div>
 
-      <div style={{ marginTop: 30 }}>
+      {/* PORTFOLIO — all images fill frame */}
+      <div style={{ marginTop: 28 }}>
         <h3>Portfolio</h3>
         {organizer.portfolio_images && organizer.portfolio_images.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => <img key={i} src={img} alt="portfolio" onClick={() => setSelectedImage(img)} style={{ width: "100%", height: 150, objectFit: "cover", borderRadius: 8, cursor: "pointer" }} />)}
+            {organizer.portfolio_images.map((img, i) => (
+              <div key={i} onClick={() => setSelectedImage(img)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}>
+                <img src={img} alt="portfolio" style={thumbImg} />
+              </div>
+            ))}
           </div>
         ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
 
+      {/* VIDEOS */}
       {organizer.account_type === "elite" && organizer.video_urls && organizer.video_urls.filter(v => v).length > 0 && (
-        <div style={{ marginTop: 30 }}>
+        <div style={{ marginTop: 24 }}>
           <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {organizer.video_urls.filter(v => v).map((url, i) => {
@@ -237,19 +223,21 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      {/* ELITE EVENTS — cards open popup */}
+      {/* ELITE EVENTS */}
       {organizer.account_type === "elite" && (
-        <div style={{ marginTop: 30 }}>
+        <div style={{ marginTop: 28 }}>
           <h3>📅 Upcoming Events</h3>
           {events.length === 0 ? <p style={{ color: "#888" }}>No upcoming events posted yet.</p> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
               {events.map(event => (
                 <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }}
-                  style={{ border: "2px solid #AABB23", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}
+                  style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(170,187,35,0.3)"}
                   onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                  <div style={{ height: 130, backgroundColor: "#f4f4f4" }}>
-                    {event.flyer_url ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
+                  <div style={{ height: 130, overflow: "hidden" }}>
+                    {event.flyer_url
+                      ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                   </div>
                   <div style={{ padding: 12 }}>
                     <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h4>
@@ -258,7 +246,6 @@ export default function OrganizerPublicProfile() {
                       📅 {event.event_date ? new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD"}
                     </p>
                     {event.venue && <p style={{ margin: 0, color: "#888", fontSize: 12 }}>📍 {event.venue}</p>}
-                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "#AABB23" }}>Tap for details →</p>
                   </div>
                 </div>
               ))}
@@ -267,9 +254,9 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
+      {/* MESSAGING */}
       {!isOwner && (() => {
-        const vt = viewerProfile?.account_type;
-        const vr = viewerProfile?.role;
+        const vt = viewerProfile?.account_type, vr = viewerProfile?.role;
         const canMessage =
           vt === "featured" ||
           (vr === "organizer" && (vt === "basic" || vt === "pro" || vt === "elite"));
@@ -290,16 +277,16 @@ export default function OrganizerPublicProfile() {
         <button onClick={() => router.back()} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
 
-      {/* FULLSCREEN PORTFOLIO IMAGE */}
+      {/* FULLSCREEN IMAGE */}
       {selectedImage && (
-        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.85)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
-          <img src={selectedImage} alt="enlarged" style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 10 }} />
+        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.9)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
+          <img src={selectedImage} alt="enlarged" style={{ maxWidth: "95%", maxHeight: "90vh", borderRadius: 10, objectFit: "contain" }} />
         </div>
       )}
 
-      {/* EVENT POPUP MODAL */}
+      {/* EVENT POPUP */}
       {selectedEvent && (
-        <div onClick={() => { if (flyerFullscreen) { setFlyerFullscreen(false); } else { setSelectedEvent(null); } }}
+        <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
           {flyerFullscreen ? (
             <img src={selectedEvent.flyer_url} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", borderRadius: 8, objectFit: "contain" }} />
@@ -307,8 +294,7 @@ export default function OrganizerPublicProfile() {
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
               {selectedEvent.flyer_url && (
                 <div style={{ position: "relative" }}>
-                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name}
-                    onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }}
+                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }}
                     style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
@@ -321,7 +307,6 @@ export default function OrganizerPublicProfile() {
                 {selectedEvent.category && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#AABB23", fontWeight: "bold" }}>{selectedEvent.category}</p>}
                 <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>
                   📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Date TBD"}
-                  {selectedEvent.event_end_date && selectedEvent.event_end_date !== selectedEvent.event_date && <span> – {new Date(selectedEvent.event_end_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</span>}
                 </p>
                 {(selectedEvent.event_start_time || selectedEvent.event_end_time) && (
                   <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>
@@ -335,9 +320,7 @@ export default function OrganizerPublicProfile() {
                     🎟️ Get Tickets / More Info
                   </a>
                 )}
-                <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>
-                  Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span>
-                </p>
+                <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span></p>
               </div>
             </div>
           )}
