@@ -1,19 +1,11 @@
 // pages/organizer-profile.js
-
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-// For social link formatting only
 function cleanHandle(v) { return v.trim().replace(/^@/, "").replace(/\s+/g, ""); }
-
-// For the profile handle field — only allow letters, numbers, hyphens, underscores
-function sanitizeHandle(value) {
-  return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, "");
-}
-function isValidHandle(value) {
-  return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value);
-}
+function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
+function isValidHandle(value) { return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value); }
 
 function formatSocialLink(platform, value) {
   if (!value || !value.trim()) return "";
@@ -23,15 +15,15 @@ function formatSocialLink(platform, value) {
   if (v.startsWith("www.")) return `https://${v}`;
   const domains = { instagram: "instagram.com", facebook: "facebook.com", tiktok: "tiktok.com", youtube: "youtube.com" };
   if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
-  const handle = cleanHandle(v);
+  const h = cleanHandle(v);
   switch (platform) {
-    case "instagram": return `https://instagram.com/${handle}`;
-    case "facebook":  return `https://facebook.com/${handle}`;
-    case "tiktok":    return `https://tiktok.com/@${handle}`;
-    case "youtube":   return `https://youtube.com/@${handle}`;
-    case "x_twitter": return `https://x.com/${handle}`;
-    case "website":   return `https://${handle}`;
-    default:          return `https://${handle}`;
+    case "instagram": return `https://instagram.com/${h}`;
+    case "facebook": return `https://facebook.com/${h}`;
+    case "tiktok": return `https://tiktok.com/@${h}`;
+    case "youtube": return `https://youtube.com/@${h}`;
+    case "x_twitter": return `https://x.com/${h}`;
+    case "website": return `https://${h}`;
+    default: return `https://${h}`;
   }
 }
 function formatUrl(v) {
@@ -126,6 +118,14 @@ export default function OrganizerProfile() {
   };
 
   const handleSave = async () => {
+    // ── EMAIL REQUIRED ──
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user?.email) {
+      setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving your profile.");
+      return;
+    }
+
+    // ── LOGO REQUIRED ──
     if (!logoUrl && !logoFile) { setMessage("⚠️ Please upload a logo or choose a placeholder before saving."); return; }
 
     // ── HANDLE VALIDATION ──
@@ -216,32 +216,14 @@ export default function OrganizerProfile() {
 
       <input placeholder="Organizer Name" value={organizerName} onChange={e => setOrganizerName(e.target.value)} style={iS} />
 
-      {/* ── HANDLE FIELD WITH VALIDATION ── */}
       <div style={{ marginBottom: 12 }}>
-        <input
-          placeholder="Handle (e.g. MyEvents)"
-          value={handle}
-          onChange={e => setHandle(sanitizeHandle(e.target.value))}
-          style={{
-            ...iS, marginBottom: 4,
-            borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db",
-          }}
-        />
+        <input placeholder="Handle (e.g. MyEvents)" value={handle} onChange={e => setHandle(sanitizeHandle(e.target.value))}
+          style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
         {handle ? (
-          isValidHandle(handle) ? (
-            <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-              ✅ Your profile URL: <strong>app.entrepromarket.com/organizer/{handle}</strong>
-            </p>
-          ) : (
-            <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>
-              ❌ Only letters, numbers, hyphens (-) and underscores (_) allowed. No spaces.
-            </p>
-          )
-        ) : (
-          <p style={{ margin: 0, fontSize: 12, color: "#888" }}>
-            Your profile URL will be: app.entrepromarket.com/organizer/YourHandle
-          </p>
-        )}
+          isValidHandle(handle)
+            ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p>
+            : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>
+        ) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
       </div>
 
       <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
@@ -263,13 +245,25 @@ export default function OrganizerProfile() {
       {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
         <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
-        {logoUrl ? <img src={logoUrl} alt="logo" style={{ width: 90, height: 90, borderRadius: "50%", objectFit: "cover", border: "3px solid #701890", display: "block", marginBottom: 8 }} />
-          : <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ Upload a logo or choose a placeholder below.</p></div>}
+        {logoUrl ? (
+          <div style={{ width: 90, height: 90, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", marginBottom: 8 }}>
+            <img src={logoUrl} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </div>
+        ) : (
+          <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
+            <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ Upload a logo or choose a placeholder below.</p>
+          </div>
+        )}
         <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); }} style={{ display: "block", marginBottom: 10 }} />
         <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
         {showLogoPicker && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-            {DEFAULT_LOGOS.map((src, i) => <img key={i} src={src} onClick={() => { setLogoUrl(src); setLogoFile(null); setShowLogoPicker(false); }} style={{ width: "100%", aspectRatio: "1", borderRadius: "50%", objectFit: "cover", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }} />)}
+            {DEFAULT_LOGOS.map((src, i) => (
+              <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setShowLogoPicker(false); }}
+                style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
+                <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -277,13 +271,15 @@ export default function OrganizerProfile() {
       {/* PORTFOLIO */}
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={lS}>Portfolio</label>
-        <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8 }}>{portfolioImages.length}/{imageLimit} images used{atLimit && " — Remove some before adding more"}</p>
+        <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8 }}>{portfolioImages.length}/{imageLimit} images{atLimit && " — Remove some before adding more"}</p>
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC.</div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
             {portfolioImages.map((img, i) => (
               <div key={i} style={{ position: "relative" }}>
-                <img src={img} style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                  <img src={img} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
                 <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
               </div>
             ))}
@@ -314,22 +310,24 @@ export default function OrganizerProfile() {
             </select>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Date</label><input type="date" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date <span style={{ fontWeight: "normal", color: "#888" }}>(multi-day)</span></label><input type="date" value={eventForm.event_end_date} onChange={e => setEventForm({ ...eventForm, event_end_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date</label><input type="date" value={eventForm.event_end_date} onChange={e => setEventForm({ ...eventForm, event_end_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => setEventForm({ ...eventForm, event_start_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => setEventForm({ ...eventForm, event_end_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
             <input placeholder="Venue" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
-            <input placeholder="Event Type (e.g. Concert, Pop Up)" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
+            <input placeholder="Event Type" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
-            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(https:// auto-added)</span></label>
+            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
             <input placeholder="e.g. eventbrite.com/your-event" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
-            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span> <span style={{ fontSize: 11, color: "#888", fontWeight: "normal" }}>(required — tap to view full size)</span></label>
+            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span></label>
             {flyerPreviewSrc ? (
               <div style={{ marginBottom: 10 }}>
-                <img src={flyerPreviewSrc} alt="flyer" onClick={() => setFlyerFullscreen(true)} style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 8, border: "2px solid #AABB23", cursor: "zoom-in", display: "block" }} />
-                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); }} style={{ marginTop: 4, fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer" }}>✕ Remove flyer</button>
+                <div style={{ height: 200, borderRadius: 8, overflow: "hidden", border: "2px solid #AABB23", marginBottom: 6 }}>
+                  <img src={flyerPreviewSrc} alt="flyer" onClick={() => setFlyerFullscreen(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "zoom-in" }} />
+                </div>
+                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer" }}>✕ Remove flyer</button>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
@@ -339,8 +337,13 @@ export default function OrganizerProfile() {
             <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={e => { setFlyerFile(e.target.files[0]); setShowFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
             <button onClick={() => setShowFlyerPicker(!showFlyerPicker)} style={{ padding: "4px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, marginBottom: 8 }}>{showFlyerPicker ? "Hide" : "Browse Placeholders"}</button>
             {showFlyerPicker && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                {FLYER_PLACEHOLDERS.map((src, i) => <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setShowFlyerPicker(false); }} style={{ cursor: "pointer", border: eventForm.flyer_url === src ? "3px solid #AABB23" : "2px solid transparent", borderRadius: 8, overflow: "hidden" }}><img src={src} style={{ width: "100%", height: 80, objectFit: "cover", display: "block" }} /></div>)}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
+                {FLYER_PLACEHOLDERS.map((src, i) => (
+                  <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setShowFlyerPicker(false); }}
+                    style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: eventForm.flyer_url === src ? "3px solid #AABB23" : "2px solid transparent" }}>
+                    <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                ))}
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -353,15 +356,17 @@ export default function OrganizerProfile() {
               {events.map(ev => (
                 <div key={ev.id} style={{ backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    {ev.flyer_url && <img src={ev.flyer_url} onClick={() => { setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "" }); setFlyerFullscreen(true); }} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, flexShrink: 0, cursor: "zoom-in" }} />}
+                    {ev.flyer_url && (
+                      <div style={{ width: 56, height: 56, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}>
+                        <img src={ev.flyer_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
+                    )}
                     <div>
                       <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
                       {ev.category && <p style={{ margin: "1px 0 0", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{ev.category}</p>}
                       <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
                         {ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}
-                        {ev.event_end_date && ev.event_end_date !== ev.event_date && ` – ${new Date(ev.event_end_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                         {ev.event_start_time && ` · ${formatTime(ev.event_start_time)}`}
-                        {ev.event_end_time && ` – ${formatTime(ev.event_end_time)}`}
                       </p>
                       {ev.venue && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#aaa" }}>{ev.venue}</p>}
                     </div>
