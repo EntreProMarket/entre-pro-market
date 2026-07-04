@@ -1,5 +1,5 @@
 // pages/vendor-profile.js
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
@@ -15,17 +15,18 @@ function formatSocialLink(platform, value) {
   if (v.startsWith("www.")) return `https://${v}`;
   const domains = { instagram: "instagram.com", facebook: "facebook.com", tiktok: "tiktok.com", youtube: "youtube.com" };
   if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
-  const handle = cleanHandle(v);
+  const h = cleanHandle(v);
   switch (platform) {
-    case "instagram": return `https://instagram.com/${handle}`;
-    case "facebook": return `https://facebook.com/${handle}`;
-    case "tiktok": return `https://tiktok.com/@${handle}`;
-    case "youtube": return `https://youtube.com/@${handle}`;
-    case "x_twitter": return `https://x.com/${handle}`;
-    case "website": return `https://${handle}`;
-    default: return `https://${handle}`;
+    case "instagram": return `https://instagram.com/${h}`;
+    case "facebook": return `https://facebook.com/${h}`;
+    case "tiktok": return `https://tiktok.com/@${h}`;
+    case "youtube": return `https://youtube.com/@${h}`;
+    case "x_twitter": return `https://x.com/${h}`;
+    case "website": return `https://${h}`;
+    default: return `https://${h}`;
   }
 }
+
 function compressImage(file, maxWidth = 1200, quality = 0.8) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -45,7 +46,6 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-// ── TIER-BASED SHOP LIMITS ──
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
 
@@ -80,11 +80,8 @@ export default function VendorProfile() {
   const [videoLimits, setVideoLimits] = useState({ free: 0, premium: 5, featured: 10 });
   const photoLimit = photoLimits[accountType] ?? photoLimits.free;
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
-
-  // ── tier-based shop limits ──
   const productLimit = PRODUCT_LIMITS[accountType] ?? PRODUCT_LIMITS.free;
   const productImageLimit = PRODUCT_IMAGE_LIMITS[accountType] ?? PRODUCT_IMAGE_LIMITS.free;
-
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
   const [newProductImages, setNewProductImages] = useState([]);
@@ -117,8 +114,7 @@ export default function VendorProfile() {
         setCity(p.city || ""); setState(p.state || ""); setDescription(p.description || "");
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
-        setPortfolioImages(p.portfolio_images || []);
-        setLogoUrl(p.logo_url || "");
+        setPortfolioImages(p.portfolio_images || []); setLogoUrl(p.logo_url || "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
       await loadProducts(user.id);
@@ -140,23 +136,30 @@ export default function VendorProfile() {
   };
 
   const handleSave = async () => {
+    // ── EMAIL REQUIRED ──
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user?.email) {
+      setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving your profile.");
+      return;
+    }
+
+    // ── HANDLE VALIDATION ──
     if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
     if (!isValidHandle(handle)) {
       setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces or special characters.");
       return;
     }
+
+    // ── LOGO REQUIRED ──
     if (!logoFile && !logoUrl) {
       setMessage("❌ Please upload a logo image before saving your profile.");
       return;
     }
 
     setSaving(true); setMessage("");
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-    if (!user) return;
+    const user = authData.user;
     try {
-      const { data: ex } = await supabase.from("profiles").select("logo_url").eq("id", user.id).single();
-      let finalLogoUrl = ex?.logo_url || logoUrl || null;
+      let finalLogoUrl = logoUrl || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
         const comp = await compressImage(logoFile, 800, 0.85);
@@ -212,15 +215,12 @@ export default function VendorProfile() {
     const { error } = await supabase.from("vendor_products").insert({
       vendor_id: userId, title: newProduct.title, description: newProduct.description,
       price: Math.round(parseFloat(newProduct.price) * 100),
-      image_url: uploadedUrls[0],
-      images: uploadedUrls,
-      is_active: true,
+      image_url: uploadedUrls[0], images: uploadedUrls, is_active: true,
     });
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product added!");
     setNewProduct({ title: "", description: "", price: "" });
-    setNewProductImages([]);
-    setNewProductImageKey(k => k + 1);
+    setNewProductImages([]); setNewProductImageKey(k => k + 1);
     await loadProducts(userId);
   };
 
@@ -238,8 +238,7 @@ export default function VendorProfile() {
     const { error } = await supabase.from("vendor_products").update({
       title: editForm.title, description: editForm.description,
       price: Math.round(parseFloat(editForm.price) * 100),
-      image_url: updatedImages[0] || null,
-      images: updatedImages,
+      image_url: updatedImages[0] || null, images: updatedImages,
     }).eq("id", editingProduct);
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product updated!"); setEditingProduct(null);
@@ -264,22 +263,15 @@ export default function VendorProfile() {
       {activeTab === "profile" && (
         <>
           <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
+
           <div style={{ marginBottom: 12 }}>
-            <input
-              placeholder="Handle (e.g. MyBakery)"
-              value={handle}
-              onChange={e => setHandle(sanitizeHandle(e.target.value))}
-              style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }}
-            />
+            <input placeholder="Handle (e.g. MyBakery)" value={handle} onChange={e => setHandle(sanitizeHandle(e.target.value))}
+              style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
             {handle ? (
-              isValidHandle(handle) ? (
-                <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ Your profile URL: <strong>app.entrepromarket.com/vendor/{handle}</strong></p>
-              ) : (
-                <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens (-) and underscores (_) allowed. No spaces.</p>
-              )
-            ) : (
-              <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL will be: app.entrepromarket.com/vendor/YourHandle</p>
-            )}
+              isValidHandle(handle)
+                ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/vendor/{handle}</p>
+                : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores allowed. No spaces.</p>
+            ) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/vendor/YourHandle</p>}
           </div>
 
           <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
@@ -300,7 +292,11 @@ export default function VendorProfile() {
 
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
-            {logoUrl && !logoFile && <img src={logoUrl} alt="current logo" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: 8, display: "block", marginBottom: 8, border: "1px solid #eee" }} />}
+            {logoUrl && !logoFile && (
+              <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", marginBottom: 8 }}>
+                <img src={logoUrl} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </div>
+            )}
             {!logoUrl && !logoFile && (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
                 <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p>
@@ -317,7 +313,9 @@ export default function VendorProfile() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
                   <div key={i} style={{ position: "relative" }}>
-                    <img src={img} alt="" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                    <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                      <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
                     <button onClick={() => setPortfolioImages(portfolioImages.filter(x => x !== img))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
                   </div>
                 ))}
@@ -332,6 +330,7 @@ export default function VendorProfile() {
               }} />
             )}
           </div>
+
           {videoLimit > 0 && (
             <div style={{ marginBottom: 20 }}>
               <label style={lS}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok</label>
@@ -340,6 +339,7 @@ export default function VendorProfile() {
               ))}
             </div>
           )}
+
           {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("❌") ? "#fef2f2" : "#eff6ff", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("❌") ? "#fca5a5" : "#93c5fd"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("❌") ? "#991b1b" : "#1e40af", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
             <button onClick={() => router.replace("/vendor-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
@@ -357,12 +357,8 @@ export default function VendorProfile() {
             <input placeholder="Venmo (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
             <button onClick={async () => {
               setSaving(true);
-              await supabase.from("profiles").update({
-                cashapp_handle: cashappHandle.replace(/^\$/, "").trim(),
-                venmo_handle: venmoHandle.replace(/^@/, "").trim(),
-              }).eq("id", userId);
-              setSaving(false);
-              setMessage("✅ Payment handles saved!");
+              await supabase.from("profiles").update({ cashapp_handle: cashappHandle.replace(/^\$/, "").trim(), venmo_handle: venmoHandle.replace(/^@/, "").trim() }).eq("id", userId);
+              setSaving(false); setMessage("✅ Payment handles saved!");
             }} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>
               {saving ? "Saving..." : "Save Handles"}
             </button>
@@ -373,8 +369,14 @@ export default function VendorProfile() {
             <span style={{ fontSize: 13, color: shopProducts.length >= productLimit ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {productLimit}</span>
           </div>
           <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>
-            Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan allows up to <strong>{productLimit} products</strong>, each with up to <strong>{productImageLimit} images</strong>.
+            Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.
           </p>
+
+          {shopProducts.length >= productLimit && (
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>
+              ⚠️ You've reached your {productLimit}-product limit. Upgrade to add more.
+            </div>
+          )}
 
           {shopProducts.length < productLimit && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
@@ -382,12 +384,14 @@ export default function VendorProfile() {
               <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
               <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
-              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first image is the main photo)</span></label>
+              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is the main photo)</span></label>
               {newProductImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
                   {newProductImages.map((file, i) => (
                     <div key={i} style={{ position: "relative" }}>
-                      <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+                      <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                        <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
                       <button onClick={() => setNewProductImages(newProductImages.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
                       {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
                     </div>
@@ -396,19 +400,10 @@ export default function VendorProfile() {
               )}
               {newProductImages.length < productImageLimit && (
                 <input key={newProductImageKey} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" multiple
-                  onChange={e => {
-                    const remaining = productImageLimit - newProductImages.length;
-                    const files = Array.from(e.target.files).slice(0, remaining);
-                    setNewProductImages(prev => [...prev, ...files].slice(0, productImageLimit));
-                  }}
+                  onChange={e => { const remaining = productImageLimit - newProductImages.length; const files = Array.from(e.target.files).slice(0, remaining); setNewProductImages(prev => [...prev, ...files].slice(0, productImageLimit)); }}
                   style={{ display: "block", marginBottom: 12 }} />
               )}
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
-            </div>
-          )}
-          {shopProducts.length >= productLimit && (
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>
-              ⚠️ You've reached your {productLimit}-product limit for the {accountType} plan. Upgrade to add more products.
             </div>
           )}
 
@@ -421,9 +416,8 @@ export default function VendorProfile() {
                 return (
                   <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
                     {productImages.length > 0 && (
-                      <div style={{ position: "relative", width: 80, height: 80, flexShrink: 0 }}>
-                        <img src={productImages[0]} alt={p.title} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} />
-                        {productImages.length > 1 && <div style={{ position: "absolute", bottom: 2, right: 2, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>+{productImages.length - 1}</div>}
+                      <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}>
+                        <img src={productImages[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                       </div>
                     )}
                     <div style={{ flex: 1 }}>
@@ -436,7 +430,9 @@ export default function VendorProfile() {
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
                               {editProductImages.map((url, i) => (
                                 <div key={i} style={{ position: "relative" }}>
-                                  <img src={url} alt="" style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 6 }} />
+                                  <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                                    <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                                  </div>
                                   <button onClick={() => removeEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
                                   {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
                                 </div>
@@ -462,7 +458,7 @@ export default function VendorProfile() {
                           <p style={{ margin: "0 0 8px", color: "#701890", fontWeight: "bold", fontSize: 14 }}>${(p.price / 100).toFixed(2)}</p>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, backgroundColor: p.is_active ? "#f0fdf4" : "#fef2f2", color: p.is_active ? "#166534" : "#991b1b", fontWeight: "bold" }}>{p.is_active ? "Active" : "Hidden"}</span>
                           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <button onClick={() => { const imgs = p.images && p.images.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                            <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                             <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                             <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                           </div>
@@ -476,7 +472,6 @@ export default function VendorProfile() {
           )}
 
           {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", borderRadius: 6, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
-
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
             <button onClick={() => setActiveTab("profile")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back to Profile</button>
           </div>
