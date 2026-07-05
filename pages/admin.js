@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-const TABS = ["Overview", "Plans & Pricing", "Users", "Featured Vendors", "Premium Vendors", "Pro Organizers", "Elite Organizers", "Ads", "Reports", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Users", "Featured Vendors", "Premium Vendors", "Pro Organizers", "Elite Organizers", "Ads", "Reports", "Exports", "Settings"];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function AdminDashboard() {
   const [downgradeReason, setDowngradeReason] = useState("");
   const [downgrading, setDowngrading] = useState(false);
   const [userInfoModal, setUserInfoModal] = useState(null);
-  const [userInfoLoading, setUserInfoLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(null);
   const [limits, setLimits] = useState({
     vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
     vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
@@ -96,7 +96,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch("/api/admin-update-tier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, newTier: newAccountType }) });
       const data = await res.json();
-      if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, account_type: newAccountType } : u)); setMessage("✅ User tier updated!"); }
+      if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, account_type: newAccountType } : u)); setMessage("✅ Tier updated!"); }
       else setMessage("❌ Error: " + data.error);
     } catch (err) { setMessage("❌ Error: " + err.message); }
   };
@@ -111,13 +111,36 @@ export default function AdminDashboard() {
   };
 
   const viewUserInfo = async (userId) => {
-    setUserInfoLoading(true); setUserInfoModal({ loading: true });
+    setUserInfoModal({ loading: true });
     try {
       const res = await fetch("/api/admin-get-user-info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
       const data = await res.json();
       setUserInfoModal(data.success ? data : { error: data.error });
     } catch (err) { setUserInfoModal({ error: err.message }); }
-    setUserInfoLoading(false);
+  };
+
+  // ── CSV EXPORT ──
+  const downloadCSV = async (type, filename) => {
+    setExportLoading(type);
+    try {
+      const res = await fetch("/api/admin-export-users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) });
+      const data = await res.json();
+      if (!data.success) { setMessage("❌ Export failed: " + data.error); return; }
+      const rows = data.rows;
+      if (rows.length === 0) { setMessage("⚠️ No data to export."); return; }
+      const headers = Object.keys(rows[0]);
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => headers.map(h => `"${(row[h] || "").toString().replace(/"/g, '""')}"`).join(","))
+      ].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      setMessage(`✅ Downloaded ${rows.length} records as ${filename}`);
+    } catch (err) { setMessage("❌ Export error: " + err.message); }
+    setExportLoading(null);
   };
 
   const saveLimits = async () => {
@@ -150,7 +173,7 @@ export default function AdminDashboard() {
     return (
       <div style={{ backgroundColor: "white", border: `1px solid ${isTier ? color : "#eee"}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {user.logo_url && <img src={user.logo_url} alt="logo" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover" }} />}
+          {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
           <div>
             <strong>{user.organizer_name || user.business_name || "—"}</strong>
             <p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p>
@@ -158,7 +181,7 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => viewUserInfo(user.id)} style={{ padding: "6px 12px", backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 11 }}>ℹ️ Info</button>
+          <button onClick={() => viewUserInfo(user.id)} style={{ padding: "6px 12px", backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 11 }}>ℹ️</button>
           <button onClick={() => handleTierChange(user, isTier ? "basic" : targetTier)} style={{ padding: "8px 14px", backgroundColor: isTier ? "#cc0000" : color, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
             {isTier ? "⬇️ Downgrade" : `${icon} Make ${label}`}
           </button>
@@ -182,7 +205,7 @@ export default function AdminDashboard() {
             </div>
             {userInfoModal.loading ? <p style={{ color: "#888" }}>Loading...</p> : userInfoModal.error ? <p style={{ color: "#cc0000" }}>❌ {userInfoModal.error}</p> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {userInfoModal.profile?.logo_url && <img src={userInfoModal.profile.logo_url} alt="logo" style={{ width: 70, height: 70, borderRadius: 10, objectFit: "cover" }} />}
+                {userInfoModal.profile?.logo_url && <div style={{ width: 70, height: 70, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={userInfoModal.profile.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                 {[
                   ["Name", userInfoModal.profile?.business_name || userInfoModal.profile?.organizer_name || "—"],
                   ["Handle", "@" + (userInfoModal.profile?.handle || "—")],
@@ -215,7 +238,7 @@ export default function AdminDashboard() {
           <div style={{ backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%" }}>
             <h3 style={{ margin: "0 0 8px", color: "#cc0000" }}>⚠️ Confirm Downgrade</h3>
             <p style={{ color: "#555", fontSize: 14, margin: "0 0 16px" }}>Downgrading <strong>{downgradeModal.userName}</strong> from <strong style={{ color: tierColor(downgradeModal.fromTier) }}>{downgradeModal.fromTier}</strong> to <strong style={{ color: tierColor(downgradeModal.toTier) }}>{downgradeModal.toTier}</strong>.</p>
-            <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#991b1b" }}>🔴 This will <strong>cancel their Stripe subscription</strong> and send a notification email.</div>
+            <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#991b1b" }}>🔴 This will <strong>cancel their Stripe subscription</strong> and send them a notification email.</div>
             <label style={{ display: "block", fontWeight: "bold", fontSize: 13, marginBottom: 6 }}>Reason <span style={{ color: "#888", fontWeight: "normal" }}>(optional)</span></label>
             <textarea value={downgradeReason} onChange={e => setDowngradeReason(e.target.value)} placeholder="e.g. Chargeback, terms violation..." rows={3} style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box", resize: "vertical", marginBottom: 20 }} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -246,7 +269,7 @@ export default function AdminDashboard() {
       </div>
 
       {message && (
-        <div style={{ margin: "16px 24px 0", padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : "#fef2f2", border: `1px solid ${message.startsWith("✅") ? "#86efac" : "#fca5a5"}`, borderRadius: 8, color: message.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold" }}>
+        <div style={{ margin: "16px 24px 0", padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("⚠️") ? "#fffbeb" : "#fef2f2", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("⚠️") ? "#fcd34d" : "#fca5a5"}`, borderRadius: 8, color: message.startsWith("✅") ? "#166534" : message.startsWith("⚠️") ? "#92400e" : "#991b1b", fontWeight: "bold" }}>
           {message}
         </div>
       )}
@@ -256,7 +279,7 @@ export default function AdminDashboard() {
         {activeTab === "Overview" && (
           <div>
             <h2 style={{ marginBottom: 20 }}>📊 Overview</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16, marginBottom: 32 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16 }}>
               {[{ label: "Total Vendors", value: stats.totalVendors, color: "#701890" }, { label: "Total Organizers", value: stats.totalOrganizers, color: "#AABB23" }, { label: "Premium Vendors", value: stats.premiumVendors, color: "#701890" }, { label: "Featured Vendors", value: stats.featuredVendors, color: "#AABB23" }, { label: "Pro Organizers", value: stats.proOrganizers, color: "#701890" }, { label: "Elite Organizers", value: stats.eliteOrganizers, color: "#AABB23" }].map(stat => (
                 <div key={stat.label} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "20px 16px", textAlign: "center" }}>
                   <p style={{ fontSize: 32, fontWeight: "bold", color: stat.color, margin: 0 }}>{stat.value}</p>
@@ -299,7 +322,7 @@ export default function AdminDashboard() {
         {activeTab === "Users" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>👥 Users</h2>
-            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Tap ℹ️ Info to view a user's full signup details including email.</p>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Tap ℹ️ Info to view full signup details including email.</p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -334,12 +357,12 @@ export default function AdminDashboard() {
 
         {activeTab === "Featured Vendors" && (
           <div>
-            <h2 style={{ marginBottom: 6 }}>🔥 Featured Vendors</h2>
+            <h2 style={{ marginBottom: 16 }}>🔥 Featured Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {users.filter(u => u.role === "vendor").map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: `1px solid ${user.account_type === "featured" ? "#AABB23" : "#eee"}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    {user.logo_url && <img src={user.logo_url} alt="logo" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover" }} />}
+                    {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                     <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><span style={{ fontSize: 11, fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type}</span></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -355,12 +378,12 @@ export default function AdminDashboard() {
 
         {activeTab === "Premium Vendors" && (
           <div>
-            <h2 style={{ marginBottom: 6 }}>💜 Premium Vendors</h2>
+            <h2 style={{ marginBottom: 16 }}>💜 Premium Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {users.filter(u => u.role === "vendor").map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: `1px solid ${user.account_type === "premium" ? "#701890" : "#eee"}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    {user.logo_url && <img src={user.logo_url} alt="logo" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover" }} />}
+                    {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                     <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><span style={{ fontSize: 11, fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type}</span></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -376,7 +399,7 @@ export default function AdminDashboard() {
 
         {activeTab === "Pro Organizers" && (
           <div>
-            <h2 style={{ marginBottom: 6 }}>🚀 Pro Organizers</h2>
+            <h2 style={{ marginBottom: 16 }}>🚀 Pro Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {users.filter(u => u.role === "organizer").map(user => <OrganizerTierCard key={user.id} user={user} targetTier="pro" color="#701890" label="Pro" icon="🚀" />)}
             </div>
@@ -385,7 +408,7 @@ export default function AdminDashboard() {
 
         {activeTab === "Elite Organizers" && (
           <div>
-            <h2 style={{ marginBottom: 6 }}>👑 Elite Organizers</h2>
+            <h2 style={{ marginBottom: 16 }}>👑 Elite Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {users.filter(u => u.role === "organizer").map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
             </div>
@@ -442,6 +465,41 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ── EXPORTS TAB ── */}
+        {activeTab === "Exports" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>📥 Export User Data</h2>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 28 }}>Download spreadsheets (.csv) directly to your phone or computer. Opens in Excel, Google Sheets, or any spreadsheet app.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
+              {[
+                { type: "vendors", label: "Vendors", icon: "🛒", color: "#701890", bg: "#f3e8ff", desc: "All vendors — name, handle, email, tier, city, state, category, signup date" },
+                { type: "organizers", label: "Organizers", icon: "🎪", color: "#AABB23", bg: "#f9ffe8", desc: "All organizers — name, handle, email, tier, city, state, category, signup date" },
+                { type: "public", label: "Public Users", icon: "👤", color: "#555", bg: "#f5f5f5", desc: "Public accounts with no role — email and signup date" },
+              ].map(({ type, label, icon, color, bg, desc }) => (
+                <div key={type} style={{ backgroundColor: "white", border: `1px solid ${color}30`, borderRadius: 12, padding: 24 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: bg, borderRadius: 20, padding: "5px 14px", marginBottom: 14 }}>
+                    <span>{icon}</span>
+                    <span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label}</span>
+                  </div>
+                  <p style={{ color: "#666", fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>{desc}</p>
+                  <button
+                    onClick={() => downloadCSV(type, `entrepromarket-${type}-${new Date().toISOString().split("T")[0]}.csv`)}
+                    disabled={exportLoading === type}
+                    style={{ width: "100%", padding: "12px", backgroundColor: color, color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14, opacity: exportLoading === type ? 0.7 : 1 }}
+                  >
+                    {exportLoading === type ? "Preparing..." : `⬇️ Download ${label} CSV`}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "14px 20px", marginTop: 24 }}>
+              <p style={{ margin: 0, fontSize: 13, color: "#166534" }}>
+                ✅ Files download directly to your device. On mobile they save to your Downloads folder. On desktop they save to your Downloads folder automatically.
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeTab === "Settings" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>⚙️ Settings</h2>
@@ -467,7 +525,6 @@ export default function AdminDashboard() {
               <h3 style={{ marginTop: 0 }}>App Links</h3>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>Opens in a new tab so the Admin panel stays open.</p>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {/* ── FIXED: open in new tab so back button returns to admin ── */}
                 <button onClick={() => window.open('/home', '_blank')} style={smallBtnStyle}>Homepage</button>
                 <button onClick={() => window.open('/marketplace', '_blank')} style={smallBtnStyle}>Marketplace</button>
                 <button onClick={() => window.open('/vendor-info', '_blank')} style={smallBtnStyle}>Vendor Info</button>
