@@ -76,7 +76,7 @@ export default function Marketplace() {
 
       {/* HEADER — logo enlarged to 140px */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
-        <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 140, height: 140, objectFit: "contain", borderRadius: "50%" }} />
+        <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%" }} />
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button onClick={() => router.push("/home")} style={{ padding: "7px 14px", backgroundColor: "white", color: "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🏡 Home</button>
           {user ? (
