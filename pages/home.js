@@ -47,11 +47,17 @@ export default function HomePage() {
       {/* ── HEADER — matches marketplace layout exactly ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "flex-end", alignItems: "center", flex: 1, marginLeft: 24 }}>
-          {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
-          {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
-          <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
-          <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }} style={{ padding: "8px 16px", backgroundColor: "white", color: "#666", border: "1px solid #ddd", borderRadius: 20, cursor: "pointer", fontSize: 13 }}>Log Out</button>
+        <div style={{ display: "flex", flex: 1, marginLeft: 24, alignItems: "center", justifyContent: "space-between" }}>
+          {/* Left column: Dashboard over Marketplace */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
+            {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
+            <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
+          </div>
+          {/* Right: Log Out aligned to top */}
+          <div style={{ alignSelf: "flex-start" }}>
+            <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }} style={{ padding: "8px 16px", backgroundColor: "white", color: "#666", border: "1px solid #ddd", borderRadius: 20, cursor: "pointer", fontSize: 13 }}>Log Out</button>
+          </div>
         </div>
       </div>
 
