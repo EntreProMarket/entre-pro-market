@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import FooterBar from "../components/FooterBar";
+import PageFooter from "../components/PageFooter";
 
 const CATEGORIES = ["All","DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"];
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
@@ -24,12 +26,9 @@ export default function Marketplace() {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
       setUser(userData?.user || null);
-      const { data } = await supabase.from("profiles").select("id, business_name, category, city, state, description, logo_url, account_type, handle, tags, portfolio_images").eq("role", "vendor").not("handle", "is", null).not("business_name", "is", null);
+      const { data } = await supabase.from("profiles").select("id, business_name, category, city, state, description, logo_url, account_type, handle, tags").eq("role", "vendor").not("handle", "is", null).not("business_name", "is", null);
       if (data) {
-        const featured = shuffle(data.filter(v => v.account_type === "featured"));
-        const premium = shuffle(data.filter(v => v.account_type === "premium"));
-        const free = shuffle(data.filter(v => !["featured","premium"].includes(v.account_type)));
-        const sorted = [...featured, ...premium, ...free];
+        const sorted = [...shuffle(data.filter(v => v.account_type === "featured")), ...shuffle(data.filter(v => v.account_type === "premium")), ...shuffle(data.filter(v => !["featured","premium"].includes(v.account_type)))];
         setVendors(sorted); setFiltered(sorted);
       }
       setLoading(false);
@@ -42,11 +41,7 @@ export default function Marketplace() {
     if (selectedCategory !== "All") result = result.filter(v => v.category === selectedCategory);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(v =>
-        v.business_name?.toLowerCase().includes(q) || v.category?.toLowerCase().includes(q) ||
-        v.city?.toLowerCase().includes(q) || v.description?.toLowerCase().includes(q) ||
-        v.tags?.some(t => t.toLowerCase().includes(q))
-      );
+      result = result.filter(v => v.business_name?.toLowerCase().includes(q) || v.category?.toLowerCase().includes(q) || v.city?.toLowerCase().includes(q) || v.tags?.some(t => t.toLowerCase().includes(q)));
     }
     setFiltered(result);
   }, [selectedCategory, searchQuery, vendors]);
@@ -72,18 +67,15 @@ export default function Marketplace() {
   if (loading) return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>Loading marketplace...</div>;
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif", padding: "0 0 40px" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif", paddingBottom: 40 }}>
 
-      {/* HEADER — logo enlarged to 140px */}
+      {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
-        <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%" }} />
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button onClick={() => router.push("/home")} style={{ padding: "7px 14px", backgroundColor: "white", color: "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🏡 Home</button>
-          {user ? (
-            <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>📊 Dashboard</button>
-          ) : (
-            <button onClick={() => router.push("/")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>Log In</button>
-          )}
+          {user ? <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>📊 Dashboard</button>
+          : <button onClick={() => router.push("/")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>Log In</button>}
         </div>
       </div>
 
@@ -149,14 +141,19 @@ export default function Marketplace() {
         )}
       </div>
 
+      <PageFooter />
+      <FooterBar />
+
+      {/* EMAIL GATE */}
       {emailGateOpen && (
         <div onClick={() => setEmailGateOpen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", textAlign: "center" }}>
             <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 100, height: 100, objectFit: "contain", borderRadius: "50%", marginBottom: 20 }} />
-            <h2 style={{ margin: "0 0 8px" }}>Join to View Vendor Profiles</h2>
+            <h2 style={{ margin: "0 0 8px" }}>Browse Our Vendors</h2>
             {!gateSubmitted ? (
               <>
-                <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>Sign up free to access the full marketplace and contact vendors.</p>
+                {/* ── FIXED WORDING ── */}
+                <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>Sign up free to browse and shop a variety of vendors by category.</p>
                 <input type="email" placeholder="Your email address" value={gateEmail} onChange={e => setGateEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleGateSubmit()} style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
                 <button onClick={handleGateSubmit} style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12 }}>Get Free Access</button>
                 <button onClick={() => { setEmailGateOpen(false); router.push("/"); }} style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Already have an account? Log in</button>
