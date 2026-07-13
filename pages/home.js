@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import FooterBar from "../components/FooterBar";
+import PageFooter from "../components/PageFooter";
 
 function formatTime(t) {
   if (!t) return "";
@@ -44,17 +46,15 @@ export default function HomePage() {
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
 
-      {/* ── HEADER — matches marketplace layout exactly ── */}
+      {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
         <div style={{ display: "flex", flex: 1, marginLeft: 24, alignItems: "center", justifyContent: "space-between" }}>
-          {/* Left column: Dashboard over Marketplace */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
           </div>
-          {/* Right: Log Out aligned to top */}
           <div style={{ alignSelf: "flex-start" }}>
             <button onClick={async () => { await supabase.auth.signOut(); router.replace("/"); }} style={{ padding: "8px 16px", backgroundColor: "white", color: "#666", border: "1px solid #ddd", borderRadius: 20, cursor: "pointer", fontSize: 13 }}>Log Out</button>
           </div>
@@ -62,7 +62,6 @@ export default function HomePage() {
       </div>
 
       <div style={{ padding: 20 }}>
-
         <AnnouncementBanner />
 
         {profile && !profile.role && (
@@ -78,7 +77,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* HERO BANNER */}
         <div style={{ background: "linear-gradient(135deg, #701890, #9b2fc4)", borderRadius: 16, padding: "32px 24px", marginBottom: 28, textAlign: "center", color: "white" }}>
           <h1 style={{ margin: "0 0 8px", fontSize: 22 }}>Welcome to Entre PRO Market</h1>
           <p style={{ margin: "0 0 20px", opacity: 0.9, fontSize: 15 }}>Connecting vendors with event organizers</p>
@@ -89,7 +87,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ADVERTISE */}
         <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 20px", marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <div>
             <p style={{ margin: 0, fontWeight: "bold", color: "#888B00", fontSize: 14 }}>📢 Advertise on EntreProMarket</p>
@@ -98,7 +95,6 @@ export default function HomePage() {
           <button onClick={() => router.push("/contact")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>Learn More</button>
         </div>
 
-        {/* FEATURED VENDORS */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>🔥 Featured Vendors</h2>
@@ -125,7 +121,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* UPCOMING EVENTS */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>👑 Upcoming Events</h2>
@@ -154,17 +149,17 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* ── COMMUNITY NEWS — restored ── */}
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
             <p style={{ fontSize: 14, margin: 0 }}>Community news and event highlights coming soon! 🎉</p>
           </div>
         </div>
-
       </div>
 
-      {/* EVENT POPUP */}
+      <PageFooter />
+      <FooterBar />
+
       {selectedEvent && (
         <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
@@ -187,17 +182,8 @@ export default function HomePage() {
                 <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
                 {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
                 {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
-                {selectedEvent.info_url && (
-                  <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer"
-                    style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>
-                    🎟️ Get Tickets / More Info
-                  </a>
-                )}
-                {selectedEvent.organizer?.handle && (
-                  <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>
-                    Event by <span onClick={() => { setSelectedEvent(null); router.push(`/organizer/${selectedEvent.organizer.handle}`); }} style={{ color: "#701890", fontWeight: "bold", cursor: "pointer", textDecoration: "underline" }}>@{selectedEvent.organizer.handle}</span>
-                  </p>
-                )}
+                {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
+                {selectedEvent.organizer?.handle && <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span onClick={() => { setSelectedEvent(null); router.push(`/organizer/${selectedEvent.organizer.handle}`); }} style={{ color: "#701890", fontWeight: "bold", cursor: "pointer", textDecoration: "underline" }}>@{selectedEvent.organizer.handle}</span></p>}
               </div>
             </div>
           )}
