@@ -118,23 +118,11 @@ export default function OrganizerProfile() {
   };
 
   const handleSave = async () => {
-    // ── EMAIL REQUIRED ──
     const { data: authData } = await supabase.auth.getUser();
-    if (!authData?.user?.email) {
-      setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving your profile.");
-      return;
-    }
-
-    // ── LOGO REQUIRED ──
+    if (!authData?.user?.email) { setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving."); return; }
     if (!logoUrl && !logoFile) { setMessage("⚠️ Please upload a logo or choose a placeholder before saving."); return; }
-
-    // ── HANDLE VALIDATION ──
     if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
-    if (!isValidHandle(handle)) {
-      setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces or special characters.");
-      return;
-    }
-
+    if (!isValidHandle(handle)) { setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces."); return; }
     if (!user) return;
     setSaving(true); setMessage("");
     try {
@@ -219,11 +207,7 @@ export default function OrganizerProfile() {
       <div style={{ marginBottom: 12 }}>
         <input placeholder="Handle (e.g. MyEvents)" value={handle} onChange={e => setHandle(sanitizeHandle(e.target.value))}
           style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
-        {handle ? (
-          isValidHandle(handle)
-            ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p>
-            : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>
-        ) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
+        {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
       </div>
 
       <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
@@ -254,7 +238,8 @@ export default function OrganizerProfile() {
             <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ Upload a logo or choose a placeholder below.</p>
           </div>
         )}
-        <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); }} style={{ display: "block", marginBottom: 10 }} />
+        {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
+        <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); }} style={{ display: "block", marginBottom: 10 }} />
         <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
         {showLogoPicker && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
@@ -285,7 +270,8 @@ export default function OrganizerProfile() {
             ))}
           </div>
         )}
-        {!atLimit && <input type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" multiple onChange={e => { const rem = imageLimit - portfolioImages.length; const files = Array.from(e.target.files).slice(0, rem); if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`); setPortfolioFiles(files); }} style={{ display: "block" }} />}
+        {/* ── FIXED: accept="image/*" ── */}
+        {!atLimit && <input type="file" accept="image/*" multiple onChange={e => { const rem = imageLimit - portfolioImages.length; const files = Array.from(e.target.files).slice(0, rem); if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`); setPortfolioFiles(files); }} style={{ display: "block" }} />}
       </div>
 
       {/* ELITE: VIDEOS */}
@@ -334,7 +320,8 @@ export default function OrganizerProfile() {
                 <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A flyer image is required.</p>
               </div>
             )}
-            <input type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={e => { setFlyerFile(e.target.files[0]); setShowFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
+            {/* ── FIXED: accept="image/*" ── */}
+            <input type="file" accept="image/*" onChange={e => { setFlyerFile(e.target.files[0]); setShowFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
             <button onClick={() => setShowFlyerPicker(!showFlyerPicker)} style={{ padding: "4px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, marginBottom: 8 }}>{showFlyerPicker ? "Hide" : "Browse Placeholders"}</button>
             {showFlyerPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
@@ -356,18 +343,11 @@ export default function OrganizerProfile() {
               {events.map(ev => (
                 <div key={ev.id} style={{ backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    {ev.flyer_url && (
-                      <div style={{ width: 56, height: 56, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}>
-                        <img src={ev.flyer_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      </div>
-                    )}
+                    {ev.flyer_url && <div style={{ width: 56, height: 56, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={ev.flyer_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                     <div>
                       <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
                       {ev.category && <p style={{ margin: "1px 0 0", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{ev.category}</p>}
-                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
-                        {ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}
-                        {ev.event_start_time && ` · ${formatTime(ev.event_start_time)}`}
-                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}{ev.event_start_time && ` · ${formatTime(ev.event_start_time)}`}</p>
                       {ev.venue && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#aaa" }}>{ev.venue}</p>}
                     </div>
                   </div>
