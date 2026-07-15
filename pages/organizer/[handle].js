@@ -10,17 +10,15 @@ function formatSocialLink(platform, value) {
   if (v.startsWith("https://")) return v;
   if (v.startsWith("http://")) return v.replace("http://", "https://");
   if (v.startsWith("www.")) return `https://${v}`;
-  const domains = { instagram: "instagram.com", facebook: "facebook.com", tiktok: "tiktok.com", youtube: "youtube.com" };
-  if (domains[platform] && v.toLowerCase().includes(domains[platform])) return `https://${v}`;
-  const handle = cleanHandle(v);
+  const h = cleanHandle(v);
   switch (platform) {
-    case "instagram": return `https://instagram.com/${handle}`;
-    case "facebook": return `https://facebook.com/${handle}`;
-    case "tiktok": return `https://tiktok.com/@${handle}`;
-    case "youtube": return `https://youtube.com/@${handle}`;
-    case "x_twitter": return `https://x.com/${handle}`;
-    case "website": return `https://${handle}`;
-    default: return `https://${handle}`;
+    case "instagram": return `https://instagram.com/${h}`;
+    case "facebook": return `https://facebook.com/${h}`;
+    case "tiktok": return `https://tiktok.com/@${h}`;
+    case "youtube": return `https://youtube.com/@${h}`;
+    case "x_twitter": return `https://x.com/${h}`;
+    case "website": return `https://${h}`;
+    default: return `https://${h}`;
   }
 }
 function formatTime(t) {
@@ -37,13 +35,7 @@ function TikTokIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" f
 function YouTubeIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>; }
 function XIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>; }
 
-// ── Universal image thumbnail style ──
-const thumbStyle = (w, h, radius = 12) => ({
-  width: w, height: h, borderRadius: radius,
-  border: "1px solid #e5e7eb",
-  overflow: "hidden", cursor: "pointer",
-  flexShrink: 0, display: "block",
-});
+const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 
 export default function OrganizerPublicProfile() {
@@ -71,39 +63,42 @@ export default function OrganizerPublicProfile() {
       if (!handle || handle === "undefined" || handle === "null") {
         if (currentUser) {
           const { data: myProfile } = await supabase.from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
-          if (myProfile?.role === "organizer") {
-            setNotFoundIsOwner(true);
-            setNotFoundIsPaid(["basic","pro","elite"].includes(myProfile?.account_type));
-          }
+          if (myProfile?.role === "organizer") { setNotFoundIsOwner(true); setNotFoundIsPaid(["basic","pro","elite"].includes(myProfile?.account_type)); }
         }
         setLoading(false); return;
       }
 
       const { data, error } = await supabase.from("profiles").select("*").eq("handle", handle).single();
 
+      let viewerIsAdmin = false;
       if (currentUser) {
-        const { data: vp } = await supabase.from("profiles").select("role, account_type, id").eq("id", currentUser.id).single();
+        const { data: vp } = await supabase.from("profiles").select("role, account_type, id, is_admin").eq("id", currentUser.id).single();
         setViewerProfile(vp);
+        viewerIsAdmin = vp?.is_admin === true;
       }
 
       if (error || !data) {
         if (currentUser) {
           const { data: myProfile } = await supabase.from("profiles").select("role, account_type, handle").eq("id", currentUser.id).single();
-          if (myProfile?.role === "organizer") {
-            setNotFoundIsOwner(true);
-            setNotFoundIsPaid(["basic","pro","elite"].includes(myProfile?.account_type));
-          }
+          if (myProfile?.role === "organizer") { setNotFoundIsOwner(true); setNotFoundIsPaid(["basic","pro","elite"].includes(myProfile?.account_type)); }
         }
         setLoading(false); return;
       }
 
       setOrganizer(data);
+
       if (data.account_type === "elite") {
         const { data: evData } = await supabase.from("organizer_events").select("*").eq("organizer_id", data.id).order("event_date", { ascending: true });
         setEvents(evData || []);
       }
+
       const ownerViewing = currentUser && data.id === currentUser.id;
-      if (!ownerViewing) await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: currentUser?.id || null }]);
+
+      // ── Skip profile view count for owner AND admin ──
+      if (!ownerViewing && !viewerIsAdmin) {
+        await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: currentUser?.id || null }]);
+      }
+
       setLoading(false);
     };
     load();
@@ -114,21 +109,13 @@ export default function OrganizerPublicProfile() {
   if (!organizer) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center" }}>
-        <img src="/logo-transparent.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
+        <img src="/logo-circle.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
         <div style={{ fontSize: 64, marginBottom: 16 }}>{notFoundIsOwner && !notFoundIsPaid ? "⚠️" : "🏗️"}</div>
-        <h2 style={{ color: "#333", marginBottom: 8 }}>
-          {notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Organizer Not Found"}
-        </h2>
+        <h2 style={{ color: "#333", marginBottom: 8 }}>{notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Organizer Not Found"}</h2>
         <p style={{ color: "#888", fontSize: 14, maxWidth: 320, lineHeight: 1.6, marginBottom: 28 }}>
-          {notFoundIsOwner
-            ? notFoundIsPaid ? "Complete your organizer profile so vendors can find you." : "Your plan payment wasn't completed. Organizer accounts require an active plan."
-            : "This organizer profile doesn't exist or may have been removed."}
+          {notFoundIsOwner ? (notFoundIsPaid ? "Complete your organizer profile so vendors can find you." : "Your plan payment wasn't completed.") : "This organizer profile doesn't exist or may have been removed."}
         </p>
-        {notFoundIsOwner && (
-          <button onClick={() => router.replace(notFoundIsPaid ? "/organizer-profile" : "/organizer-info")} style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}>
-            {notFoundIsPaid ? "✏️ Set Up My Profile" : "🎪 Complete My Organizer Signup"}
-          </button>
-        )}
+        {notFoundIsOwner && <button onClick={() => router.replace(notFoundIsPaid ? "/organizer-profile" : "/organizer-info")} style={{ padding: "13px 28px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12, width: "100%", maxWidth: 280 }}>{notFoundIsPaid ? "✏️ Set Up My Profile" : "🎪 Complete My Signup"}</button>}
         <button onClick={() => router.replace(notFoundIsOwner ? (notFoundIsPaid ? "/organizer-dashboard" : "/home") : "/marketplace")} style={{ padding: "11px 24px", backgroundColor: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, fontWeight: "bold", fontSize: 14, cursor: "pointer", width: "100%", maxWidth: 280 }}>
           {notFoundIsOwner ? "← Back to Dashboard" : "← Back to Marketplace"}
         </button>
@@ -164,12 +151,7 @@ export default function OrganizerPublicProfile() {
       <h1 style={{ marginBottom: 4 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
 
-      {/* LOGO — fills square, cover crop, thin border */}
-      {organizer.logo_url && (
-        <div onClick={() => setSelectedImage(organizer.logo_url)} style={thumbStyle(160, 160, 12)}>
-          <img src={organizer.logo_url} alt="logo" style={thumbImg} />
-        </div>
-      )}
+      {organizer.logo_url && <div onClick={() => setSelectedImage(organizer.logo_url)} style={thumbStyle(160, 160, 12)}><img src={organizer.logo_url} alt="logo" style={thumbImg} /></div>}
 
       <div style={{ marginTop: 16 }}>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
@@ -183,31 +165,25 @@ export default function OrganizerPublicProfile() {
       <div style={{ marginTop: 20 }}>
         <h3 style={{ marginBottom: 12 }}>Links</h3>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-          {organizer.website   && <a href={formatSocialLink("website",   organizer.website)}   target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><WebsiteIcon /></a>}
-          {organizer.instagram && <a href={formatSocialLink("instagram", organizer.instagram)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><InstagramIcon /></a>}
-          {organizer.facebook  && <a href={formatSocialLink("facebook",  organizer.facebook)}  target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><MetaIcon /></a>}
-          {organizer.tiktok    && <a href={formatSocialLink("tiktok",    organizer.tiktok)}    target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><TikTokIcon /></a>}
-          {organizer.youtube   && <a href={formatSocialLink("youtube",   organizer.youtube)}   target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><YouTubeIcon /></a>}
-          {organizer.x_twitter && <a href={formatSocialLink("x_twitter",organizer.x_twitter)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}><XIcon /></a>}
+          {organizer.website && <a href={formatSocialLink("website", organizer.website)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><WebsiteIcon /></a>}
+          {organizer.instagram && <a href={formatSocialLink("instagram", organizer.instagram)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><InstagramIcon /></a>}
+          {organizer.facebook && <a href={formatSocialLink("facebook", organizer.facebook)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><MetaIcon /></a>}
+          {organizer.tiktok && <a href={formatSocialLink("tiktok", organizer.tiktok)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><TikTokIcon /></a>}
+          {organizer.youtube && <a href={formatSocialLink("youtube", organizer.youtube)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><YouTubeIcon /></a>}
+          {organizer.x_twitter && <a href={formatSocialLink("x_twitter", organizer.x_twitter)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><XIcon /></a>}
         </div>
       </div>
 
-      {/* PORTFOLIO — all images fill frame */}
       <div style={{ marginTop: 28 }}>
         <h3>Portfolio</h3>
-        {organizer.portfolio_images && organizer.portfolio_images.length > 0 ? (
+        {organizer.portfolio_images?.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => (
-              <div key={i} onClick={() => setSelectedImage(img)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}>
-                <img src={img} alt="portfolio" style={thumbImg} />
-              </div>
-            ))}
+            {organizer.portfolio_images.map((img, i) => <div key={i} onClick={() => setSelectedImage(img)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}><img src={img} alt="portfolio" style={thumbImg} /></div>)}
           </div>
         ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
 
-      {/* VIDEOS */}
-      {organizer.account_type === "elite" && organizer.video_urls && organizer.video_urls.filter(v => v).length > 0 && (
+      {organizer.account_type === "elite" && organizer.video_urls?.filter(v => v).length > 0 && (
         <div style={{ marginTop: 24 }}>
           <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -223,28 +199,20 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      {/* ELITE EVENTS */}
       {organizer.account_type === "elite" && (
         <div style={{ marginTop: 28 }}>
           <h3>📅 Upcoming Events</h3>
           {events.length === 0 ? <p style={{ color: "#888" }}>No upcoming events posted yet.</p> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
               {events.map(event => (
-                <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }}
-                  style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(170,187,35,0.3)"}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
                   <div style={{ height: 130, overflow: "hidden" }}>
-                    {event.flyer_url
-                      ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
+                    {event.flyer_url ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                   </div>
                   <div style={{ padding: 12 }}>
                     <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h4>
                     {event.category && <p style={{ margin: "0 0 2px", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{event.category}</p>}
-                    <p style={{ margin: "0 0 2px", fontSize: 12, color: "#701890", fontWeight: "bold" }}>
-                      📅 {event.event_date ? new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD"}
-                    </p>
+                    <p style={{ margin: "0 0 2px", fontSize: 12, color: "#701890", fontWeight: "bold" }}>📅 {event.event_date ? new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD"}</p>
                     {event.venue && <p style={{ margin: 0, color: "#888", fontSize: 12 }}>📍 {event.venue}</p>}
                   </div>
                 </div>
@@ -254,21 +222,17 @@ export default function OrganizerPublicProfile() {
         </div>
       )}
 
-      {/* MESSAGING */}
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type, vr = viewerProfile?.role;
-        const canMessage =
-          vt === "featured" ||
-          (vr === "organizer" && (vt === "basic" || vt === "pro" || vt === "elite"));
+        const canMessage = vt === "featured" || (vr === "organizer");
         return canMessage ? (
           <div style={{ marginTop: 20 }}>
             <button onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
           </div>
         ) : viewerProfile?.role === "vendor" ? (
           <div style={{ marginTop: 20, padding: "12px 16px", backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, textAlign: "center" }}>
-            <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 13 }}>Want to work with organizers like this?</p>
-            <p style={{ margin: "4px 0 8px", color: "#888", fontSize: 12 }}>Upgrade to Featured Vendor to contact organizers directly.</p>
-            <button onClick={() => router.push("/vendor-info")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Upgrade to Featured</button>
+            <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 13 }}>Upgrade to Featured Vendor to contact organizers directly.</p>
+            <button onClick={() => router.push("/vendor-info")} style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Upgrade to Featured</button>
           </div>
         ) : null;
       })()}
@@ -277,14 +241,12 @@ export default function OrganizerPublicProfile() {
         <button onClick={() => router.back()} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
 
-      {/* FULLSCREEN IMAGE */}
       {selectedImage && (
         <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.9)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
           <img src={selectedImage} alt="enlarged" style={{ maxWidth: "95%", maxHeight: "90vh", borderRadius: 10, objectFit: "contain" }} />
         </div>
       )}
 
-      {/* EVENT POPUP */}
       {selectedEvent && (
         <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
@@ -294,8 +256,7 @@ export default function OrganizerPublicProfile() {
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
               {selectedEvent.flyer_url && (
                 <div style={{ position: "relative" }}>
-                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }}
-                    style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
+                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
               )}
@@ -305,21 +266,12 @@ export default function OrganizerPublicProfile() {
                 </div>
                 <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>{selectedEvent.event_name}</h2>
                 {selectedEvent.category && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#AABB23", fontWeight: "bold" }}>{selectedEvent.category}</p>}
-                <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>
-                  📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Date TBD"}
-                </p>
-                {(selectedEvent.event_start_time || selectedEvent.event_end_time) && (
-                  <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>
-                )}
+                <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Date TBD"}</p>
+                {(selectedEvent.event_start_time || selectedEvent.event_end_time) && <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>}
                 {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
                 {selectedEvent.event_type && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#888" }}>🎭 {selectedEvent.event_type}</p>}
                 {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
-                {selectedEvent.info_url && (
-                  <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer"
-                    style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>
-                    🎟️ Get Tickets / More Info
-                  </a>
-                )}
+                {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
                 <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span></p>
               </div>
             </div>
