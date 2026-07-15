@@ -25,10 +25,21 @@ export default function VendorDashboard() {
         return;
       }
       setProfile(profileData);
-      const { count: msgCount } = await supabase.from("messages").select("*", { count: "exact", head: true }).or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
+
+      // ── Only count RECEIVED messages ──
+      const { count: msgCount } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .eq("recipient_id", user.id);
       setMessageCount(msgCount || 0);
-      const { count: viewCount } = await supabase.from("profile_views").select("*", { count: "exact", head: true }).eq("profile_id", user.id);
+
+      // ── Profile views (owner & admin visits excluded at insert point) ──
+      const { count: viewCount } = await supabase
+        .from("profile_views")
+        .select("*", { count: "exact", head: true })
+        .eq("profile_id", user.id);
       setProfileViews(viewCount || 0);
+
       setLoading(false);
     };
     loadUser();
@@ -43,17 +54,13 @@ export default function VendorDashboard() {
     featured: { label: "Featured", color: "#AABB23", bg: "#f9ffe8", icon: "🔥" },
   };
   const { label, color, bg, icon } = tierConfig[tier] || tierConfig.free;
-
   const fields = [profile?.business_name, profile?.category, profile?.city, profile?.description, profile?.logo_url, profile?.portfolio_images?.length > 0, profile?.website || profile?.instagram || profile?.facebook];
-  const completed = fields.filter(Boolean).length;
-  const percent = Math.round((completed / fields.length) * 100);
+  const percent = Math.round((fields.filter(Boolean).length / fields.length) * 100);
 
   return (
     <DashboardLayout>
       <div style={{ maxWidth: 700, fontFamily: "sans-serif" }}>
-
         <AnnouncementBanner />
-
         <h1 style={{ marginBottom: 4 }}>Vendor Dashboard</h1>
         <p style={{ color: "#666", marginBottom: 24 }}>Welcome back, <strong>{profile?.business_name || "Vendor"}</strong></p>
 
@@ -97,10 +104,9 @@ export default function VendorDashboard() {
           </div>
           <div style={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>{messageCount}</p>
-            <p style={{ fontSize: 13, color: "#888", margin: 0, marginTop: 4 }}>Messages</p>
+            <p style={{ fontSize: 13, color: "#888", margin: 0, marginTop: 4 }}>Messages Received</p>
           </div>
         </div>
-
       </div>
     </DashboardLayout>
   );
