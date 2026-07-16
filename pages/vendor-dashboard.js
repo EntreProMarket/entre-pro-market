@@ -25,21 +25,10 @@ export default function VendorDashboard() {
         return;
       }
       setProfile(profileData);
-
-      // ── Only count RECEIVED messages ──
-      const { count: msgCount } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("recipient_id", user.id);
+      const { count: msgCount } = await supabase.from("messages").select("*", { count: "exact", head: true }).eq("recipient_id", user.id);
       setMessageCount(msgCount || 0);
-
-      // ── Profile views (owner & admin visits excluded at insert point) ──
-      const { count: viewCount } = await supabase
-        .from("profile_views")
-        .select("*", { count: "exact", head: true })
-        .eq("profile_id", user.id);
+      const { count: viewCount } = await supabase.from("profile_views").select("*", { count: "exact", head: true }).eq("profile_id", user.id);
       setProfileViews(viewCount || 0);
-
       setLoading(false);
     };
     loadUser();
@@ -65,14 +54,13 @@ export default function VendorDashboard() {
         <p style={{ color: "#666", marginBottom: 24 }}>Welcome back, <strong>{profile?.business_name || "Vendor"}</strong></p>
 
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: bg, border: `1px solid ${color}`, borderRadius: 20, padding: "6px 16px", marginBottom: 24 }}>
-          <span style={{ fontSize: 16 }}>{icon}</span>
-          <span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label} Vendor</span>
+          <span>{icon}</span><span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label} Vendor</span>
         </div>
 
         {tier === "free" && (
           <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 10, padding: "16px 20px", marginBottom: 24 }}>
             <p style={{ margin: 0, fontWeight: "bold", color: "#701890", marginBottom: 8 }}>⬆️ Upgrade Your Plan</p>
-            <p style={{ margin: 0, fontSize: 13, color: "#555", marginBottom: 12 }}>Upgrade to Premium to show your contact info and social links. Upgrade to Featured for maximum marketplace exposure.</p>
+            <p style={{ margin: 0, fontSize: 13, color: "#555", marginBottom: 12 }}>Upgrade to Premium or Featured for more visibility and features.</p>
             <button onClick={() => router.push("/vendor-info")} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer" }}>View Upgrade Options</button>
           </div>
         )}
@@ -90,23 +78,29 @@ export default function VendorDashboard() {
           <div style={{ backgroundColor: "#eee", borderRadius: 20, height: 10, overflow: "hidden" }}>
             <div style={{ width: `${percent}%`, height: "100%", backgroundColor: percent === 100 ? "#AABB23" : "#701890", borderRadius: 20, transition: "width 0.4s ease" }} />
           </div>
-          {percent < 100 ? (
-            <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>Complete your profile to attract more organizers.{" "}<span onClick={() => router.push("/vendor-profile")} style={{ color: "#701890", cursor: "pointer", textDecoration: "underline" }}>Edit Profile</span></p>
-          ) : (
-            <p style={{ fontSize: 12, color: "#AABB23", marginTop: 8, marginBottom: 0, fontWeight: "bold" }}>✅ Profile is fully complete!</p>
-          )}
+          {percent < 100
+            ? <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>Complete your profile to attract more organizers.{" "}<span onClick={() => router.push("/vendor-profile")} style={{ color: "#701890", cursor: "pointer", textDecoration: "underline" }}>Edit Profile</span></p>
+            : <p style={{ fontSize: 12, color: "#AABB23", marginTop: 8, marginBottom: 0, fontWeight: "bold" }}>✅ Profile is fully complete!</p>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div style={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>{profileViews}</p>
-            <p style={{ fontSize: 13, color: "#888", margin: 0, marginTop: 4 }}>Profile Views</p>
+            <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Profile Views</p>
           </div>
           <div style={{ backgroundColor: "#fff", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>{messageCount}</p>
-            <p style={{ fontSize: 13, color: "#888", margin: 0, marginTop: 4 }}>Messages Received</p>
+            <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Messages Received</p>
           </div>
         </div>
+
+        {/* ── Profile Insights — Featured Vendors only ── */}
+        {tier === "featured" && (
+          <button onClick={() => router.push("/profile-insights")}
+            style={{ width: "100%", padding: "14px", backgroundColor: "#111", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", cursor: "pointer", fontSize: 15, marginTop: 4 }}>
+            📈 View Profile Insights
+          </button>
+        )}
       </div>
     </DashboardLayout>
   );
