@@ -25,20 +25,10 @@ export default function OrganizerDashboard() {
         return;
       }
       setProfile(p);
-
-      // ── Only count RECEIVED messages ──
-      const { count: msgCount } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("recipient_id", user.id);
+      const { count: msgCount } = await supabase.from("messages").select("*", { count: "exact", head: true }).eq("recipient_id", user.id);
       setMessageCount(msgCount || 0);
-
-      const { count: viewCount } = await supabase
-        .from("profile_views")
-        .select("*", { count: "exact", head: true })
-        .eq("profile_id", user.id);
+      const { count: viewCount } = await supabase.from("profile_views").select("*", { count: "exact", head: true }).eq("profile_id", user.id);
       setProfileViews(viewCount || 0);
-
       setLoading(false);
     };
     load();
@@ -67,8 +57,7 @@ export default function OrganizerDashboard() {
         <p style={{ color: "#666", marginBottom: 24 }}>Welcome back, <strong>{profile?.organizer_name || "Organizer"}</strong></p>
 
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: bg, border: `1px solid ${color}`, borderRadius: 20, padding: "6px 16px", marginBottom: 24 }}>
-          <span style={{ fontSize: 16 }}>{icon}</span>
-          <span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label}</span>
+          <span>{icon}</span><span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label}</span>
         </div>
 
         {tier === "basic" && (
@@ -104,14 +93,12 @@ export default function OrganizerDashboard() {
           <div style={{ backgroundColor: "#eee", borderRadius: 20, height: 10, overflow: "hidden" }}>
             <div style={{ width: `${percent}%`, height: "100%", backgroundColor: percent === 100 ? "#AABB23" : "#701890", borderRadius: 20 }} />
           </div>
-          {percent < 100 ? (
-            <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>Complete your profile to attract more vendors.{" "}<span onClick={() => router.push("/organizer-profile")} style={{ color: "#701890", cursor: "pointer", textDecoration: "underline" }}>Edit Profile</span></p>
-          ) : (
-            <p style={{ fontSize: 12, color: "#AABB23", marginTop: 8, marginBottom: 0, fontWeight: "bold" }}>✅ Profile is fully complete!</p>
-          )}
+          {percent < 100
+            ? <p style={{ fontSize: 12, color: "#888", marginTop: 8, marginBottom: 0 }}>Complete your profile to attract more vendors.{" "}<span onClick={() => router.push("/organizer-profile")} style={{ color: "#701890", cursor: "pointer", textDecoration: "underline" }}>Edit Profile</span></p>
+            : <p style={{ fontSize: 12, color: "#AABB23", marginTop: 8, marginBottom: 0, fontWeight: "bold" }}>✅ Profile is fully complete!</p>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
             <p style={{ fontSize: 28, fontWeight: "bold", color: "#701890", margin: 0 }}>{profileViews}</p>
             <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Profile Views</p>
@@ -121,6 +108,14 @@ export default function OrganizerDashboard() {
             <p style={{ fontSize: 13, color: "#888", margin: "4px 0 0" }}>Messages Received</p>
           </div>
         </div>
+
+        {/* ── Profile Insights — Elite Organizers only ── */}
+        {tier === "elite" && (
+          <button onClick={() => router.push("/profile-insights")}
+            style={{ width: "100%", padding: "14px", backgroundColor: "#111", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", cursor: "pointer", fontSize: 15, marginTop: 4 }}>
+            📈 View Profile Insights
+          </button>
+        )}
       </div>
     </DashboardLayout>
   );
