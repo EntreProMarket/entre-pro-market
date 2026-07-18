@@ -2,40 +2,14 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-
-function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
-function formatSocialLink(platform, value) {
-  if (!value || !value.trim()) return "";
-  const v = value.trim();
-  if (v.startsWith("https://")) return v;
-  if (v.startsWith("http://")) return v.replace("http://", "https://");
-  if (v.startsWith("www.")) return `https://${v}`;
-  const h = cleanHandle(v);
-  switch (platform) {
-    case "instagram": return `https://instagram.com/${h}`;
-    case "facebook": return `https://facebook.com/${h}`;
-    case "tiktok": return `https://tiktok.com/@${h}`;
-    case "youtube": return `https://youtube.com/@${h}`;
-    case "x_twitter": return `https://x.com/${h}`;
-    case "website": return `https://${h}`;
-    default: return `https://${h}`;
-  }
-}
-
-const IC = "#701890", IS = 32;
-function WebsiteIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill="none" stroke={IC} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>; }
-function InstagramIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill="none" stroke={IC} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>; }
-function MetaIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>; }
-function TikTokIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.75a4.85 4.85 0 0 1-1.01-.06z"/></svg>; }
-function YouTubeIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/></svg>; }
-function XIcon() { return <svg width={IS} height={IS} viewBox="0 0 24 24" fill={IC}><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>; }
+import { SocialLinks } from "../../components/SocialIcons";
 
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 
 export default function VendorPublicProfile() {
   const router = useRouter();
-  const { handle, tab } = router.query;
+  const { handle, tab, from: fromParam } = router.query;
   const [vendor, setVendor] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +57,7 @@ export default function VendorPublicProfile() {
         viewerIsAdmin = vp?.is_admin === true;
       }
 
-      // ── Only count views from real visitors — skip owner and admin ──
+      // ── Count all views except owner and admin (anonymous visitors tracked too) ──
       if (!ownerViewing && !viewerIsAdmin) {
         await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: user?.id || null }]);
       }
@@ -95,11 +69,16 @@ export default function VendorPublicProfile() {
     fetchVendor();
   }, [handle]);
 
+  const handleBack = () => {
+    if (fromParam === "insights") { router.push("/profile-insights"); return; }
+    router.back();
+  };
+
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   if (!vendor) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, fontFamily: "sans-serif", backgroundColor: "#fafafa", textAlign: "center" }}>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, fontFamily: "sans-serif", textAlign: "center" }}>
         <img src="/logo-circle.png" alt="Entre PRO Market" style={{ width: 120, marginBottom: 24 }} />
         <div style={{ fontSize: 64, marginBottom: 16 }}>🏗️</div>
         <h2 style={{ color: "#333", marginBottom: 8 }}>{notFoundIsOwner ? "Your Profile Isn't Set Up Yet" : "Vendor Not Found"}</h2>
@@ -113,8 +92,6 @@ export default function VendorPublicProfile() {
       </div>
     );
   }
-
-  const iL = { display: "flex", opacity: 1, transition: "opacity 0.2s" };
 
   return (
     <div style={{ maxWidth: 800, margin: "auto", padding: 20, position: "relative", fontFamily: "sans-serif" }}>
@@ -157,16 +134,10 @@ export default function VendorPublicProfile() {
             </div>
           </div>
 
+          {/* ── Real social icons from shared component ── */}
           <div style={{ marginTop: 20 }}>
             <h3 style={{ marginBottom: 12 }}>Links</h3>
-            <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
-              {vendor.website && <a href={formatSocialLink("website", vendor.website)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><WebsiteIcon /></a>}
-              {vendor.instagram && <a href={formatSocialLink("instagram", vendor.instagram)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><InstagramIcon /></a>}
-              {vendor.facebook && <a href={formatSocialLink("facebook", vendor.facebook)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><MetaIcon /></a>}
-              {vendor.tiktok && <a href={formatSocialLink("tiktok", vendor.tiktok)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><TikTokIcon /></a>}
-              {vendor.youtube && <a href={formatSocialLink("youtube", vendor.youtube)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><YouTubeIcon /></a>}
-              {vendor.x_twitter && <a href={formatSocialLink("x_twitter", vendor.x_twitter)} target="_blank" rel="noreferrer" style={iL} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}><XIcon /></a>}
-            </div>
+            <SocialLinks profile={vendor} size={32} />
           </div>
 
           <div style={{ marginTop: 28 }}>
@@ -196,14 +167,14 @@ export default function VendorPublicProfile() {
 
           {!isOwner && (() => {
             const vr = viewerProfile?.role, vt = viewerProfile?.account_type;
-            const canMessage = (vr === "vendor" && (vt === "premium" || vt === "featured")) || (vr === "organizer");
+            const canMessage = (vr === "vendor" && (vt === "premium" || vt === "featured")) || vr === "organizer";
             return canMessage ? (
               <div style={{ marginTop: 20 }}>
                 <button onClick={() => router.push(`/messages?to=${vendor.id}&from=vendor/${vendor.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
               </div>
             ) : viewerProfile ? (
               <div style={{ marginTop: 20, padding: "12px 16px", backgroundColor: "#f5f5f5", borderRadius: 8, textAlign: "center" }}>
-                <p style={{ margin: 0, color: "#888", fontSize: 13 }}>Upgrade your plan to contact this vendor directly.</p>
+                <p style={{ margin: 0, color: "#888", fontSize: 13 }}>Upgrade your plan to contact this vendor.</p>
                 <button onClick={() => router.push("/vendor-info")} style={{ marginTop: 8, padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Upgrade Plan</button>
               </div>
             ) : null;
@@ -218,10 +189,10 @@ export default function VendorPublicProfile() {
             {products.map(p => {
               const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
               return (
-                <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
+                <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", backgroundColor: "white" }}>
                   <div style={{ height: 180, overflow: "hidden", position: "relative" }}>
                     {imgs[0] ? <img src={imgs[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc" }}>No Image</div>}
-                    {imgs.length > 1 && <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 6px", borderRadius: 8 }}>1 / {imgs.length}</div>}
+                    {imgs.length > 1 && <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 6px", borderRadius: 8 }}>1/{imgs.length}</div>}
                   </div>
                   <div style={{ padding: 12 }}>
                     <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
@@ -234,8 +205,9 @@ export default function VendorPublicProfile() {
         </div>
       )}
 
+      {/* ── Back button uses router.back() so it always returns to where user came from ── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
-        <button onClick={() => router.push("/marketplace")} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
+        <button onClick={handleBack} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
 
       {selectedImage && (
