@@ -63,14 +63,14 @@ export default function Home() {
     setSubmitting(false);
   };
 
-  // ── SPLASH: uses logo IMAGE — no text overflow possible ──
+  // ── SPLASH: shows ENTRE_PRO.png with proper scaling — no cutoff ──
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0 32px" }}>
         <img
-          src="/logo-circle.png"
+          src="/ENTRE_PRO.png"
           alt="Entre PRO Market"
-          style={{ width: 180, height: 180, objectFit: "contain", borderRadius: "50%" }}
+          style={{ width: "100%", maxWidth: 320, height: "auto", objectFit: "contain" }}
         />
       </div>
     );
