@@ -29,7 +29,7 @@ export default function Home() {
     };
     checkSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") { router.replace("/reset-password"); }
     });
     return () => listener?.subscription?.unsubscribe();
@@ -63,14 +63,14 @@ export default function Home() {
     setSubmitting(false);
   };
 
-  // ── SPLASH: shows ENTRE_PRO.png with proper scaling — no cutoff ──
+  // ── SPLASH: uses logo IMAGE — no text overflow possible ──
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0 32px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white" }}>
         <img
-          src="/ENTRE_PRO.png"
+          src="/logo-circle.png"
           alt="Entre PRO Market"
-          style={{ width: "100%", maxWidth: 320, height: "auto", objectFit: "contain" }}
+          style={{ width: 180, height: 180, objectFit: "contain", borderRadius: "50%" }}
         />
       </div>
     );
@@ -80,8 +80,9 @@ export default function Home() {
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "sans-serif" }}>
       <div style={{ backgroundColor: "white", borderRadius: 16, padding: "36px 28px", maxWidth: 400, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <img src="/ENTRE_PRO.png" alt="EntreProMarket" style={{ width: "70%", maxWidth: 220, height: "auto", objectFit: "contain", marginBottom: 8 }} />
-          <p style={{ margin: 0, color: "#888", fontSize: 14 }}>Connecting vendors with event organizers</p>
+          <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 100, height: 100, objectFit: "contain", borderRadius: "50%", marginBottom: 12 }} />
+          <h1 style={{ margin: 0, fontSize: 22, color: "#111" }}>Entre PRO Market</h1>
+          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>Connecting vendors with event organizers</p>
         </div>
 
         <div style={{ display: "flex", marginBottom: 24, backgroundColor: "#f0f0f0", borderRadius: 10, padding: 4 }}>
@@ -126,3 +127,4 @@ export default function Home() {
     </div>
   );
 }
+
