@@ -82,7 +82,7 @@ export default function Home() {
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 100, height: 100, objectFit: "contain", borderRadius: "50%", marginBottom: 12 }} />
           <h1 style={{ margin: 0, fontSize: 22, color: "#111" }}>Entre PRO Market</h1>
-          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>Connecting vendors with event organizers</p>
+          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>The marketplace for vendors and event organizers</p>
         </div>
 
         <div style={{ display: "flex", marginBottom: 24, backgroundColor: "#f0f0f0", borderRadius: 10, padding: 4 }}>
@@ -120,11 +120,26 @@ export default function Home() {
           {submitting ? "Please wait..." : mode === "login" ? "Log In" : "Create Account"}
         </button>
 
-        <div style={{ textAlign: "center", marginTop: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", margin: "20px 0" }}>
+          <div style={{ flex: 1, height: 1, backgroundColor: "#eee" }} />
+          <span style={{ padding: "0 12px", color: "#aaa", fontSize: 12 }}>or</span>
+          <div style={{ flex: 1, height: 1, backgroundColor: "#eee" }} />
+        </div>
+
+        <button onClick={() => router.push("/vendor-info")}
+          style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 10 }}>
+          🛒 Become a Vendor
+        </button>
+
+        <button onClick={() => router.push("/organizer-info")}
+          style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#222", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 20 }}>
+          🎪 Become an Organizer
+        </button>
+
+        <div style={{ textAlign: "center" }}>
           <span onClick={() => router.push("/marketplace")} style={{ color: "#AABB23", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Browse Marketplace Without an Account</span>
         </div>
       </div>
     </div>
   );
 }
-
