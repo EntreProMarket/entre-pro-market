@@ -29,7 +29,7 @@ export default function Home() {
     };
     checkSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") { router.replace("/reset-password"); }
     });
     return () => listener?.subscription?.unsubscribe();
@@ -63,14 +63,14 @@ export default function Home() {
     setSubmitting(false);
   };
 
-  // ── SPLASH: uses logo IMAGE — no text overflow possible ──
+  // ── SPLASH: shows ENTRE_PRO.png with proper scaling — no cutoff ──
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0 32px" }}>
         <img
-          src="/logo-circle.png"
+          src="/ENTRE_PRO.png"
           alt="Entre PRO Market"
-          style={{ width: 180, height: 180, objectFit: "contain", borderRadius: "50%" }}
+          style={{ width: "100%", maxWidth: 320, height: "auto", objectFit: "contain" }}
         />
       </div>
     );
@@ -80,9 +80,8 @@ export default function Home() {
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "sans-serif" }}>
       <div style={{ backgroundColor: "white", borderRadius: 16, padding: "36px 28px", maxWidth: 400, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 100, height: 100, objectFit: "contain", borderRadius: "50%", marginBottom: 12 }} />
-          <h1 style={{ margin: 0, fontSize: 22, color: "#111" }}>Entre PRO Market</h1>
-          <p style={{ margin: "6px 0 0", color: "#888", fontSize: 14 }}>Connecting vendors with event organizers</p>
+          <img src="/ENTRE_PRO.png" alt="EntreProMarket" style={{ width: "70%", maxWidth: 220, height: "auto", objectFit: "contain", marginBottom: 8 }} />
+          <p style={{ margin: 0, color: "#888", fontSize: 14 }}>Connecting vendors with event organizers</p>
         </div>
 
         <div style={{ display: "flex", marginBottom: 24, backgroundColor: "#f0f0f0", borderRadius: 10, padding: 4 }}>
