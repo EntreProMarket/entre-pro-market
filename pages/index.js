@@ -66,11 +66,11 @@ export default function Home() {
   // ── SPLASH: shows ENTRE_PRO.png with proper scaling — no cutoff ──
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0 32px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0 40px" }}>
         <img
           src="/ENTRE_PRO.png"
           alt="Entre PRO Market"
-          style={{ width: "100%", maxWidth: 320, height: "auto", objectFit: "contain" }}
+          style={{ width: "100%", maxWidth: 240, height: "auto", objectFit: "contain" }}
         />
       </div>
     );
