@@ -78,6 +78,7 @@ export default function VendorPublicProfile() {
 
   const handleBack = () => {
     if (fromParam === "insights") { router.push("/profile-insights"); return; }
+    if (fromParam === "admin") { router.push("/admin"); return; }
     router.push("/marketplace");
   };
 
