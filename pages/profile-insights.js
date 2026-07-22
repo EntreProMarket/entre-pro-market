@@ -75,8 +75,10 @@ export default function ProfileInsights() {
 
   if (loading) return <DashboardLayout><div style={{ padding: 20 }}>Loading...</div></DashboardLayout>;
 
-  const loggedInViews = allViews.filter(v => v.viewer_id !== null);
-  const anonymousViews = allViews.filter(v => v.viewer_id === null);
+  // A view only counts as "Logged In" if the viewer has an actual business/organizer name to show.
+  // Logged-in accounts with no vendor/organizer profile (or no viewer_id at all) are Anonymous.
+  const loggedInViews = allViews.filter(v => v.viewer_id !== null && (v.viewer?.business_name || v.viewer?.organizer_name));
+  const anonymousViews = allViews.filter(v => v.viewer_id === null || !(v.viewer?.business_name || v.viewer?.organizer_name));
   const tierLabel = profile?.role === "vendor" ? "🔥 Featured Vendor" : "👑 Elite Organizer";
   const dashPath = profile?.role === "vendor" ? "/vendor-dashboard" : "/organizer-dashboard";
   const currentViewList = viewsSubTab === "loggedin" ? loggedInViews : anonymousViews;
