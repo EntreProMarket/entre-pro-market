@@ -67,7 +67,7 @@ export default function Marketplace() {
   if (loading) return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>Loading marketplace...</div>;
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif", paddingBottom: 40 }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
@@ -152,7 +152,6 @@ export default function Marketplace() {
             <h2 style={{ margin: "0 0 8px" }}>Browse Our Vendors</h2>
             {!gateSubmitted ? (
               <>
-                {/* ── FIXED WORDING ── */}
                 <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>Sign up free to browse and shop a variety of vendors by category.</p>
                 <input type="email" placeholder="Your email address" value={gateEmail} onChange={e => setGateEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleGateSubmit()} style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
                 <button onClick={handleGateSubmit} style={{ width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 12 }}>Get Free Access</button>
