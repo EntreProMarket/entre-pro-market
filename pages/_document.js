@@ -6,6 +6,10 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
+        {/* Viewport — required for correct mobile rendering. Its absence causes
+            content to render at desktop width and scale/shift incorrectly on phones. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
 
