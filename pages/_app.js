@@ -34,9 +34,25 @@ function AutoLogout() {
   return null;
 }
 
+// ── Registers public/sw.js so Chrome/Android will recognize the app as
+// installable. Without this, the service worker file exists but never
+// runs, and Chrome has no basis to offer the "Add to Home Screen" prompt. ──
+function ServiceWorkerRegister() {
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.error("Service worker registration failed:", err);
+      });
+    }
+  }, []);
+
+  return null;
+}
+
 export default function App({ Component, pageProps }) {
   return (
     <>
+      <ServiceWorkerRegister />
       <AutoLogout />
       <Component {...pageProps} />
     </>
