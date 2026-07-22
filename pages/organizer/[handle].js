@@ -77,7 +77,8 @@ export default function OrganizerPublicProfile() {
 
   const handleBack = () => {
     if (fromParam === "insights") { router.push("/profile-insights"); return; }
-    router.back();
+    if (fromParam === "admin") { router.push("/admin"); return; }
+    router.push("/marketplace");
   };
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
