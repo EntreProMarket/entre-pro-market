@@ -20,7 +20,14 @@ export default function VendorPublicProfile() {
   const [activeTab, setActiveTab] = useState("profile");
   const [notFoundIsOwner, setNotFoundIsOwner] = useState(false);
 
-  useEffect(() => { if (tab === "shop") setActiveTab("shop"); }, [tab]);
+  useEffect(() => { setActiveTab(tab === "shop" ? "shop" : "profile"); }, [tab]);
+
+  const switchTab = (t) => {
+    setActiveTab(t);
+    const newQuery = { ...router.query };
+    if (t === "shop") newQuery.tab = "shop"; else delete newQuery.tab;
+    router.push({ pathname: router.pathname, query: newQuery }, undefined, { shallow: true });
+  };
 
   useEffect(() => {
     if (!handle) return;
@@ -118,8 +125,8 @@ export default function VendorPublicProfile() {
       <p style={{ color: "#777", marginBottom: 16 }}>@{vendor.handle}</p>
 
       <div style={{ display: "flex", borderBottom: "2px solid #eee", marginBottom: 20 }}>
-        <button onClick={() => setActiveTab("profile")} style={{ padding: "10px 20px", border: "none", borderBottom: activeTab === "profile" ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === "profile" ? "#701890" : "#666", fontWeight: activeTab === "profile" ? "bold" : "normal", cursor: "pointer", fontSize: 14 }}>📋 Profile</button>
-        {products.length > 0 && <button onClick={() => setActiveTab("shop")} style={{ padding: "10px 20px", border: "none", borderBottom: activeTab === "shop" ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === "shop" ? "#701890" : "#666", fontWeight: activeTab === "shop" ? "bold" : "normal", cursor: "pointer", fontSize: 14 }}>🛒 Shop ({products.length})</button>}
+        <button onClick={() => switchTab("profile")} style={{ padding: "10px 20px", border: "none", borderBottom: activeTab === "profile" ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === "profile" ? "#701890" : "#666", fontWeight: activeTab === "profile" ? "bold" : "normal", cursor: "pointer", fontSize: 14 }}>📋 Profile</button>
+        {products.length > 0 && <button onClick={() => switchTab("shop")} style={{ padding: "10px 20px", border: "none", borderBottom: activeTab === "shop" ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === "shop" ? "#701890" : "#666", fontWeight: activeTab === "shop" ? "bold" : "normal", cursor: "pointer", fontSize: 14 }}>🛒 Shop ({products.length})</button>}
       </div>
 
       {activeTab === "profile" && (
