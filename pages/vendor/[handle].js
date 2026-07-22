@@ -189,13 +189,15 @@ export default function VendorPublicProfile() {
             {products.map(p => {
               const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
               return (
-                <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", backgroundColor: "white" }}>
+                <div key={p.id} onClick={() => router.push(`/product/${p.id}`)}
+                  style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", backgroundColor: "white", cursor: "pointer" }}>
                   <div style={{ height: 180, overflow: "hidden", position: "relative" }}>
                     {imgs[0] ? <img src={imgs[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc" }}>No Image</div>}
                     {imgs.length > 1 && <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 6px", borderRadius: 8 }}>1/{imgs.length}</div>}
                   </div>
                   <div style={{ padding: 12 }}>
                     <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
+                    {p.description && <p style={{ margin: "0 0 6px", fontSize: 12, color: "#888", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.description}</p>}
                     <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 16 }}>${(p.price / 100).toFixed(2)}</p>
                   </div>
                 </div>
