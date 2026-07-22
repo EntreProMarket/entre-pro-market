@@ -36,6 +36,10 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("popstate", freezeBack);
   }, []);
 
+  useEffect(() => {
+    if (router.query.tab && TABS.includes(router.query.tab)) setActiveTab(router.query.tab);
+  }, [router.query.tab]);
+
   const checkAdmin = async () => {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
@@ -221,7 +225,7 @@ export default function AdminDashboard() {
                   ["Last Login", userInfoModal.lastSignIn ? new Date(userInfoModal.lastSignIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
                   ["Stripe Customer", userInfoModal.profile?.stripe_customer_id || "—"],
                 ].map(([label, value]) => (
-                  <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", alignItems: "start", padding: "8px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
+                  <div key={label} style={{ display: "grid", gridTemplateColumns: "120px minmax(0, 1fr)", alignItems: "start", padding: "8px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
                     <span style={{ fontSize: 13, color: "#888", fontWeight: "bold" }}>{label}</span>
                     <span style={{ fontSize: 13, color: "#333", textAlign: "left", wordBreak: "break-all" }}>{value}</span>
                   </div>
