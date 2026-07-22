@@ -204,8 +204,8 @@ export default function AdminDashboard() {
               <button onClick={() => setUserInfoModal(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
             </div>
             {userInfoModal.loading ? <p style={{ color: "#888" }}>Loading...</p> : userInfoModal.error ? <p style={{ color: "#cc0000" }}>❌ {userInfoModal.error}</p> : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {userInfoModal.profile?.logo_url && <div style={{ width: 70, height: 70, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={userInfoModal.profile.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {userInfoModal.profile?.logo_url && <div style={{ width: 70, height: 70, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", marginBottom: 10 }}><img src={userInfoModal.profile.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                 {[
                   ["Name", userInfoModal.profile?.business_name || userInfoModal.profile?.organizer_name || "—"],
                   ["Handle", "@" + (userInfoModal.profile?.handle || "—")],
@@ -221,9 +221,9 @@ export default function AdminDashboard() {
                   ["Last Login", userInfoModal.lastSignIn ? new Date(userInfoModal.lastSignIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
                   ["Stripe Customer", userInfoModal.profile?.stripe_customer_id || "—"],
                 ].map(([label, value]) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
-                    <span style={{ fontSize: 13, color: "#888", fontWeight: "bold", flexShrink: 0 }}>{label}</span>
-                    <span style={{ fontSize: 13, color: "#333", textAlign: "right", wordBreak: "break-all" }}>{value}</span>
+                  <div key={label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", alignItems: "start", padding: "8px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
+                    <span style={{ fontSize: 13, color: "#888", fontWeight: "bold" }}>{label}</span>
+                    <span style={{ fontSize: 13, color: "#333", textAlign: "left", wordBreak: "break-all" }}>{value}</span>
                   </div>
                 ))}
               </div>
@@ -344,7 +344,7 @@ export default function AdminDashboard() {
                       <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
                       <td style={tdStyle}>
                         <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️ Info</button>
-                        <button onClick={() => window.open(`/${user.role}/${user.handle}`, "_blank")} style={{ ...smallBtnStyle, marginLeft: 4 }}>View</button>
+                        <button onClick={() => window.open(`/${user.role}/${user.handle}?from=admin`, "_blank")} style={{ ...smallBtnStyle, marginLeft: 4 }}>View</button>
                         <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000", marginLeft: 4 }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
                       </td>
                     </tr>
