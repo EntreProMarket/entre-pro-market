@@ -1,6 +1,6 @@
 {
   "name": "Entre PRO Market",
-  "short_name": "Entre PRO",
+  "short_name": "Entre PM",
   "description": "The marketplace connecting vendors with event organizers",
   "start_url": "/",
   "display": "standalone",
@@ -21,7 +21,7 @@
       "purpose": "any"
     },
     {
-      "src": "/logo-circle-maskable.png",
+      "src": "/logo-text-maskable.png",
       "sizes": "886x886",
       "type": "image/png",
       "purpose": "maskable"
