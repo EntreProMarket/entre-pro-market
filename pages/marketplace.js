@@ -17,6 +17,7 @@ export default function Marketplace() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [emailGateOpen, setEmailGateOpen] = useState(false);
   const [gateEmail, setGateEmail] = useState("");
   const [gateSubmitted, setGateSubmitted] = useState(false);
@@ -25,7 +26,12 @@ export default function Marketplace() {
   useEffect(() => {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
-      setUser(userData?.user || null);
+      const currentUser = userData?.user || null;
+      setUser(currentUser);
+      if (currentUser) {
+        const { data: profileData } = await supabase.from("profiles").select("role").eq("id", currentUser.id).single();
+        setUserRole(profileData?.role || null);
+      }
       const { data } = await supabase.from("profiles").select("id, business_name, category, city, state, description, logo_url, account_type, handle, tags").eq("role", "vendor").not("handle", "is", null).not("business_name", "is", null);
       if (data) {
         const sorted = [...shuffle(data.filter(v => v.account_type === "featured")), ...shuffle(data.filter(v => v.account_type === "premium")), ...shuffle(data.filter(v => !["featured","premium"].includes(v.account_type)))];
@@ -74,8 +80,9 @@ export default function Marketplace() {
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button onClick={() => router.push("/home")} style={{ padding: "7px 14px", backgroundColor: "white", color: "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🏡 Home</button>
-          {user ? <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>📊 Dashboard</button>
-          : <button onClick={() => router.push("/")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>Log In</button>}
+          {userRole === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>📊 Dashboard</button>}
+          {userRole === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>📊 Dashboard</button>}
+          {!user && <button onClick={() => router.push("/")} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>Log In</button>}
         </div>
       </div>
 
