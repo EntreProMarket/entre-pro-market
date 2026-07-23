@@ -65,11 +65,11 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0 4px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0" }}>
         <img
           src="/ENTRE_PRO.png"
           alt="Entre PRO Market"
-          style={{ width: "100%", maxWidth: 1475, height: "auto", objectFit: "contain" }}
+          style={{ width: "100%", maxWidth: 1500, height: "auto", objectFit: "contain" }}
         />
       </div>
     );
