@@ -69,7 +69,7 @@ export default function Home() {
         <img
           src="/ENTRE_PRO.png"
           alt="Entre PRO Market"
-          style={{ width: "100%", maxWidth: 420, height: "auto", objectFit: "contain" }}
+          style={{ width: "100%", maxWidth: 640, height: "auto", objectFit: "contain" }}
         />
       </div>
     );
