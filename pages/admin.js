@@ -335,20 +335,22 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.filter(u => u.role === "vendor" || u.role === "organizer").map((user, i) => (
+                  {users.map((user, i) => (
                     <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? "#f9f9f9" : "white" }}>
-                      <td style={tdStyle}><strong>{user.business_name || user.organizer_name || "—"}</strong><br /><span style={{ fontSize: 11, color: "#888" }}>@{user.handle}</span></td>
-                      <td style={tdStyle}><span style={{ padding: "3px 8px", borderRadius: 10, fontSize: 11, fontWeight: "bold", backgroundColor: user.role === "vendor" ? "#f3e8ff" : "#f9ffe8", color: user.role === "vendor" ? "#701890" : "#888B00" }}>{user.role}</span></td>
-                      <td style={tdStyle}><span style={{ fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type || "free"}</span></td>
+                      <td style={tdStyle}><strong>{user.business_name || user.organizer_name || "Public User"}</strong><br /><span style={{ fontSize: 11, color: "#888" }}>{user.handle ? `@${user.handle}` : "no handle"}</span></td>
+                      <td style={tdStyle}><span style={{ padding: "3px 8px", borderRadius: 10, fontSize: 11, fontWeight: "bold", backgroundColor: user.role === "vendor" ? "#f3e8ff" : user.role === "organizer" ? "#f9ffe8" : "#f0f0f0", color: user.role === "vendor" ? "#701890" : user.role === "organizer" ? "#888B00" : "#666" }}>{user.role || "public"}</span></td>
+                      <td style={tdStyle}>{user.role ? <span style={{ fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type || "free"}</span> : <span style={{ color: "#bbb" }}>—</span>}</td>
                       <td style={tdStyle}>
-                        <select value={user.account_type || "free"} onChange={e => handleTierChange(user, e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>
-                          {user.role === "vendor" ? (<><option value="free">Free</option><option value="premium">Premium</option><option value="featured">Featured</option></>) : (<><option value="basic">Basic</option><option value="pro">Pro</option><option value="elite">Elite</option></>)}
-                        </select>
+                        {user.role ? (
+                          <select value={user.account_type || "free"} onChange={e => handleTierChange(user, e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>
+                            {user.role === "vendor" ? (<><option value="free">Free</option><option value="premium">Premium</option><option value="featured">Featured</option></>) : (<><option value="basic">Basic</option><option value="pro">Pro</option><option value="elite">Elite</option></>)}
+                          </select>
+                        ) : <span style={{ color: "#bbb" }}>—</span>}
                       </td>
                       <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
                       <td style={tdStyle}>
                         <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️ Info</button>
-                        <button onClick={() => window.open(`/${user.role}/${user.handle}?from=admin`, "_blank")} style={{ ...smallBtnStyle, marginLeft: 4 }}>View</button>
+                        {user.role && user.handle && <button onClick={() => window.open(`/${user.role}/${user.handle}?from=admin`, "_blank")} style={{ ...smallBtnStyle, marginLeft: 4 }}>View</button>}
                         <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000", marginLeft: 4 }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
                       </td>
                     </tr>
