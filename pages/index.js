@@ -41,6 +41,10 @@ export default function Home() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { setMessage("❌ " + error.message); setSubmitting(false); return; }
     const { data: userData } = await supabase.auth.getUser();
+    const { data: existingProfile } = await supabase.from("profiles").select("id").eq("id", userData.user.id).single();
+    if (!existingProfile) {
+      await supabase.from("profiles").upsert({ id: userData.user.id });
+    }
     const { data: profile } = await supabase.from("profiles").select("role, is_admin").eq("id", userData.user.id).single();
     if (profile?.is_admin) { router.replace("/admin"); return; }
     if (profile?.role === "vendor") { router.replace("/vendor-dashboard"); return; }
