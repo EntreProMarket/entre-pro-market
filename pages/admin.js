@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-const TABS = ["Overview", "Plans & Pricing", "Users", "Featured Vendors", "Premium Vendors", "Pro Organizers", "Elite Organizers", "Ads", "Reports", "Exports", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "Reports", "Exports", "Settings"];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -323,34 +323,24 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === "Users" && (
+        {activeTab === "Public Users" && (
           <div>
-            <h2 style={{ marginBottom: 6 }}>👥 Users</h2>
-            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Tap ℹ️ Info to view full signup details including email.</p>
+            <h2 style={{ marginBottom: 6 }}>👤 Public Users</h2>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Accounts with no vendor/organizer role yet. Tap ℹ️ Info to view email.</p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ backgroundColor: "#111", color: "white" }}>
-                    <th style={thStyle}>Name</th><th style={thStyle}>Role</th><th style={thStyle}>Tier</th><th style={thStyle}>Change Tier</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th>
+                    <th style={thStyle}>Account</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user, i) => (
+                  {users.filter(u => !u.role).map((user, i) => (
                     <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? "#f9f9f9" : "white" }}>
-                      <td style={tdStyle}><strong>{user.business_name || user.organizer_name || "Public User"}</strong><br /><span style={{ fontSize: 11, color: "#888" }}>{user.handle ? `@${user.handle}` : "no handle"}</span></td>
-                      <td style={tdStyle}><span style={{ padding: "3px 8px", borderRadius: 10, fontSize: 11, fontWeight: "bold", backgroundColor: user.role === "vendor" ? "#f3e8ff" : user.role === "organizer" ? "#f9ffe8" : "#f0f0f0", color: user.role === "vendor" ? "#701890" : user.role === "organizer" ? "#888B00" : "#666" }}>{user.role || "public"}</span></td>
-                      <td style={tdStyle}>{user.role ? <span style={{ fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type || "free"}</span> : <span style={{ color: "#bbb" }}>—</span>}</td>
-                      <td style={tdStyle}>
-                        {user.role ? (
-                          <select value={user.account_type || "free"} onChange={e => handleTierChange(user, e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, cursor: "pointer" }}>
-                            {user.role === "vendor" ? (<><option value="free">Free</option><option value="premium">Premium</option><option value="featured">Featured</option></>) : (<><option value="basic">Basic</option><option value="pro">Pro</option><option value="elite">Elite</option></>)}
-                          </select>
-                        ) : <span style={{ color: "#bbb" }}>—</span>}
-                      </td>
+                      <td style={tdStyle}><strong>Public User</strong></td>
                       <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
                       <td style={tdStyle}>
                         <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️ Info</button>
-                        {user.role && user.handle && <button onClick={() => window.open(`/${user.role}/${user.handle}?from=admin`, "_blank")} style={{ ...smallBtnStyle, marginLeft: 4 }}>View</button>}
                         <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000", marginLeft: 4 }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
                       </td>
                     </tr>
@@ -361,20 +351,20 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === "Featured Vendors" && (
+        {activeTab === "Free Vendors" && (
           <div>
-            <h2 style={{ marginBottom: 16 }}>🔥 Featured Vendors</h2>
+            <h2 style={{ marginBottom: 16 }}>🆓 Free Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "vendor").map(user => (
-                <div key={user.id} style={{ backgroundColor: "white", border: `1px solid ${user.account_type === "featured" ? "#AABB23" : "#eee"}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              {users.filter(u => u.role === "vendor" && (!u.account_type || u.account_type === "free")).map(user => (
+                <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><span style={{ fontSize: 11, fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type}</span></div>
+                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
-                    {user.account_type !== "featured" && <button onClick={() => handleTierChange(user, "featured")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🔥 Make Featured</button>}
-                    {user.account_type === "featured" && <button onClick={() => handleTierChange(user, "free")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>}
+                    <button onClick={() => handleTierChange(user, "premium")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>💜 Make Premium</button>
+                    <button onClick={() => handleTierChange(user, "featured")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🔥 Make Featured</button>
                   </div>
                 </div>
               ))}
@@ -386,16 +376,58 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>💜 Premium Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "vendor").map(user => (
-                <div key={user.id} style={{ backgroundColor: "white", border: `1px solid ${user.account_type === "premium" ? "#701890" : "#eee"}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              {users.filter(u => u.role === "vendor" && u.account_type === "premium").map(user => (
+                <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #701890", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><span style={{ fontSize: 11, fontWeight: "bold", color: tierColor(user.account_type) }}>{user.account_type}</span></div>
+                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
-                    {user.account_type !== "premium" && <button onClick={() => handleTierChange(user, "premium")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>💜 Make Premium</button>}
-                    {user.account_type === "premium" && <button onClick={() => handleTierChange(user, "free")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>}
+                    <button onClick={() => handleTierChange(user, "featured")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🔥 Make Featured</button>
+                    <button onClick={() => handleTierChange(user, "free")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Featured Vendors" && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>🔥 Featured Vendors</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {users.filter(u => u.role === "vendor" && u.account_type === "featured").map(user => (
+                <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                    <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p></div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
+                    <button onClick={() => handleTierChange(user, "premium")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>💜 Move to Premium</button>
+                    <button onClick={() => handleTierChange(user, "free")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Basic Organizers" && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>💼 Basic Organizers</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {users.filter(u => u.role === "organizer" && (!u.account_type || u.account_type === "basic")).map(user => (
+                <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                    <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p></div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
+                    <button onClick={() => handleTierChange(user, "pro")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🚀 Make Pro</button>
+                    <button onClick={() => handleTierChange(user, "elite")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>👑 Make Elite</button>
                   </div>
                 </div>
               ))}
@@ -407,7 +439,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>🚀 Pro Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer").map(user => <OrganizerTierCard key={user.id} user={user} targetTier="pro" color="#701890" label="Pro" icon="🚀" />)}
+              {users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium")).map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
             </div>
           </div>
         )}
@@ -416,7 +448,18 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>👑 Elite Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer").map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
+              {users.filter(u => u.role === "organizer" && u.account_type === "elite").map(user => (
+                <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                    <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p></div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
+                    <button onClick={() => handleTierChange(user, "basic")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade</button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
