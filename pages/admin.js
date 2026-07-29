@@ -171,6 +171,7 @@ export default function AdminDashboard() {
 
   const logout = async () => { await supabase.auth.signOut(); router.replace("/"); };
   const tierColor = (t) => ({ premium: "#701890", featured: "#AABB23", pro: "#701890", elite: "#AABB23", basic: "#888", free: "#aaa" }[t] || "#aaa");
+  const formatSignupDate = (d) => d ? new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
 
   const OrganizerTierCard = ({ user, targetTier, color, label, icon }) => {
     const isTier = user.account_type === targetTier;
@@ -181,6 +182,7 @@ export default function AdminDashboard() {
           <div>
             <strong>{user.organizer_name || user.business_name || "—"}</strong>
             <p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Signed up {formatSignupDate(user.created_at)}</p>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Current: {user.account_type || "basic"}</p>
           </div>
         </div>
@@ -331,13 +333,14 @@ export default function AdminDashboard() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ backgroundColor: "#111", color: "white" }}>
-                    <th style={thStyle}>Account</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th>
+                    <th style={thStyle}>Account</th><th style={thStyle}>Signed Up</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.filter(u => !u.role).map((user, i) => (
                     <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? "#f9f9f9" : "white" }}>
                       <td style={tdStyle}><strong>Public User</strong></td>
+                      <td style={tdStyle}>{formatSignupDate(user.created_at)}</td>
                       <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
                       <td style={tdStyle}>
                         <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️ Info</button>
@@ -359,7 +362,7 @@ export default function AdminDashboard() {
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p></div>
+                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Signed up {formatSignupDate(user.created_at)}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
@@ -380,7 +383,7 @@ export default function AdminDashboard() {
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #701890", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p></div>
+                    <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Signed up {formatSignupDate(user.created_at)}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
@@ -401,7 +404,7 @@ export default function AdminDashboard() {
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p></div>
+                    <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Signed up {formatSignupDate(user.created_at)}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
@@ -422,7 +425,7 @@ export default function AdminDashboard() {
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p></div>
+                    <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Signed up {formatSignupDate(user.created_at)}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
@@ -452,7 +455,7 @@ export default function AdminDashboard() {
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p></div>
+                    <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Signed up {formatSignupDate(user.created_at)}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
