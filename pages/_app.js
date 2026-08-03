@@ -88,6 +88,17 @@ function InstallBanner() {
   );
 }
 
+function BfcacheGuard() {
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", handler);
+    return () => window.removeEventListener("pageshow", handler);
+  }, []);
+  return null;
+}
+
 export default function App({ Component, pageProps }) {
   return (
     <>
