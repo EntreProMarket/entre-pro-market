@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
 const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "Reports", "Exports", "Settings"];
+const SEARCHABLE_TABS = ["Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers"];
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -22,6 +23,8 @@ export default function AdminDashboard() {
   const [downgrading, setDowngrading] = useState(false);
   const [userInfoModal, setUserInfoModal] = useState(null);
   const [exportLoading, setExportLoading] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [rolePicks, setRolePicks] = useState({});
   const [limits, setLimits] = useState({
     vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
     vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
@@ -76,6 +79,13 @@ export default function AdminDashboard() {
     if (settingsData?.length) { const m = {}; settingsData.forEach(s => { m[s.key] = s.value; }); setLimits(prev => ({ ...prev, ...m })); }
   };
 
+  // ── SEARCH ──
+  const matchesSearch = (u) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return [u.business_name, u.organizer_name, u.handle, u.category, u.city, u.state].some(f => f && f.toLowerCase().includes(q));
+  };
+
   const PAID_TIERS = ["premium", "featured", "pro", "elite"];
   const handleTierChange = (user, newTier) => {
     if (user.account_type === newTier) return;
@@ -102,6 +112,18 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, account_type: newAccountType } : u)); setMessage("✅ Tier updated!"); }
       else setMessage("❌ Error: " + data.error);
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+  };
+
+  // ── SET ROLE + TIER (for Public Users → Vendor/Organizer) ──
+  const setUserRoleTier = async (userId, role, tier) => {
+    try {
+      const res = await fetch("/api/admin-set-role-tier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, role, tier }) });
+      const data = await res.json();
+      if (data.success) {
+        setUsers(users.map(u => u.id === userId ? { ...u, role, account_type: tier } : u));
+        setMessage(`✅ Upgraded to ${role === "vendor" ? "Vendor" : "Organizer"} (${tier})`);
+      } else setMessage("❌ Error: " + data.error);
     } catch (err) { setMessage("❌ Error: " + err.message); }
   };
 
@@ -172,6 +194,16 @@ export default function AdminDashboard() {
   const logout = async () => { await supabase.auth.signOut(); router.replace("/"); };
   const tierColor = (t) => ({ premium: "#701890", featured: "#AABB23", pro: "#701890", elite: "#AABB23", basic: "#888", free: "#aaa" }[t] || "#aaa");
   const formatLastLogin = (d) => d ? new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Never logged in";
+
+  const getPick = (userId) => rolePicks[userId] || { role: "vendor", tier: "free" };
+  const updatePick = (userId, field, value) => {
+    setRolePicks(prev => {
+      const cur = prev[userId] || { role: "vendor", tier: "free" };
+      const next = { ...cur, [field]: value };
+      if (field === "role") next.tier = value === "vendor" ? "free" : "basic";
+      return { ...prev, [userId]: next };
+    });
+  };
 
   const OrganizerTierCard = ({ user, targetTier, color, label, icon }) => {
     const isTier = user.account_type === targetTier;
@@ -282,6 +314,17 @@ export default function AdminDashboard() {
 
       <div style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
 
+        {SEARCHABLE_TABS.includes(activeTab) && (
+          <div style={{ marginBottom: 18 }}>
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search by name, handle, city, category..."
+              style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box" }}
+            />
+          </div>
+        )}
+
         {activeTab === "Overview" && (
           <div>
             <h2 style={{ marginBottom: 20 }}>📊 Overview</h2>
@@ -328,7 +371,7 @@ export default function AdminDashboard() {
         {activeTab === "Public Users" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>👤 Public Users</h2>
-            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Accounts with no vendor/organizer role yet. Tap ℹ️ Info to view email.</p>
+            <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>Accounts with no vendor/organizer role yet. Pick a role + tier and tap Upgrade to promote them directly (useful for free test accounts).</p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -337,17 +380,42 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.filter(u => !u.role).map((user, i) => (
-                    <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? "#f9f9f9" : "white" }}>
-                      <td style={tdStyle}><strong>Public User</strong></td>
-                      <td style={tdStyle}>{formatLastLogin(user.last_sign_in_at)}</td>
-                      <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
-                      <td style={tdStyle}>
-                        <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️ Info</button>
-                        <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000", marginLeft: 4 }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {users.filter(u => !u.role && matchesSearch(u)).map((user, i) => {
+                    const pick = getPick(user.id);
+                    return (
+                      <tr key={user.id} style={{ backgroundColor: i % 2 === 0 ? "#f9f9f9" : "white" }}>
+                        <td style={tdStyle}><strong>Public User</strong></td>
+                        <td style={tdStyle}>{formatLastLogin(user.last_sign_in_at)}</td>
+                        <td style={tdStyle}><span style={{ color: user.suspended ? "#cc0000" : "#16a34a", fontWeight: "bold", fontSize: 12 }}>{user.suspended ? "Suspended" : "Active"}</span></td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                            <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
+                            <select value={pick.role} onChange={e => updatePick(user.id, "role", e.target.value)} style={smallSelectStyle}>
+                              <option value="vendor">Vendor</option>
+                              <option value="organizer">Organizer</option>
+                            </select>
+                            <select value={pick.tier} onChange={e => updatePick(user.id, "tier", e.target.value)} style={smallSelectStyle}>
+                              {pick.role === "vendor" ? (
+                                <>
+                                  <option value="free">Free</option>
+                                  <option value="premium">Premium</option>
+                                  <option value="featured">Featured</option>
+                                </>
+                              ) : (
+                                <>
+                                  <option value="basic">Basic</option>
+                                  <option value="pro">Pro</option>
+                                  <option value="elite">Elite</option>
+                                </>
+                              )}
+                            </select>
+                            <button onClick={() => setUserRoleTier(user.id, pick.role, pick.tier)} style={{ ...smallBtnStyle, backgroundColor: "#16a34a" }}>⬆️ Upgrade</button>
+                            <button onClick={() => suspendUser(user.id, !user.suspended)} style={{ ...smallBtnStyle, backgroundColor: user.suspended ? "#16a34a" : "#cc0000" }}>{user.suspended ? "Reinstate" : "Suspend"}</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -358,7 +426,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>🆓 Free Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "vendor" && (!u.account_type || u.account_type === "free")).map(user => (
+              {users.filter(u => u.role === "vendor" && (!u.account_type || u.account_type === "free") && matchesSearch(u)).map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
@@ -379,7 +447,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>💜 Premium Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "vendor" && u.account_type === "premium").map(user => (
+              {users.filter(u => u.role === "vendor" && u.account_type === "premium" && matchesSearch(u)).map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #701890", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
@@ -400,7 +468,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>🔥 Featured Vendors</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "vendor" && u.account_type === "featured").map(user => (
+              {users.filter(u => u.role === "vendor" && u.account_type === "featured" && matchesSearch(u)).map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
@@ -421,7 +489,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>💼 Basic Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer" && (!u.account_type || u.account_type === "basic")).map(user => (
+              {users.filter(u => u.role === "organizer" && (!u.account_type || u.account_type === "basic") && matchesSearch(u)).map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
@@ -442,7 +510,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>🚀 Pro Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium")).map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
+              {users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium") && matchesSearch(u)).map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
             </div>
           </div>
         )}
@@ -451,7 +519,7 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>👑 Elite Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer" && u.account_type === "elite").map(user => (
+              {users.filter(u => u.role === "organizer" && u.account_type === "elite" && matchesSearch(u)).map(user => (
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
@@ -600,3 +668,4 @@ const labelStyle = { display: "block", fontWeight: "bold", marginBottom: 5, font
 const thStyle = { padding: "12px 14px", textAlign: "left", fontWeight: "bold", whiteSpace: "nowrap" };
 const tdStyle = { padding: "12px 14px", borderBottom: "1px solid #eee", verticalAlign: "middle" };
 const smallBtnStyle = { padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 };
+const smallSelectStyle = { padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, backgroundColor: "white" };
