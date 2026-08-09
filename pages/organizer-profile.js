@@ -38,6 +38,14 @@ function formatTime(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+// ── VIDEO/GIF HELPERS ──
+const VIDEO_EXT = [".mp4", ".mov", ".webm", ".ogg", ".m4v"];
+const GIF_EXT = [".gif"];
+function isUploadedVideoUrl(url) { if (!url) return false; const clean = url.split("?")[0].toLowerCase(); return VIDEO_EXT.some(ext => clean.endsWith(ext)); }
+function isUploadedGifUrl(url) { if (!url) return false; const clean = url.split("?")[0].toLowerCase(); return GIF_EXT.some(ext => clean.endsWith(ext)); }
+const MAX_VIDEO_MB = 50;
+const MAX_GIF_MB = 15;
+
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Venue","Other"];
@@ -70,6 +78,7 @@ export default function OrganizerProfile() {
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
   const [videoUrls, setVideoUrls] = useState(["","","","",""]);
+  const [videoFiles, setVideoFiles] = useState([null, null, null, null, null]);
   const [events, setEvents] = useState([]);
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState(BLANK_EVENT);
@@ -117,6 +126,24 @@ export default function OrganizerProfile() {
     return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
   };
 
+  // ── VIDEO/GIF FILE PICK ──
+  const handleVideoFilePick = (i, file) => {
+    if (!file) return;
+    const isGif = file.type === "image/gif";
+    const isVideo = file.type.startsWith("video/");
+    if (!isGif && !isVideo) { setMessage("❌ Please choose a video file (MP4, MOV, WebM) or a GIF."); return; }
+    const maxBytes = (isGif ? MAX_GIF_MB : MAX_VIDEO_MB) * 1024 * 1024;
+    if (file.size > maxBytes) { setMessage(`❌ File too large. Max ${isGif ? MAX_GIF_MB : MAX_VIDEO_MB}MB for ${isGif ? "GIFs" : "videos"}.`); return; }
+    setMessage("");
+    const vf = [...videoFiles]; vf[i] = file; setVideoFiles(vf);
+    const vu = [...videoUrls]; vu[i] = URL.createObjectURL(file); setVideoUrls(vu);
+  };
+
+  const removeVideoSlot = (i) => {
+    const vf = [...videoFiles]; vf[i] = null; setVideoFiles(vf);
+    const vu = [...videoUrls]; vu[i] = ""; setVideoUrls(vu);
+  };
+
   const handleSave = async () => {
     const { data: authData } = await supabase.auth.getUser();
     if (!authData?.user?.email) { setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving."); return; }
@@ -137,6 +164,15 @@ export default function OrganizerProfile() {
           if (url) updatedPortfolio.push(url);
         }
       }
+      // ── Upload any picked video/GIF files, replacing their blob preview URL with the real one ──
+      let finalVideoUrls = [...videoUrls];
+      for (let i = 0; i < videoFiles.length; i++) {
+        if (videoFiles[i]) {
+          const up = await uploadFile(videoFiles[i], "organizer-videos");
+          if (up) finalVideoUrls[i] = up;
+          else { setSaving(false); return; }
+        }
+      }
       const { error } = await supabase.from("profiles").upsert({
         id: user.id, organizer_name: organizerName, handle, category, city, state: stateVal, description,
         website: formatSocialLink("website", website), instagram: formatSocialLink("instagram", instagram),
@@ -144,11 +180,12 @@ export default function OrganizerProfile() {
         youtube: formatSocialLink("youtube", youtube), x_twitter: formatSocialLink("x_twitter", xTwitter),
         tags: tags.split(",").map(t => t.trim()).filter(Boolean), logo_url: uploadedLogoUrl,
         portfolio_images: updatedPortfolio,
-        video_urls: accountType === "elite" ? videoUrls.filter(v => v.trim()) : [],
+        video_urls: accountType === "elite" ? finalVideoUrls.filter(v => v.trim()) : [],
         role: "organizer",
       });
       if (error) throw error;
       setPortfolioImages(updatedPortfolio); setPortfolioFiles([]); setLogoUrl(uploadedLogoUrl);
+      setVideoUrls(finalVideoUrls); setVideoFiles([null, null, null, null, null]);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/organizer/${handle}`), 1200);
     } catch (err) { setMessage("❌ Error: " + err.message); }
@@ -274,11 +311,49 @@ export default function OrganizerProfile() {
         {!atLimit && <input type="file" accept="image/*" multiple onChange={e => { const rem = imageLimit - portfolioImages.length; const files = Array.from(e.target.files).slice(0, rem); if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`); setPortfolioFiles(files); }} style={{ display: "block" }} />}
       </div>
 
-      {/* ELITE: VIDEOS */}
+      {/* ELITE: VIDEOS & GIFS */}
       {accountType === "elite" && (
         <div style={{ marginTop: 20, marginBottom: 20, backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: 16 }}>
-          <label style={{ ...lS, color: "#888B00" }}>👑 Video Links (up to 5) — YouTube, Instagram or TikTok</label>
-          {Array.from({ length: 5 }).map((_, i) => <input key={i} value={videoUrls[i] || ""} onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }} placeholder={`Video link ${i + 1}`} style={iS} />)}
+          <label style={{ ...lS, color: "#888B00" }}>👑 Videos & GIFs (up to 5)</label>
+          <p style={{ fontSize: 12, color: "#666", marginTop: -4, marginBottom: 12 }}>Paste a YouTube, Instagram, or TikTok link — or upload your own MP4/MOV/WebM video or GIF directly (max {MAX_VIDEO_MB}MB for video, {MAX_GIF_MB}MB for GIF).</p>
+          {Array.from({ length: 5 }).map((_, i) => {
+            const current = videoUrls[i] || "";
+            const isFilePreview = !!videoFiles[i];
+            const isVideoLike = isFilePreview ? videoFiles[i].type.startsWith("video/") : isUploadedVideoUrl(current);
+            const isGifLike = isFilePreview ? videoFiles[i].type === "image/gif" : isUploadedGifUrl(current);
+            return (
+              <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i < 4 ? "1px solid #e5efc0" : "none" }}>
+                {current && (isVideoLike || isGifLike) ? (
+                  <div style={{ marginBottom: 8, position: "relative" }}>
+                    <div style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #AABB23", maxWidth: 260 }}>
+                      {isGifLike
+                        ? <img src={current} alt={`gif ${i + 1}`} style={{ width: "100%", display: "block" }} />
+                        : <video src={current} controls style={{ width: "100%", display: "block", maxHeight: 180 }} />}
+                    </div>
+                    <button onClick={() => removeVideoSlot(i)} style={{ marginTop: 6, fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", padding: 0 }}>✕ Remove</button>
+                  </div>
+                ) : (
+                  <input
+                    value={current}
+                    onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }}
+                    placeholder={`Video link ${i + 1} (YouTube, Instagram, TikTok...)`}
+                    style={{ ...iS, marginBottom: 8 }}
+                  />
+                )}
+                {!current && (
+                  <label style={{ display: "inline-block", fontSize: 12, color: "#701890", cursor: "pointer" }}>
+                    📤 Or upload a video/GIF file
+                    <input
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm,video/ogg,image/gif"
+                      onChange={e => { handleVideoFilePick(i, e.target.files[0]); e.target.value = ""; }}
+                      style={{ display: "block", marginTop: 4 }}
+                    />
+                  </label>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
