@@ -127,6 +127,20 @@ export default function AdminDashboard() {
     } catch (err) { setMessage("❌ Error: " + err.message); }
   };
 
+  // ── DEMOTE TO PUBLIC USER (for Free Vendors / Basic Organizers, and reversing accidental upgrades) ──
+  const demoteToPublic = async (user) => {
+    const name = user.business_name || user.organizer_name || user.handle || "this user";
+    if (!confirm(`Demote ${name} back to a Public User? This removes their vendor/organizer profile role and tier. This cannot be undone from here.`)) return;
+    try {
+      const res = await fetch("/api/admin-demote-to-public", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user.id }) });
+      const data = await res.json();
+      if (data.success) {
+        setUsers(users.map(u => u.id === user.id ? { ...u, role: null, account_type: null } : u));
+        setMessage(`✅ ${name} demoted to Public User`);
+      } else setMessage("❌ Error: " + data.error);
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+  };
+
   const suspendUser = async (userId, suspended) => {
     try {
       const res = await fetch("/api/admin-suspend-user", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, suspended }) });
@@ -203,29 +217,6 @@ export default function AdminDashboard() {
       if (field === "role") next.tier = value === "vendor" ? "free" : "basic";
       return { ...prev, [userId]: next };
     });
-  };
-
-  const OrganizerTierCard = ({ user, targetTier, color, label, icon }) => {
-    const isTier = user.account_type === targetTier;
-    return (
-      <div style={{ backgroundColor: "white", border: `1px solid ${isTier ? color : "#eee"}`, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-          <div>
-            <strong>{user.organizer_name || user.business_name || "—"}</strong>
-            <p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Last login: {formatLastLogin(user.last_sign_in_at)}</p>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Current: {user.account_type || "basic"}</p>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => viewUserInfo(user.id)} style={{ padding: "6px 12px", backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 11 }}>ℹ️</button>
-          <button onClick={() => handleTierChange(user, isTier ? "basic" : targetTier)} style={{ padding: "8px 14px", backgroundColor: isTier ? "#cc0000" : color, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>
-            {isTier ? "⬇️ Downgrade" : `${icon} Make ${label}`}
-          </button>
-        </div>
-      </div>
-    );
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Panel...</div>;
@@ -432,10 +423,11 @@ export default function AdminDashboard() {
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                     <div><strong>{user.business_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Last login: {formatLastLogin(user.last_sign_in_at)}</p></div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
                     <button onClick={() => handleTierChange(user, "premium")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>💜 Make Premium</button>
                     <button onClick={() => handleTierChange(user, "featured")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🔥 Make Featured</button>
+                    <button onClick={() => demoteToPublic(user)} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade to Public</button>
                   </div>
                 </div>
               ))}
@@ -495,10 +487,11 @@ export default function AdminDashboard() {
                     {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                     <div><strong>{user.organizer_name || "—"}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Last login: {formatLastLogin(user.last_sign_in_at)}</p></div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
                     <button onClick={() => handleTierChange(user, "pro")} style={{ padding: "8px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>🚀 Make Pro</button>
                     <button onClick={() => handleTierChange(user, "elite")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>👑 Make Elite</button>
+                    <button onClick={() => demoteToPublic(user)} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade to Public</button>
                   </div>
                 </div>
               ))}
@@ -510,7 +503,23 @@ export default function AdminDashboard() {
           <div>
             <h2 style={{ marginBottom: 16 }}>🚀 Pro Organizers</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium") && matchesSearch(u)).map(user => <OrganizerTierCard key={user.id} user={user} targetTier="elite" color="#AABB23" label="Elite" icon="👑" />)}
+              {users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium") && matchesSearch(u)).map(user => (
+                <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #701890", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {user.logo_url && <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={user.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                    <div>
+                      <strong>{user.organizer_name || user.business_name || "—"}</strong>
+                      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>@{user.handle} · {user.category} · {user.city}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Last login: {formatLastLogin(user.last_sign_in_at)}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
+                    <button onClick={() => handleTierChange(user, "elite")} style={{ padding: "8px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>👑 Make Elite</button>
+                    <button onClick={() => handleTierChange(user, "basic")} style={{ padding: "8px 14px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>⬇️ Downgrade to Basic</button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
