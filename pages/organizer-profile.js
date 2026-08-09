@@ -345,7 +345,7 @@ export default function OrganizerProfile() {
                     📤 Or upload a video/GIF file
                     <input
                       type="file"
-                      accept="video/mp4,video/quicktime,video/webm,video/ogg,image/gif"
+                      accept="video/*,image/gif"
                       onChange={e => { handleVideoFilePick(i, e.target.files[0]); e.target.value = ""; }}
                       style={{ display: "block", marginTop: 4 }}
                     />
