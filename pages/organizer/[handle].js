@@ -13,6 +13,12 @@ function formatTime(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+// ── VIDEO/GIF HELPERS ──
+const VIDEO_EXT = [".mp4", ".mov", ".webm", ".ogg", ".m4v"];
+const GIF_EXT = [".gif"];
+function isUploadedVideoUrl(url) { if (!url) return false; const clean = url.split("?")[0].toLowerCase(); return VIDEO_EXT.some(ext => clean.endsWith(ext)); }
+function isUploadedGifUrl(url) { if (!url) return false; const clean = url.split("?")[0].toLowerCase(); return GIF_EXT.some(ext => clean.endsWith(ext)); }
+
 export default function OrganizerPublicProfile() {
   const router = useRouter();
   const { handle, from: fromParam } = router.query;
@@ -156,6 +162,15 @@ export default function OrganizerPublicProfile() {
           <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {organizer.video_urls.filter(v => v).map((url, i) => {
+              // ── Uploaded video file ──
+              if (isUploadedVideoUrl(url)) {
+                return <video key={i} src={url} controls style={{ width: "100%", maxHeight: 360, borderRadius: 8, backgroundColor: "#000", display: "block" }} />;
+              }
+              // ── Uploaded GIF ──
+              if (isUploadedGifUrl(url)) {
+                return <img key={i} src={url} alt={`video-gif-${i}`} style={{ width: "100%", borderRadius: 8, display: "block" }} />;
+              }
+              // ── Pasted links: YouTube / Instagram / TikTok / generic embed ──
               let embedUrl = url;
               if (url.includes("youtube.com/watch")) { const id = new URL(url).searchParams.get("v"); embedUrl = `https://www.youtube.com/embed/${id}`; }
               else if (url.includes("youtu.be/")) { const id = url.split("youtu.be/")[1].split("?")[0]; embedUrl = `https://www.youtube.com/embed/${id}`; }
