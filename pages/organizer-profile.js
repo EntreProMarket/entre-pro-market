@@ -341,15 +341,26 @@ export default function OrganizerProfile() {
                   />
                 )}
                 {!current && (
-                  <label style={{ display: "inline-block", fontSize: 12, color: "#701890", cursor: "pointer" }}>
-                    📤 Or upload a video/GIF file
-                    <input
-                      type="file"
-                      accept="video/*,image/gif"
-                      onChange={e => { handleVideoFilePick(i, e.target.files[0]); e.target.value = ""; }}
-                      style={{ display: "block", marginTop: 4 }}
-                    />
-                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <label style={{ display: "inline-block", fontSize: 12, color: "#701890", cursor: "pointer" }}>
+                      📤 Or upload a video file
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={e => { handleVideoFilePick(i, e.target.files[0]); e.target.value = ""; }}
+                        style={{ display: "block", marginTop: 4 }}
+                      />
+                    </label>
+                    <label style={{ display: "inline-block", fontSize: 12, color: "#701890", cursor: "pointer" }}>
+                      📤 Or upload a GIF
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={e => { handleVideoFilePick(i, e.target.files[0]); e.target.value = ""; }}
+                        style={{ display: "block", marginTop: 4 }}
+                      />
+                    </label>
+                  </div>
                 )}
               </div>
             );
