@@ -119,11 +119,27 @@ export default function OrganizerProfile() {
     load();
   }, [router]);
 
-  const uploadFile = async (file, bucket) => {
+  const uploadFile = async (file, bucket, attempt = 1) => {
     const fileName = `${Date.now()}-${file.name}`;
-    const { error } = await supabase.storage.from(bucket).upload(fileName, file);
-    if (error) { setMessage("❌ Upload error: " + error.message); return null; }
-    return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
+    try {
+      const { error } = await supabase.storage.from(bucket).upload(fileName, file);
+      if (error) {
+        if (attempt < 3 && /fetch|network|timeout/i.test(error.message || "")) {
+          await new Promise(r => setTimeout(r, 1500 * attempt));
+          return uploadFile(file, bucket, attempt + 1);
+        }
+        setMessage("❌ Upload error: " + error.message);
+        return null;
+      }
+      return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
+    } catch (err) {
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+        return uploadFile(file, bucket, attempt + 1);
+      }
+      setMessage("❌ Upload error: " + err.message + " — your connection may have dropped mid-upload. Please try again on a stronger connection.");
+      return null;
+    }
   };
 
   // ── VIDEO/GIF FILE PICK ──
@@ -237,6 +253,16 @@ export default function OrganizerProfile() {
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
+      {/* ── UPLOADING OVERLAY ── */}
+      {(saving || savingEvent) && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, textAlign: "center" }}>
+          <style>{`@keyframes epm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontSize: 56, animation: "epm-spin 1.6s linear infinite", marginBottom: 20 }}>⏳</div>
+          <p style={{ color: "white", fontWeight: "bold", fontSize: 17, margin: "0 0 8px" }}>Uploading your files...</p>
+          <p style={{ color: "#ddd", fontSize: 14, maxWidth: 320, lineHeight: 1.6, margin: 0 }}>Photos and videos can take a moment, especially on mobile data. Please stay on this page and be patient — we'll retry automatically if your connection blips.</p>
+        </div>
+      )}
+
       <h1 style={{ marginBottom: 20 }}>Edit Organizer Profile</h1>
 
       <input placeholder="Organizer Name" value={organizerName} onChange={e => setOrganizerName(e.target.value)} style={iS} />
