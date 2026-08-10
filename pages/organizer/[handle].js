@@ -205,7 +205,7 @@ export default function OrganizerPublicProfile() {
 
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type, vr = viewerProfile?.role;
-        const canMessage = vt === "featured" || vr === "organizer";
+        const canMessage = viewerProfile?.is_admin || vt === "featured" || vr === "organizer";
         return canMessage ? (
           <div style={{ marginTop: 20 }}>
             <button onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
