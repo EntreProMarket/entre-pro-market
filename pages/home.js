@@ -16,7 +16,7 @@ export default function HomePage() {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [featuredVendors, setFeaturedVendors] = useState([]);
-  const [eliteEvents, setEliteEvents] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
@@ -30,10 +30,25 @@ export default function HomePage() {
       setProfile(profileData);
       const { data: vendors } = await supabase.from("profiles").select("*").eq("role", "vendor").eq("account_type", "featured").not("business_name", "is", null);
       if (vendors?.length) setFeaturedVendors([...vendors].sort(() => Math.random() - 0.5).slice(0, 6));
+
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
-      const { data: eventsData } = await supabase.from("organizer_events").select("*, organizer:organizer_id(organizer_name, handle, logo_url, account_type)").gte("event_date", todayStr).order("event_date", { ascending: true }).limit(20);
-      setEliteEvents((eventsData || []).filter(e => e.organizer?.account_type === "elite"));
+
+      // ── Elite Organizer events ──
+      const { data: eliteData } = await supabase.from("organizer_events").select("*, organizer:organizer_id(organizer_name, handle, logo_url, account_type)").gte("event_date", todayStr).order("event_date", { ascending: true }).limit(20);
+      const eliteOnly = (eliteData || []).filter(e => e.organizer?.account_type === "elite").map(e => ({ ...e, _source: "elite" }));
+
+      // ── Admin-created EPM events ──
+      const { data: epmData } = await supabase.from("epm_events").select("*").gte("event_date", todayStr).order("event_date", { ascending: true }).limit(20);
+      const epmOnly = (epmData || []).map(e => ({ ...e, _source: "epm" }));
+
+      // ── Merge & sort together by date so they mix, not two separate lists ──
+      const combined = [...eliteOnly, ...epmOnly].sort((a, b) => {
+        if (!a.event_date) return 1;
+        if (!b.event_date) return -1;
+        return new Date(a.event_date) - new Date(b.event_date);
+      });
+      setUpcomingEvents(combined);
       setLoading(false);
     };
     load();
@@ -41,16 +56,17 @@ export default function HomePage() {
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
 
-  const visibleEvents = eliteEvents.slice(0, 6);
+  const visibleEvents = upcomingEvents.slice(0, 6);
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif", width: "100%", overflowX: "hidden", position: "relative" }}>
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
         <div style={{ display: "flex", flex: 1, marginLeft: 24, alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {profile?.is_admin && <button onClick={() => router.push("/admin")} style={{ padding: "8px 16px", backgroundColor: "#111", color: "white", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛠️ Admin Panel</button>}
             {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
@@ -64,7 +80,7 @@ export default function HomePage() {
       <div style={{ padding: 20 }}>
         <AnnouncementBanner />
 
-        {profile && !profile.role && (
+        {profile && !profile.role && !profile.is_admin && (
           <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "14px 20px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div>
               <p style={{ margin: 0, fontWeight: "bold", color: "#166534", fontSize: 14 }}>👋 Welcome to EntreProMarket!</p>
@@ -95,6 +111,7 @@ export default function HomePage() {
           <button onClick={() => router.push("/contact")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>Learn More</button>
         </div>
 
+        {/* a. FEATURED VENDORS */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>🔥 Featured Vendors</h2>
@@ -121,15 +138,17 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* b. UPCOMING EVENTS — Elite Organizer + Admin EPM Events, mixed together by date */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>👑 Upcoming Events</h2>
-            {eliteEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
+            {upcomingEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
           </div>
           {visibleEvents.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
               {visibleEvents.map(event => (
-                <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
+                <div key={`${event._source}-${event.id}`} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
+                  {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
                   <div style={{ height: 150, overflow: "hidden" }}>
                     {event.flyer_url ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                   </div>
@@ -144,11 +163,12 @@ export default function HomePage() {
             </div>
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
-              <p style={{ fontSize: 14, margin: 0 }}>Elite Organizer events will appear here. 🎪 Coming soon!</p>
+              <p style={{ fontSize: 14, margin: 0 }}>Elite Organizer and Entre PRO Market events will appear here. 🎪 Coming soon!</p>
             </div>
           )}
         </div>
 
+        {/* c. COMMUNITY & NEWS */}
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
@@ -183,7 +203,11 @@ export default function HomePage() {
                 {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
                 {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
                 {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
-                {selectedEvent.organizer?.handle && <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span onClick={() => { setSelectedEvent(null); router.push(`/organizer/${selectedEvent.organizer.handle}`); }} style={{ color: "#701890", fontWeight: "bold", cursor: "pointer", textDecoration: "underline" }}>@{selectedEvent.organizer.handle}</span></p>}
+                {selectedEvent._source === "epm" ? (
+                  <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Hosted by <span style={{ color: "#701890", fontWeight: "bold" }}>Entre PRO Market</span></p>
+                ) : selectedEvent.organizer?.handle ? (
+                  <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span onClick={() => { setSelectedEvent(null); router.push(`/organizer/${selectedEvent.organizer.handle}`); }} style={{ color: "#701890", fontWeight: "bold", cursor: "pointer", textDecoration: "underline" }}>@{selectedEvent.organizer.handle}</span></p>
+                ) : null}
               </div>
             </div>
           )}
