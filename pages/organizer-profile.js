@@ -161,6 +161,10 @@ export default function OrganizerProfile() {
   };
 
   const handleSave = async () => {
+    if (accountType === "elite" && (eventForm.event_name.trim() !== "" || flyerFile)) {
+      setMessage(`⚠️ You have an unsaved event in progress ("${eventForm.event_name || "untitled"}"). Please tap "${editingEvent ? "Update Event" : "Add Event"}" first, or clear the event fields, before saving your profile — otherwise it will be lost.`);
+      return;
+    }
     const { data: authData } = await supabase.auth.getUser();
     if (!authData?.user?.email) { setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving."); return; }
     if (!logoUrl && !logoFile) { setMessage("⚠️ Please upload a logo or choose a placeholder before saving."); return; }
@@ -211,9 +215,13 @@ export default function OrganizerProfile() {
   const saveEvent = async () => {
     if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
     if (!eventForm.flyer_url && !flyerFile) { setMessage("⚠️ A flyer image is required."); return; }
-    setSavingEvent(true);
+    setSavingEvent(true); setMessage("");
     let flyerUrl = eventForm.flyer_url || "";
-    if (flyerFile) { const up = await uploadFile(flyerFile, "organizer-portfolio"); if (up) flyerUrl = up; }
+    if (flyerFile) {
+      const up = await uploadFile(flyerFile, "organizer-portfolio");
+      if (!up) { setSavingEvent(false); return; } // uploadFile already set an error message
+      flyerUrl = up;
+    }
     const eventData = {
       event_name: eventForm.event_name, event_date: eventForm.event_date || null,
       event_end_date: eventForm.event_end_date || null, event_start_time: eventForm.event_start_time || null,
@@ -221,14 +229,22 @@ export default function OrganizerProfile() {
       event_type: eventForm.event_type, category: eventForm.category,
       description: eventForm.description, info_url: formatUrl(eventForm.info_url), flyer_url: flyerUrl,
     };
-    if (editingEvent) {
-      await supabase.from("organizer_events").update(eventData).eq("id", editingEvent);
-      setEvents(events.map(e => e.id === editingEvent ? { ...e, ...eventData } : e));
-    } else {
-      const { data } = await supabase.from("organizer_events").insert([{ ...eventData, organizer_id: user.id }]).select().single();
-      if (data) setEvents([...events, data]);
+    try {
+      if (editingEvent) {
+        const { error } = await supabase.from("organizer_events").update(eventData).eq("id", editingEvent);
+        if (error) throw error;
+        setEvents(events.map(e => e.id === editingEvent ? { ...e, ...eventData } : e));
+      } else {
+        const { data, error } = await supabase.from("organizer_events").insert([{ ...eventData, organizer_id: user.id }]).select().single();
+        if (error) throw error;
+        if (data) setEvents([...events, data]);
+      }
+      setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setShowFlyerPicker(false);
+      setMessage("✅ Event saved!");
+    } catch (err) {
+      setMessage("❌ Error saving event: " + err.message);
     }
-    setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setShowFlyerPicker(false); setSavingEvent(false);
+    setSavingEvent(false);
     setMessage("✅ Event saved!");
   };
 
