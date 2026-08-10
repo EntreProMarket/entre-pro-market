@@ -175,7 +175,7 @@ export default function VendorPublicProfile() {
 
           {!isOwner && (() => {
             const vr = viewerProfile?.role, vt = viewerProfile?.account_type;
-            const canMessage = (vr === "vendor" && (vt === "premium" || vt === "featured")) || vr === "organizer";
+            const canMessage = viewerProfile?.is_admin || (vr === "vendor" && (vt === "premium" || vt === "featured")) || vr === "organizer";
             return canMessage ? (
               <div style={{ marginTop: 20 }}>
                 <button onClick={() => router.push(`/messages?to=${vendor.id}&from=vendor/${vendor.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
