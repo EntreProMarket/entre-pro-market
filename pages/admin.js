@@ -10,7 +10,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Overview");
-  const [stats, setStats] = useState({});
+  // stats is now computed live from `users` below (see const stats = ... near render) so it never goes stale after in-session upgrades/downgrades
   const [plans, setPlans] = useState([]);
   const [users, setUsers] = useState([]);
   const [ads, setAds] = useState([]);
@@ -60,13 +60,6 @@ export default function AdminDashboard() {
   };
 
   const loadAllData = async () => {
-    const { count: totalVendors } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor");
-    const { count: totalOrganizers } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "organizer");
-    const { count: premiumVendors } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor").eq("account_type", "premium");
-    const { count: featuredVendors } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "vendor").eq("account_type", "featured");
-    const { count: proOrganizers } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "organizer").eq("account_type", "pro");
-    const { count: eliteOrganizers } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "organizer").eq("account_type", "elite");
-    setStats({ totalVendors: totalVendors || 0, totalOrganizers: totalOrganizers || 0, premiumVendors: premiumVendors || 0, featuredVendors: featuredVendors || 0, proOrganizers: proOrganizers || 0, eliteOrganizers: eliteOrganizers || 0 });
     const { data: plansData } = await supabase.from("plans").select("*").order("role", { ascending: true }).order("sort_order", { ascending: true });
     setPlans(plansData || []);
     const { data: usersData } = await supabase.rpc("get_all_profiles");
@@ -217,6 +210,16 @@ export default function AdminDashboard() {
       if (field === "role") next.tier = value === "vendor" ? "free" : "basic";
       return { ...prev, [userId]: next };
     });
+  };
+
+  // ── Computed live from `users` so Overview always matches every other tab instantly, even mid-session after upgrades/downgrades ──
+  const stats = {
+    totalVendors: users.filter(u => u.role === "vendor").length,
+    totalOrganizers: users.filter(u => u.role === "organizer").length,
+    premiumVendors: users.filter(u => u.role === "vendor" && u.account_type === "premium").length,
+    featuredVendors: users.filter(u => u.role === "vendor" && u.account_type === "featured").length,
+    proOrganizers: users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium")).length,
+    eliteOrganizers: users.filter(u => u.role === "organizer" && u.account_type === "elite").length,
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Panel...</div>;
