@@ -9,6 +9,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const timerRef = useRef(null);
@@ -36,8 +37,9 @@ export default function DashboardLayout({ children }) {
       const { data } = await supabase.auth.getUser();
       if (!data?.user) { router.replace("/"); return; }
       setUser(data.user);
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
+      const { data: profile } = await supabase.from("profiles").select("role, is_admin").eq("id", data.user.id).single();
       setRole(profile?.role || null);
+      setIsAdmin(profile?.is_admin === true);
       const { count } = await supabase.from("messages").select("*", { count: "exact", head: true }).eq("recipient_id", data.user.id).eq("read", false);
       setUnreadCount(count || 0);
     };
@@ -84,6 +86,8 @@ export default function DashboardLayout({ children }) {
     router.push(role ? "/messages" : "/messaging-locked");
   };
 
+  const goToAdmin = () => { setMenuOpen(false); window.location.assign("/admin"); };
+
   const navigate = (path) => { setMenuOpen(false); router.push(path); };
 
   if (!user) return <div style={{ padding: 30 }}>Loading...</div>;
@@ -115,6 +119,11 @@ export default function DashboardLayout({ children }) {
           <h2 style={{ margin: 0, fontSize: 18 }}>Entre PRO Market</h2>
           <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: "white", fontSize: 20, cursor: "pointer" }}>✕</button>
         </div>
+        {isAdmin && (
+          <div onClick={goToAdmin} style={{ cursor: "pointer", padding: "10px 14px", borderRadius: 6, fontSize: 15, color: "white", marginBottom: 4, backgroundColor: "#701890", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>🛠️ Admin Panel</span>
+          </div>
+        )}
         {navItem("🏡 Home", () => { window.location.assign("/home"); })}
         {navItem("🏠 Dashboard", goToDashboard)}
         {navItem("👤 Profile", goToProfile)}
