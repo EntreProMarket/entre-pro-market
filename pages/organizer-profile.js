@@ -1,7 +1,56 @@
 // pages/organizer-profile.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
+
+// ── IMAGE POSITIONING: position stored as a #pos=X,Y fragment on the URL itself, no DB changes needed ──
+function withPosition(url, pos) {
+  if (!url) return url;
+  const base = url.split("#")[0];
+  if (!pos) return base;
+  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
+}
+function parsePosition(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 } };
+  const [x, y] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+}
+
+function PositionableImage({ src, position, onChange, height = 200 }) {
+  const ref = useRef(null);
+  const dragState = useRef(null);
+
+  const handlePointerDown = (e) => {
+    dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
+    e.target.setPointerCapture?.(e.pointerId);
+  };
+  const handlePointerMove = (e) => {
+    if (!dragState.current || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const dx = e.clientX - dragState.current.x;
+    const dy = e.clientY - dragState.current.y;
+    const newX = Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100));
+    const newY = Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100));
+    onChange({ x: newX, y: newY });
+  };
+  const handlePointerUp = () => { dragState.current = null; };
+
+  return (
+    <div
+      ref={ref}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      style={{ width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
+    >
+      <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
+    </div>
+  );
+}
 
 function cleanHandle(v) { return v.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -49,7 +98,7 @@ const MAX_GIF_MB = 15;
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
-const BLANK_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "" };
+const BLANK_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
 
 export default function OrganizerProfile() {
   const router = useRouter();
@@ -86,6 +135,9 @@ export default function OrganizerProfile() {
   const [flyerFile, setFlyerFile] = useState(null);
   const [showFlyerPicker, setShowFlyerPicker] = useState(false);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
+  const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
+  const [repositioningIndex, setRepositioningIndex] = useState(null);
+  const [flyerPosition, setFlyerPosition] = useState({ x: 50, y: 50 });
 
   useEffect(() => {
     const load = async () => {
@@ -106,7 +158,8 @@ export default function OrganizerProfile() {
         setDescription(p.description || ""); setWebsite(p.website || "");
         setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
-        setTags(p.tags ? p.tags.join(", ") : ""); setLogoUrl(p.logo_url || "");
+        setTags(p.tags ? p.tags.join(", ") : "");
+        { const parsed = parsePosition(p.logo_url || ""); setLogoUrl(parsed.src || ""); setLogoPosition(parsed.position); }
         setPortfolioImages(p.portfolio_images || []); setAccountType(p.account_type || "basic");
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","",""]).slice(0, 5));
         if (p.account_type === "elite") {
@@ -175,7 +228,8 @@ export default function OrganizerProfile() {
     try {
       const { data: ex } = await supabase.from("profiles").select("logo_url").eq("id", user.id).single();
       let uploadedLogoUrl = ex?.logo_url || logoUrl;
-      if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = up; }
+      if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = withPosition(up, logoPosition); }
+      else if (logoUrl) { uploadedLogoUrl = withPosition(uploadedLogoUrl.split("#")[0], logoPosition); }
       let updatedPortfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
         const remaining = (imageLimits[accountType] ?? 10) - updatedPortfolio.length;
@@ -220,13 +274,13 @@ export default function OrganizerProfile() {
     if (flyerFile) {
       const up = await uploadFile(flyerFile, "organizer-portfolio");
       if (!up) { setSavingEvent(false); return; } // uploadFile already set an error message
-      flyerUrl = up;
+      flyerUrl = withPosition(up, flyerPosition);
     }
     const eventData = {
       event_name: eventForm.event_name, event_date: eventForm.event_date || null,
       event_end_date: eventForm.event_end_date || null, event_start_time: eventForm.event_start_time || null,
       event_end_time: eventForm.event_end_time || null, venue: eventForm.venue,
-      event_type: eventForm.event_type, category: eventForm.category,
+      event_type: eventForm.event_type, category: eventForm.category, price: eventForm.price || "",
       description: eventForm.description, info_url: formatUrl(eventForm.info_url), flyer_url: flyerUrl,
     };
     try {
@@ -239,7 +293,7 @@ export default function OrganizerProfile() {
         if (error) throw error;
         if (data) setEvents([...events, data]);
       }
-      setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setShowFlyerPicker(false);
+      setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerPosition({ x: 50, y: 50 }); setShowFlyerPicker(false);
       setMessage("✅ Event saved!");
     } catch (err) {
       setMessage("❌ Error saving event: " + err.message);
@@ -255,7 +309,7 @@ export default function OrganizerProfile() {
   };
 
   const removePortfolioImage = async (url) => {
-    await supabase.storage.from("organizer-portfolio").remove([url.split("/").pop()]);
+    await supabase.storage.from("organizer-portfolio").remove([url.split("#")[0].split("/").pop()]);
     const updated = portfolioImages.filter(img => img !== url);
     setPortfolioImages(updated);
     if (user) await supabase.from("profiles").update({ portfolio_images: updated }).eq("id", user.id);
@@ -309,8 +363,8 @@ export default function OrganizerProfile() {
       <div style={{ marginTop: 16, marginBottom: 16 }}>
         <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
         {logoUrl ? (
-          <div style={{ width: 90, height: 90, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", marginBottom: 8 }}>
-            <img src={logoUrl} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <div style={{ maxWidth: 220, marginBottom: 8 }}>
+            <PositionableImage src={logoUrl} position={logoPosition} onChange={setLogoPosition} height={160} />
           </div>
         ) : (
           <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
@@ -318,12 +372,12 @@ export default function OrganizerProfile() {
           </div>
         )}
         {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-        <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); }} style={{ display: "block", marginBottom: 10 }} />
+        <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); }} style={{ display: "block", marginBottom: 10 }} />
         <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
         {showLogoPicker && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
             {DEFAULT_LOGOS.map((src, i) => (
-              <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setShowLogoPicker(false); }}
+              <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setShowLogoPicker(false); }}
                 style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
                 <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
@@ -339,16 +393,31 @@ export default function OrganizerProfile() {
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC.</div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-            {portfolioImages.map((img, i) => (
-              <div key={i} style={{ position: "relative" }}>
-                <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-                  <img src={img} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            {portfolioImages.map((img, i) => {
+              const { src, position } = parsePosition(img);
+              return (
+                <div key={i} style={{ position: "relative" }}>
+                  <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                    <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block" }} />
+                  </div>
+                  <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+                  <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Position</button>
                 </div>
-                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
+        {repositioningIndex !== null && portfolioImages[repositioningIndex] && (() => {
+          const { src, position } = parsePosition(portfolioImages[repositioningIndex]);
+          return (
+            <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+              <PositionableImage src={src} position={position} onChange={pos => {
+                setPortfolioImages(prev => prev.map((u, idx) => idx === repositioningIndex ? withPosition(u, pos) : u));
+              }} height={180} />
+              <button onClick={() => setRepositioningIndex(null)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
+            </div>
+          );
+        })()}
         {/* ── FIXED: accept="image/*" ── */}
         {!atLimit && <input type="file" accept="image/*" multiple onChange={e => { const rem = imageLimit - portfolioImages.length; const files = Array.from(e.target.files).slice(0, rem); if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`); setPortfolioFiles(files); }} style={{ display: "block" }} />}
       </div>
@@ -430,18 +499,22 @@ export default function OrganizerProfile() {
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => setEventForm({ ...eventForm, event_start_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => setEventForm({ ...eventForm, event_end_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
-            <input placeholder="Venue" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
+            <input placeholder="Venue & Address (e.g. 123 Main St, City, State)" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
             <input placeholder="Event Type" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
+            <input placeholder="e.g. $25, Free, $10-$50" value={eventForm.price || ""} onChange={e => setEventForm({ ...eventForm, price: e.target.value })} style={iS} />
+            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#701890" }}>💳 Add your Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — you're not limited to Eventbrite. Use this to promote and sell tickets straight through the app.</div>
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
-            <input placeholder="e.g. eventbrite.com/your-event" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
+            <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span></label>
             {flyerPreviewSrc ? (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ height: 200, borderRadius: 8, overflow: "hidden", border: "2px solid #AABB23", marginBottom: 6 }}>
-                  <img src={flyerPreviewSrc} alt="flyer" onClick={() => setFlyerFullscreen(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "zoom-in" }} />
-                </div>
-                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer" }}>✕ Remove flyer</button>
+              <div style={{ marginBottom: 10, maxWidth: 300 }}>
+                <PositionableImage src={flyerFile ? flyerPreviewSrc : parsePosition(flyerPreviewSrc).src} position={flyerFile ? flyerPosition : parsePosition(flyerPreviewSrc).position} onChange={pos => {
+                  setFlyerPosition(pos);
+                  if (!flyerFile) setEventForm(prev => ({ ...prev, flyer_url: withPosition(parsePosition(prev.flyer_url).src, pos) }));
+                }} height={200} />
+                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); setFlyerPosition({ x: 50, y: 50 }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
@@ -449,12 +522,12 @@ export default function OrganizerProfile() {
               </div>
             )}
             {/* ── FIXED: accept="image/*" ── */}
-            <input type="file" accept="image/*" onChange={e => { setFlyerFile(e.target.files[0]); setShowFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
+            <input type="file" accept="image/*" onChange={e => { setFlyerFile(e.target.files[0]); setFlyerPosition({ x: 50, y: 50 }); setShowFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
             <button onClick={() => setShowFlyerPicker(!showFlyerPicker)} style={{ padding: "4px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, marginBottom: 8 }}>{showFlyerPicker ? "Hide" : "Browse Placeholders"}</button>
             {showFlyerPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
                 {FLYER_PLACEHOLDERS.map((src, i) => (
-                  <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setShowFlyerPicker(false); }}
+                  <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setFlyerPosition({ x: 50, y: 50 }); setShowFlyerPicker(false); }}
                     style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: eventForm.flyer_url === src ? "3px solid #AABB23" : "2px solid transparent" }}>
                     <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
@@ -480,7 +553,7 @@ export default function OrganizerProfile() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "" }); setFlyerFile(null); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setFlyerFile(null); setFlyerPosition({ x: 50, y: 50 }); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                     <button onClick={() => deleteEvent(ev.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                   </div>
                 </div>
