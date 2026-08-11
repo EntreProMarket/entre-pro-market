@@ -6,7 +6,7 @@ import { useRouter } from "next/router";
 const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Messaging", "Reports", "Exports", "Settings"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
-const BLANK_EPM_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
+const BLANK_EPM_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
 function parsePos(url) {
   if (!url) return { src: url, position: { x: 50, y: 50 } };
   const [base, frag] = url.split("#pos=");
@@ -75,6 +75,9 @@ export default function AdminDashboard() {
   const [selectedRecipients, setSelectedRecipients] = useState([]);
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [messagingView, setMessagingView] = useState("compose"); // "compose" | "sent"
+  const [sentMessages, setSentMessages] = useState([]);
+  const [loadingSent, setLoadingSent] = useState(false);
   const [limits, setLimits] = useState({
     vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
     vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
@@ -225,7 +228,7 @@ export default function AdminDashboard() {
     const eventData = {
       event_name: epmEventForm.event_name, event_date: epmEventForm.event_date || null,
       event_end_date: epmEventForm.event_end_date || null, event_start_time: epmEventForm.event_start_time || null,
-      event_end_time: epmEventForm.event_end_time || null, venue: epmEventForm.venue,
+      event_end_time: epmEventForm.event_end_time || null, venue: epmEventForm.venue, venue_address: epmEventForm.venue_address || "",
       event_type: epmEventForm.event_type, category: epmEventForm.category, price: epmEventForm.price || "",
       description: epmEventForm.description, info_url: formatEpmUrl(epmEventForm.info_url), flyer_url: flyerUrl,
     };
@@ -272,8 +275,38 @@ export default function AdminDashboard() {
       if (error) throw error;
       setMessage(`✅ Message sent to ${selectedRecipients.length} recipient${selectedRecipients.length !== 1 ? "s" : ""}!`);
       setSelectedRecipients([]); setBroadcastMessage("");
+      if (messagingView === "sent") loadSentMessages();
     } catch (err) { setMessage("❌ Error sending message: " + err.message); }
     setSendingBroadcast(false);
+  };
+
+  const loadSentMessages = async () => {
+    if (!adminId) return;
+    setLoadingSent(true);
+    const { data } = await supabase.from("messages").select("*, recipient:recipient_id(business_name, organizer_name, handle, role)").eq("sender_id", adminId).order("created_at", { ascending: false });
+    setSentMessages(data || []);
+    setLoadingSent(false);
+  };
+
+  const deleteSentMessage = async (id) => {
+    if (!confirm("Delete this sent message?")) return;
+    await supabase.from("messages").delete().eq("id", id);
+    setSentMessages(sentMessages.filter(m => m.id !== id));
+  };
+
+  const resendMessage = async (msg) => {
+    try {
+      const { error } = await supabase.from("messages").insert([{ sender_id: adminId, recipient_id: msg.recipient_id, content: msg.content, read: false }]);
+      if (error) throw error;
+      setMessage("✅ Message resent!");
+      loadSentMessages();
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+  };
+
+  const replyToRecipient = (msg) => {
+    setMessagingView("compose");
+    setSelectedRecipients([msg.recipient_id]);
+    setBroadcastMessage("");
   };
 
   const suspendUser = async (userId, suspended) => {
@@ -355,16 +388,19 @@ export default function AdminDashboard() {
   };
 
   // ── Computed live from `users` so Overview always matches every other tab instantly, even mid-session after upgrades/downgrades ──
+  // ── Excludes incomplete/nameless profiles (leftover test accounts) so Overview matches real listings ──
+  const isRealVendor = u => u.role === "vendor" && (u.business_name || u.logo_url);
+  const isRealOrganizer = u => u.role === "organizer" && (u.organizer_name || u.logo_url);
   const stats = {
-    totalVendors: users.filter(u => u.role === "vendor").length,
-    totalOrganizers: users.filter(u => u.role === "organizer").length,
+    totalVendors: users.filter(isRealVendor).length,
+    totalOrganizers: users.filter(isRealOrganizer).length,
     publicUsers: users.filter(u => !u.role).length,
-    freeVendors: users.filter(u => u.role === "vendor" && (!u.account_type || u.account_type === "free")).length,
-    premiumVendors: users.filter(u => u.role === "vendor" && u.account_type === "premium").length,
-    featuredVendors: users.filter(u => u.role === "vendor" && u.account_type === "featured").length,
-    basicOrganizers: users.filter(u => u.role === "organizer" && (!u.account_type || u.account_type === "basic")).length,
-    proOrganizers: users.filter(u => u.role === "organizer" && (u.account_type === "pro" || u.account_type === "premium")).length,
-    eliteOrganizers: users.filter(u => u.role === "organizer" && u.account_type === "elite").length,
+    freeVendors: users.filter(u => isRealVendor(u) && (!u.account_type || u.account_type === "free")).length,
+    premiumVendors: users.filter(u => isRealVendor(u) && u.account_type === "premium").length,
+    featuredVendors: users.filter(u => isRealVendor(u) && u.account_type === "featured").length,
+    basicOrganizers: users.filter(u => isRealOrganizer(u) && (!u.account_type || u.account_type === "basic")).length,
+    proOrganizers: users.filter(u => isRealOrganizer(u) && (u.account_type === "pro" || u.account_type === "premium")).length,
+    eliteOrganizers: users.filter(u => isRealOrganizer(u) && u.account_type === "elite").length,
   };
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Panel...</div>;
@@ -738,7 +774,8 @@ export default function AdminDashboard() {
                 <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={epmEventForm.event_start_time} onChange={e => setEpmEventForm({ ...epmEventForm, event_start_time: e.target.value })} style={{ ...inputStyle, marginBottom: 0 }} /></div>
                 <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={epmEventForm.event_end_time} onChange={e => setEpmEventForm({ ...epmEventForm, event_end_time: e.target.value })} style={{ ...inputStyle, marginBottom: 0 }} /></div>
               </div>
-              <input placeholder="Venue & Address (e.g. 123 Main St, City, State)" value={epmEventForm.venue} onChange={e => setEpmEventForm({ ...epmEventForm, venue: e.target.value })} style={inputStyle} />
+              <input placeholder="Venue Name" value={epmEventForm.venue} onChange={e => setEpmEventForm({ ...epmEventForm, venue: e.target.value })} style={inputStyle} />
+              <textarea placeholder="Address (street, city, state)" value={epmEventForm.venue_address || ""} onChange={e => setEpmEventForm({ ...epmEventForm, venue_address: e.target.value })} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
               <input placeholder="Event Type" value={epmEventForm.event_type} onChange={e => setEpmEventForm({ ...epmEventForm, event_type: e.target.value })} style={inputStyle} />
               <textarea placeholder="Event Description" value={epmEventForm.description} onChange={e => setEpmEventForm({ ...epmEventForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
               <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
@@ -794,7 +831,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                      <button onClick={() => { setEditingEpmEvent(ev.id); setEpmEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                      <button onClick={() => { setEditingEpmEvent(ev.id); setEpmEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                       <button onClick={() => deleteEpmEvent(ev.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                     </div>
                   </div>
@@ -814,29 +851,59 @@ export default function AdminDashboard() {
         {activeTab === "Messaging" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>✉️ Message Vendors & Organizers</h2>
-            <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Select one or more recipients below and send them a message directly from Admin.</p>
-            <input value={broadcastSearch} onChange={e => setBroadcastSearch(e.target.value)} placeholder="🔍 Search recipients by name, handle, city..." style={{ ...inputStyle, marginBottom: 10 }} />
-            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-              <button onClick={selectAllFiltered} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Select All Shown ({filteredRecipients.length})</button>
-              <button onClick={() => setSelectedRecipients([])} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Clear Selection</button>
-              <span style={{ fontSize: 13, color: "#701890", fontWeight: "bold" }}>{selectedRecipients.length} selected</span>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              <button onClick={() => setMessagingView("compose")} style={{ padding: "8px 16px", backgroundColor: messagingView === "compose" ? "#701890" : "white", color: messagingView === "compose" ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>✏️ Compose</button>
+              <button onClick={() => { setMessagingView("sent"); loadSentMessages(); }} style={{ padding: "8px 16px", backgroundColor: messagingView === "sent" ? "#701890" : "white", color: messagingView === "sent" ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📤 Sent Messages</button>
             </div>
-            <div style={{ maxHeight: 380, overflowY: "auto", border: "1px solid #eee", borderRadius: 8, marginBottom: 16 }}>
-              {filteredRecipients.length === 0 ? <p style={{ padding: 16, color: "#888", margin: 0 }}>No matching vendors or organizers.</p> : filteredRecipients.map(u => (
-                <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid #f0f0f0" }}>
-                  <input type="checkbox" checked={selectedRecipients.includes(u.id)} onChange={() => toggleRecipient(u.id)} />
-                  {u.logo_url && <div onClick={() => window.open(`/${u.role}/${u.handle}?from=admin`, "_blank")} style={{ width: 34, height: 34, borderRadius: 6, overflow: "hidden", cursor: "pointer", flexShrink: 0, border: "1px solid #e5e7eb" }}><img src={u.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>{u.business_name || u.organizer_name || u.handle}</p>
-                    <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{u.role === "vendor" ? "🛒" : "🎪"} {u.role} · {u.account_type || "—"} · {u.city || ""}</p>
-                  </div>
+
+            {messagingView === "compose" ? (
+              <>
+                <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Select one or more recipients below and send them a message directly from Admin. Users see your messages as coming from "Entre PRO Market" and cannot reply to this inbox — they're auto-redirected to email instead.</p>
+                <input value={broadcastSearch} onChange={e => setBroadcastSearch(e.target.value)} placeholder="🔍 Search recipients by name, handle, city..." style={{ ...inputStyle, marginBottom: 10 }} />
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+                  <button onClick={selectAllFiltered} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Select All Shown ({filteredRecipients.length})</button>
+                  <button onClick={() => setSelectedRecipients([])} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Clear Selection</button>
+                  <span style={{ fontSize: 13, color: "#701890", fontWeight: "bold" }}>{selectedRecipients.length} selected</span>
                 </div>
-              ))}
-            </div>
-            <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write your message..." rows={4} style={{ ...inputStyle, resize: "vertical" }} />
-            <button onClick={sendBroadcastMessage} disabled={sendingBroadcast} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14 }}>
-              {sendingBroadcast ? "Sending..." : `📨 Send to ${selectedRecipients.length} Recipient${selectedRecipients.length !== 1 ? "s" : ""}`}
-            </button>
+                <div style={{ maxHeight: 380, overflowY: "auto", border: "1px solid #eee", borderRadius: 8, marginBottom: 16 }}>
+                  {filteredRecipients.length === 0 ? <p style={{ padding: 16, color: "#888", margin: 0 }}>No matching vendors or organizers.</p> : filteredRecipients.map(u => (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid #f0f0f0" }}>
+                      <input type="checkbox" checked={selectedRecipients.includes(u.id)} onChange={() => toggleRecipient(u.id)} />
+                      {u.logo_url && <div onClick={() => window.open(`/${u.role}/${u.handle}?from=admin`, "_blank")} style={{ width: 34, height: 34, borderRadius: 6, overflow: "hidden", cursor: "pointer", flexShrink: 0, border: "1px solid #e5e7eb" }}><img src={u.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>{u.business_name || u.organizer_name || u.handle}</p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{u.role === "vendor" ? "🛒" : "🎪"} {u.role} · {u.account_type || "—"} · {u.city || ""}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write your message..." rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+                <button onClick={sendBroadcastMessage} disabled={sendingBroadcast} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14 }}>
+                  {sendingBroadcast ? "Sending..." : `📨 Send to ${selectedRecipients.length} Recipient${selectedRecipients.length !== 1 ? "s" : ""}`}
+                </button>
+              </>
+            ) : (
+              <div>
+                {loadingSent ? <p style={{ color: "#888" }}>Loading...</p> : sentMessages.length === 0 ? <p style={{ color: "#888" }}>No sent messages yet.</p> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {sentMessages.map(msg => (
+                      <div key={msg.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 8, padding: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
+                          <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>To: {msg.recipient?.business_name || msg.recipient?.organizer_name || msg.recipient?.handle || "Unknown"}</p>
+                          <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{new Date(msg.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                        </div>
+                        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#444" }}>{msg.content}</p>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => replyToRecipient(msg)} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>↩️ Reply</button>
+                          <button onClick={() => resendMessage(msg)} style={{ padding: "5px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>🔁 Resend</button>
+                          <button onClick={() => deleteSentMessage(msg.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>🗑️ Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
