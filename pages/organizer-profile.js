@@ -504,7 +504,7 @@ export default function OrganizerProfile() {
             <input placeholder="Event Type" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
-            <input placeholder="e.g. $25, Free, $10-$50" value={eventForm.price || ""} onChange={e => setEventForm({ ...eventForm, price: e.target.value })} style={iS} />
+            <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => setEventForm({ ...eventForm, price: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
             <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#701890" }}>💳 Add your Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — you're not limited to Eventbrite. Use this to promote and sell tickets straight through the app.</div>
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
             <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
