@@ -6,6 +6,13 @@ import { SocialLinks } from "../../components/SocialIcons";
 
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
+function parsePos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 } };
+  const [x, y] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+}
 
 function formatTime(t) {
   if (!t) return "";
@@ -132,7 +139,7 @@ export default function OrganizerPublicProfile() {
       <h1 style={{ marginBottom: 4 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
 
-      {organizer.logo_url && <div onClick={() => setSelectedImage(organizer.logo_url)} style={thumbStyle(160, 160, 12)}><img src={organizer.logo_url} alt="logo" style={thumbImg} /></div>}
+      {organizer.logo_url && (() => { const p = parsePos(organizer.logo_url); return <div onClick={() => setSelectedImage(p.src)} style={thumbStyle(160, 160, 12)}><img src={p.src} alt="logo" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%` }} /></div>; })()}
 
       <div style={{ marginTop: 16 }}>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
@@ -152,7 +159,7 @@ export default function OrganizerPublicProfile() {
         <h3>Portfolio</h3>
         {organizer.portfolio_images?.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => <div key={i} onClick={() => setSelectedImage(img)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}><img src={img} alt="portfolio" style={thumbImg} /></div>)}
+            {organizer.portfolio_images.map((img, i) => { const p = parsePos(img); return <div key={i} onClick={() => setSelectedImage(p.src)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}><img src={p.src} alt="portfolio" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%` }} /></div>; })}
           </div>
         ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
@@ -189,13 +196,14 @@ export default function OrganizerPublicProfile() {
             {events.map(event => (
               <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
                 <div style={{ height: 130, overflow: "hidden" }}>
-                  {event.flyer_url ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
+                  {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                 </div>
                 <div style={{ padding: 12 }}>
                   <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h4>
                   {event.category && <p style={{ margin: "0 0 2px", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{event.category}</p>}
                   <p style={{ margin: "0 0 2px", fontSize: 12, color: "#701890", fontWeight: "bold" }}>📅 {event.event_date ? new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD"}</p>
                   {event.venue && <p style={{ margin: 0, color: "#888", fontSize: 12 }}>📍 {event.venue}</p>}
+                  {event.price && <p style={{ margin: "2px 0 0", color: "#AABB23", fontSize: 12, fontWeight: "bold" }}>💵 {event.price}</p>}
                 </div>
               </div>
             ))}
@@ -205,7 +213,7 @@ export default function OrganizerPublicProfile() {
 
       {!isOwner && (() => {
         const vt = viewerProfile?.account_type, vr = viewerProfile?.role;
-        const canMessage = viewerProfile?.is_admin || vt === "featured" || vr === "organizer";
+        const canMessage = vt === "featured" || vr === "organizer";
         return canMessage ? (
           <div style={{ marginTop: 20 }}>
             <button onClick={() => router.push(`/messages?to=${organizer.id}&from=organizer/${organizer.handle}`)} style={{ padding: "12px 24px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15, width: "100%" }}>✉️ Send Message</button>
@@ -232,15 +240,15 @@ export default function OrganizerPublicProfile() {
         <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
           {flyerFullscreen ? (
-            <img src={selectedEvent.flyer_url} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", objectFit: "contain", borderRadius: 8 }} />
+            <img src={parsePos(selectedEvent.flyer_url).src} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", objectFit: "contain", borderRadius: 8 }} />
           ) : (
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
-              {selectedEvent.flyer_url && (
+              {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
                 <div style={{ position: "relative" }}>
-                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "cover", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
+                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
-              )}
+              ); })()}
               <div style={{ padding: 24 }}>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
                   <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
@@ -250,6 +258,7 @@ export default function OrganizerPublicProfile() {
                 <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
                 {(selectedEvent.event_start_time || selectedEvent.event_end_time) && <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>}
                 {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
+                {selectedEvent.price && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>💵 {selectedEvent.price}</p>}
                 {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
                 {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
                 <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span></p>
