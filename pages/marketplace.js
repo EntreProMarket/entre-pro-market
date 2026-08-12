@@ -75,7 +75,8 @@ export default function Marketplace() {
   if (loading) return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>Loading marketplace...</div>;
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
+    <div style={{ fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
@@ -150,9 +151,10 @@ export default function Marketplace() {
           </div>
         )}
       </div>
+    </div>
 
-      <PageFooter />
-      <FooterBar />
+    <PageFooter />
+    <FooterBar />
 
       {/* EMAIL GATE */}
       {emailGateOpen && (
