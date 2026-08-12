@@ -65,7 +65,7 @@ export default function PageFooter() {
       marginLeft: "calc(-50vw + 50%)",
       marginRight: "calc(-50vw + 50%)",
     }}>
-      <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         {settings.footer_email && <a href={`mailto:${settings.footer_email}`} style={iconBtn}><EmailIcon /></a>}
         {settings.footer_instagram && <a href={settings.footer_instagram} target="_blank" rel="noreferrer" style={iconBtn}><InstagramIcon /></a>}
         {settings.footer_facebook && <a href={settings.footer_facebook} target="_blank" rel="noreferrer" style={iconBtn}><FacebookIcon /></a>}
