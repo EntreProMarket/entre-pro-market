@@ -33,6 +33,7 @@ export default function PageFooter() {
     footer_tiktok: "",
     footer_x: "",
   });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -42,6 +43,7 @@ export default function PageFooter() {
         data.forEach(r => { m[r.key] = r.value; });
         setSettings(prev => ({ ...prev, ...m }));
       }
+      setSettingsLoaded(true);
     };
     load();
   }, []);
@@ -60,14 +62,16 @@ export default function PageFooter() {
     <div style={{
       backgroundColor: "#701890", color: "white",
       padding: "28px 20px 36px", marginTop: 40, textAlign: "center",
-      /* ── Full-bleed technique: calc-based margins instead of left/transform.
-         This is immune to sticky/positioned ancestors that broke the old
-         width:100vw + left:50% + translateX(-50%) approach on some pages. ── */
-      width: "100vw",
-      marginLeft: "calc(-50vw + 50%)",
-      marginRight: "calc(-50vw + 50%)",
+      /* ── No vw units, no calc, no negative margins. This div relies on its
+         PARENT being an unconstrained full-width wrapper (see home.js /
+         marketplace.js) so it's naturally 100% of the true viewport with
+         zero risk of the sub-pixel overflow that 100vw can cause on mobile
+         browsers with dynamic toolbars. ── */
+      width: "100%",
+      boxSizing: "border-box",
     }}>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+      {/* Reserve the icon row's height even before data loads, so nothing shifts/pops in */}
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap", minHeight: 42, opacity: settingsLoaded ? 1 : 0, transition: "opacity 0.15s ease" }}>
         {settings.footer_email && <a href={`mailto:${settings.footer_email}`} style={iconBtn}><EmailIcon /></a>}
         {settings.footer_instagram && <a href={settings.footer_instagram} target="_blank" rel="noreferrer" style={iconBtn}><InstagramIcon /></a>}
         {settings.footer_facebook && <a href={settings.footer_facebook} target="_blank" rel="noreferrer" style={iconBtn}><FacebookIcon /></a>}
