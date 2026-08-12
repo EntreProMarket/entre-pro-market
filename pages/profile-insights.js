@@ -26,6 +26,7 @@ export default function ProfileInsights() {
       setProfile(p);
       setLoading(false);
       await loadViews(user.id);
+      await loadMessages(user.id);
     };
     load();
   }, [router]);
@@ -42,11 +43,10 @@ export default function ProfileInsights() {
     setLoadingData(false);
   };
 
-  const loadMessages = async () => {
-    if (messages.length > 0) return;
-    setLoadingData(true);
+  const loadMessages = async (userIdParam) => {
     const { data: userData } = await supabase.auth.getUser();
-    const userId = userData?.user?.id;
+    const userId = userIdParam || userData?.user?.id;
+    if (!userId) return;
     const { data } = await supabase
       .from("messages")
       .select("id, content, created_at, read, sender_id, sender:sender_id(business_name, organizer_name, handle, role, account_type, logo_url)")
@@ -54,12 +54,10 @@ export default function ProfileInsights() {
       .order("created_at", { ascending: false })
       .limit(100);
     setMessages(data || []);
-    setLoadingData(false);
   };
 
   const handleMainTab = async (tab) => {
     setMainTab(tab);
-    if (tab === "messages") await loadMessages();
   };
 
   const formatDate = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -106,7 +104,7 @@ export default function ProfileInsights() {
             <p style={{ fontSize: 13, color: "#701890", margin: "4px 0 0", fontWeight: "bold" }}>Total Profile Views</p>
           </div>
           <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 10, padding: "16px 20px", textAlign: "center" }}>
-            <p style={{ fontSize: 32, fontWeight: "bold", color: "#AABB23", margin: 0 }}>{messages.length || "—"}</p>
+            <p style={{ fontSize: 32, fontWeight: "bold", color: "#AABB23", margin: 0 }}>{messages.length}</p>
             <p style={{ fontSize: 13, color: "#888B00", margin: "4px 0 0", fontWeight: "bold" }}>Messages Received</p>
           </div>
         </div>
