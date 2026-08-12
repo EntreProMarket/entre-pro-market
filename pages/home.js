@@ -66,7 +66,8 @@ export default function HomePage() {
   const visibleEvents = upcomingEvents.slice(0, 6);
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
+    <div style={{ fontFamily: "sans-serif" }}>
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
@@ -183,9 +184,10 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+    </div>
 
-      <PageFooter />
-      <FooterBar />
+    <PageFooter />
+    <FooterBar />
 
       {selectedEvent && (
         <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
@@ -221,6 +223,7 @@ export default function HomePage() {
           )}
         </div>
       )}
+    </div>
     </div>
   );
 }
