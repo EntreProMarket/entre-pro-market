@@ -52,6 +52,8 @@ export default function PageFooter() {
     backgroundColor: "rgba(255,255,255,0.2)",
     textDecoration: "none", cursor: "pointer",
     border: "none", transition: "background 0.2s",
+    padding: 0, margin: 0, boxSizing: "border-box", flexShrink: 0,
+    font: "inherit", appearance: "none", WebkitAppearance: "none",
   };
 
   return (
