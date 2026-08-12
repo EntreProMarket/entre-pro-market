@@ -6,9 +6,10 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* Viewport — required for correct mobile rendering. Its absence causes
-            content to render at desktop width and scale/shift incorrectly on phones. */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        {/* Viewport — locked so the app behaves like a native app: no pinch-zoom,
+            no double-tap zoom, no page panning. Tapping a flyer/portfolio image
+            to enlarge it still works (that's a bigger in-app view, not browser zoom). */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
 
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
