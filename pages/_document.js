@@ -6,6 +6,10 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
+        {/* Global reset — browsers apply a default 8px margin to <body> unless
+            this is zeroed out. Without it, any full-width element (like the
+            purple footer) shows a small gap from the true screen edges. */}
+        <style>{`html, body { margin: 0; padding: 0; }`}</style>
         {/* Viewport — locked so the app behaves like a native app: no pinch-zoom,
             no double-tap zoom, no page panning. Tapping a flyer/portfolio image
             to enlarge it still works (that's a bigger in-app view, not browser zoom). */}
