@@ -67,8 +67,6 @@ export default function HomePage() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
-      <style>{`html, body { overflow-x: hidden; }`}</style>
-
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
