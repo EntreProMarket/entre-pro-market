@@ -58,7 +58,12 @@ export default function PageFooter() {
     <div style={{
       backgroundColor: "#701890", color: "white",
       padding: "28px 20px 36px", marginTop: 40, textAlign: "center",
-      width: "100vw", position: "relative", left: "50%", transform: "translateX(-50%)",
+      /* ── Full-bleed technique: calc-based margins instead of left/transform.
+         This is immune to sticky/positioned ancestors that broke the old
+         width:100vw + left:50% + translateX(-50%) approach on some pages. ── */
+      width: "100vw",
+      marginLeft: "calc(-50vw + 50%)",
+      marginRight: "calc(-50vw + 50%)",
     }}>
       <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
         {settings.footer_email && <a href={`mailto:${settings.footer_email}`} style={iconBtn}><EmailIcon /></a>}
