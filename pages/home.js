@@ -66,9 +66,8 @@ export default function HomePage() {
   const visibleEvents = upcomingEvents.slice(0, 6);
 
   return (
-    <>
-    <style>{`html, body { overflow-x: hidden; }`}</style>
     <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "sans-serif" }}>
+      <style>{`html, body { overflow-x: hidden; }`}</style>
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
@@ -186,10 +185,9 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-    </div>
 
-    <PageFooter />
-    <FooterBar />
+      <PageFooter />
+      <FooterBar />
 
       {selectedEvent && (
         <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
@@ -225,6 +223,6 @@ export default function HomePage() {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }
