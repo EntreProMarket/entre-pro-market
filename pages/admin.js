@@ -3,7 +3,8 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Messaging", "Reports", "Exports", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Messaging", "Business Email", "Reports", "Exports", "Settings"];
+const BUSINESS_MAILBOXES = ["noreply", "support", "events", "shop", "services"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const BLANK_EPM_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
@@ -78,6 +79,15 @@ export default function AdminDashboard() {
   const [messagingView, setMessagingView] = useState("compose"); // "compose" | "sent"
   const [sentMessages, setSentMessages] = useState([]);
   const [loadingSent, setLoadingSent] = useState(false);
+  const [activeMailbox, setActiveMailbox] = useState("support");
+  const [businessEmails, setBusinessEmails] = useState([]);
+  const [loadingBusinessEmails, setLoadingBusinessEmails] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composeReplyId, setComposeReplyId] = useState(null);
+  const [sendingBusinessEmail, setSendingBusinessEmail] = useState(false);
   const [limits, setLimits] = useState({
     vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
     vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
@@ -95,6 +105,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (router.query.tab && TABS.includes(router.query.tab)) setActiveTab(router.query.tab);
   }, [router.query.tab]);
+
+  useEffect(() => {
+    if (activeTab === "Business Email") loadBusinessEmails(activeMailbox);
+  }, [activeTab]);
 
   const checkAdmin = async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -307,6 +321,55 @@ export default function AdminDashboard() {
     setMessagingView("compose");
     setSelectedRecipients([msg.recipient_id]);
     setBroadcastMessage("");
+  };
+
+  // ── BUSINESS EMAIL (Resend-powered mailboxes) ──
+  const loadBusinessEmails = async (mailbox) => {
+    setLoadingBusinessEmails(true);
+    const { data } = await supabase.from("business_emails").select("*").eq("mailbox", mailbox).order("created_at", { ascending: false }).limit(200);
+    setBusinessEmails(data || []);
+    setLoadingBusinessEmails(false);
+  };
+
+  const openCompose = (prefill) => {
+    setComposeTo(prefill?.to || "");
+    setComposeSubject(prefill?.subject || "");
+    setComposeBody("");
+    setComposeReplyId(prefill?.replyId || null);
+    setComposeOpen(true);
+  };
+
+  const sendBusinessEmail = async () => {
+    if (!composeTo.trim() || !composeSubject.trim() || !composeBody.trim()) {
+      setMessage("⚠️ To, subject, and message are all required.");
+      return;
+    }
+    setSendingBusinessEmail(true); setMessage("");
+    try {
+      const res = await fetch("/api/send-business-email", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mailbox: activeMailbox, to: composeTo.trim(), subject: composeSubject.trim(), body: composeBody.trim(), adminId, replyToEmailId: composeReplyId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to send");
+      setMessage("✅ Email sent!");
+      setComposeOpen(false); setComposeTo(""); setComposeSubject(""); setComposeBody(""); setComposeReplyId(null);
+      loadBusinessEmails(activeMailbox);
+    } catch (err) {
+      setMessage("❌ Error sending email: " + err.message);
+    }
+    setSendingBusinessEmail(false);
+  };
+
+  const markEmailRead = async (id) => {
+    await supabase.from("business_emails").update({ read: true }).eq("id", id);
+    setBusinessEmails(businessEmails.map(e => e.id === id ? { ...e, read: true } : e));
+  };
+
+  const deleteBusinessEmail = async (id) => {
+    if (!confirm("Delete this email from your records? This cannot be undone.")) return;
+    await supabase.from("business_emails").delete().eq("id", id);
+    setBusinessEmails(businessEmails.filter(e => e.id !== id));
   };
 
   const suspendUser = async (userId, suspended) => {
@@ -902,6 +965,75 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── BUSINESS EMAIL TAB ── */}
+        {activeTab === "Business Email" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>📧 Business Email</h2>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Send and receive email from your @entrepromarket.com addresses — no Gmail involved, so your personal address is never exposed.</p>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+              {BUSINESS_MAILBOXES.map(mb => (
+                <button key={mb} onClick={() => { setActiveMailbox(mb); loadBusinessEmails(mb); }}
+                  style={{ padding: "8px 16px", backgroundColor: activeMailbox === mb ? "#701890" : "white", color: activeMailbox === mb ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+                  {mb}@
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <p style={{ margin: 0, fontSize: 13, color: "#888" }}>{activeMailbox}@entrepromarket.com</p>
+              <button onClick={() => openCompose({ to: "", subject: "" })} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>✏️ Compose</button>
+            </div>
+
+            {composeOpen && (
+              <div style={{ backgroundColor: "white", border: "2px solid #701890", borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 14 }}>{composeReplyId ? "↩️ Reply" : "✏️ New Email"} — from {activeMailbox}@entrepromarket.com</p>
+                <input placeholder="To (email address)" value={composeTo} onChange={e => setComposeTo(e.target.value)} style={inputStyle} />
+                <input placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} style={inputStyle} />
+                <textarea placeholder="Message" value={composeBody} onChange={e => setComposeBody(e.target.value)} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button onClick={() => { setComposeOpen(false); setComposeReplyId(null); }} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
+                  <button onClick={sendBusinessEmail} disabled={sendingBusinessEmail} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{sendingBusinessEmail ? "Sending..." : "📨 Send"}</button>
+                </div>
+              </div>
+            )}
+
+            {loadingBusinessEmails ? <p style={{ color: "#888" }}>Loading...</p> : businessEmails.length === 0 ? (
+              <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 32, textAlign: "center", color: "#aaa" }}>
+                <p style={{ fontSize: 36, margin: 0 }}>📧</p>
+                <p style={{ fontSize: 14, marginTop: 12 }}>No emails yet for {activeMailbox}@. Tap "🔍 refresh" by switching tabs, or Compose to send your first one.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {businessEmails.map(em => (
+                  <div key={em.id} style={{ backgroundColor: em.direction === "inbound" && !em.read ? "#faf5ff" : "white", border: `1px solid ${em.direction === "inbound" && !em.read ? "#701890" : "#eee"}`, borderRadius: 10, padding: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
+                      <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>
+                        {em.direction === "inbound" ? "📥 From: " : "📤 To: "}
+                        {em.direction === "inbound" ? em.from_address : em.to_address}
+                        {em.direction === "inbound" && !em.read && <span style={{ marginLeft: 8, fontSize: 10, backgroundColor: "#701890", color: "white", padding: "1px 6px", borderRadius: 8, fontWeight: "bold" }}>NEW</span>}
+                        {em.status === "failed" && <span style={{ marginLeft: 8, fontSize: 10, backgroundColor: "#cc0000", color: "white", padding: "1px 6px", borderRadius: 8, fontWeight: "bold" }}>FAILED</span>}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{new Date(em.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                    </div>
+                    <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{em.subject}</p>
+                    <p style={{ margin: "0 0 12px", fontSize: 13, color: "#444", whiteSpace: "pre-wrap" }}>{em.body}</p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {em.direction === "inbound" && (
+                        <button onClick={() => openCompose({ to: em.from_address, subject: em.subject?.startsWith("Re:") ? em.subject : `Re: ${em.subject}`, replyId: em.id })} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>↩️ Reply</button>
+                      )}
+                      {em.direction === "inbound" && !em.read && (
+                        <button onClick={() => markEmailRead(em.id)} style={{ padding: "5px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>✓ Mark Read</button>
+                      )}
+                      <button onClick={() => deleteBusinessEmail(em.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>🗑️ Delete</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
