@@ -26,6 +26,8 @@ export default function HomePage() {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [newsArticles, setNewsArticles] = useState([]);
+  const [selectedArticle, setSelectedArticle] = useState(null);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
 
   useEffect(() => {
@@ -56,6 +58,10 @@ export default function HomePage() {
         return new Date(a.event_date) - new Date(b.event_date);
       });
       setUpcomingEvents(combined);
+
+      // ── Community & News ──
+      const { data: newsData } = await supabase.from("community_news").select("*").eq("published", true).order("created_at", { ascending: false }).limit(12);
+      setNewsArticles(newsData || []);
       setLoading(false);
     };
     load();
@@ -179,9 +185,29 @@ export default function HomePage() {
         {/* c. COMMUNITY & NEWS */}
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
-          <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
-            <p style={{ fontSize: 14, margin: 0 }}>Community news and event highlights coming soon! 🎉</p>
-          </div>
+          {newsArticles.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+              {newsArticles.map(article => {
+                const cover = parsePos(article.cover_image_url || "");
+                const firstParagraph = article.content_blocks?.find(b => b.type === "paragraph")?.text || "";
+                return (
+                  <div key={article.id} onClick={() => setSelectedArticle(article)} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
+                    <div style={{ height: 140, overflow: "hidden" }}>
+                      {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
+                    </div>
+                    <div style={{ padding: 12 }}>
+                      <h3 style={{ margin: "0 0 6px", fontSize: 14 }}>{article.title}</h3>
+                      {firstParagraph && <p style={{ margin: 0, fontSize: 12, color: "#888", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{firstParagraph}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
+              <p style={{ fontSize: 14, margin: 0 }}>Community news and event highlights coming soon! 🎉</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -221,6 +247,33 @@ export default function HomePage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {selectedArticle && (
+        <div onClick={() => setSelectedArticle(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+            {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
+              <img src={cover.src} alt={selectedArticle.title} style={{ width: "100%", maxHeight: 260, objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, borderRadius: "16px 16px 0 0", display: "block" }} />
+            ); })()}
+            <div style={{ padding: 24 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button onClick={() => setSelectedArticle(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
+              </div>
+              <h2 style={{ margin: "0 0 16px", fontSize: 20 }}>{selectedArticle.title}</h2>
+              {(selectedArticle.content_blocks || []).map((block, i) => block.type === "paragraph" ? (
+                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7 }}>{block.text}</p>
+              ) : (() => {
+                const img = parsePos(block.url);
+                return (
+                  <div key={i} style={{ marginBottom: 16 }}>
+                    <img src={img.src} alt={block.caption || ""} style={{ width: "100%", borderRadius: 8, objectFit: "cover", objectPosition: `${img.position.x}% ${img.position.y}%`, display: "block" }} />
+                    {block.caption && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#888", textAlign: "center", fontStyle: "italic" }}>{block.caption}</p>}
+                  </div>
+                );
+              })())}
+            </div>
+          </div>
         </div>
       )}
     </div>
