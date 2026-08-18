@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Messaging", "Business Email", "Reports", "Exports", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Community & News", "Messaging", "Business Email", "Reports", "Exports", "Settings"];
 const BUSINESS_MAILBOXES = ["noreply", "support", "events", "shop", "services"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
@@ -88,6 +88,16 @@ export default function AdminDashboard() {
   const [composeBody, setComposeBody] = useState("");
   const [composeReplyId, setComposeReplyId] = useState(null);
   const [sendingBusinessEmail, setSendingBusinessEmail] = useState(false);
+  const [newsArticles, setNewsArticles] = useState([]);
+  const [loadingNews, setLoadingNews] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState(null);
+  const [articleTitle, setArticleTitle] = useState("");
+  const [articleCoverUrl, setArticleCoverUrl] = useState("");
+  const [articleCoverFile, setArticleCoverFile] = useState(null);
+  const [articleCoverPosition, setArticleCoverPosition] = useState({ x: 50, y: 50 });
+  const [articleBlocks, setArticleBlocks] = useState([{ type: "paragraph", text: "" }]);
+  const [savingArticle, setSavingArticle] = useState(false);
+  const [composingArticle, setComposingArticle] = useState(false);
   const [limits, setLimits] = useState({
     vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
     vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
@@ -108,6 +118,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === "Business Email") loadBusinessEmails(activeMailbox);
+    if (activeTab === "Community & News") loadNewsArticles();
   }, [activeTab]);
 
   const checkAdmin = async () => {
@@ -370,6 +381,106 @@ export default function AdminDashboard() {
     if (!confirm("Delete this email from your records? This cannot be undone.")) return;
     await supabase.from("business_emails").delete().eq("id", id);
     setBusinessEmails(businessEmails.filter(e => e.id !== id));
+  };
+
+  // ── COMMUNITY & NEWS ──
+  const BLANK_ARTICLE_BLOCKS = [{ type: "paragraph", text: "" }];
+
+  const loadNewsArticles = async () => {
+    setLoadingNews(true);
+    const { data } = await supabase.from("community_news").select("*").order("created_at", { ascending: false });
+    setNewsArticles(data || []);
+    setLoadingNews(false);
+  };
+
+  const resetArticleForm = () => {
+    setEditingArticleId(null); setArticleTitle(""); setArticleCoverUrl(""); setArticleCoverFile(null);
+    setArticleCoverPosition({ x: 50, y: 50 }); setArticleBlocks(BLANK_ARTICLE_BLOCKS); setComposingArticle(false);
+  };
+
+  const startNewArticle = () => { resetArticleForm(); setComposingArticle(true); };
+
+  const startEditArticle = (article) => {
+    setEditingArticleId(article.id);
+    setArticleTitle(article.title || "");
+    const cover = parsePos(article.cover_image_url || "");
+    setArticleCoverUrl(cover.src || ""); setArticleCoverPosition(cover.position);
+    setArticleCoverFile(null);
+    setArticleBlocks((article.content_blocks?.length ? article.content_blocks : BLANK_ARTICLE_BLOCKS).map(b =>
+      b.type === "image" ? { ...b, file: null, position: parsePos(b.url).position, _displaySrc: parsePos(b.url).src } : b
+    ));
+    setComposingArticle(true);
+  };
+
+  const addParagraphBlock = () => setArticleBlocks([...articleBlocks, { type: "paragraph", text: "" }]);
+  const addImageBlock = () => setArticleBlocks([...articleBlocks, { type: "image", url: "", file: null, position: { x: 50, y: 50 }, caption: "" }]);
+  const updateBlock = (index, updates) => setArticleBlocks(articleBlocks.map((b, i) => i === index ? { ...b, ...updates } : b));
+  const removeBlock = (index) => setArticleBlocks(articleBlocks.filter((_, i) => i !== index));
+  const moveBlock = (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= articleBlocks.length) return;
+    const copy = [...articleBlocks];
+    [copy[index], copy[newIndex]] = [copy[newIndex], copy[index]];
+    setArticleBlocks(copy);
+  };
+
+  const saveArticle = async () => {
+    if (!articleTitle.trim()) { setMessage("⚠️ Article title is required."); return; }
+    const hasContent = articleBlocks.some(b => (b.type === "paragraph" && b.text.trim()) || (b.type === "image" && (b.url || b.file)));
+    if (!hasContent) { setMessage("⚠️ Add at least one paragraph or image to the article."); return; }
+    setSavingArticle(true); setMessage("");
+    try {
+      let coverUrl = articleCoverUrl;
+      if (articleCoverFile) {
+        const up = await uploadFile(articleCoverFile, "organizer-portfolio");
+        if (!up) { setSavingArticle(false); return; }
+        coverUrl = up;
+      }
+      coverUrl = coverUrl ? withPos(coverUrl.split("#")[0], articleCoverPosition) : "";
+
+      const finalBlocks = [];
+      for (const block of articleBlocks) {
+        if (block.type === "paragraph") {
+          if (block.text.trim()) finalBlocks.push({ type: "paragraph", text: block.text.trim() });
+        } else if (block.type === "image") {
+          let url = block.url;
+          if (block.file) {
+            const up = await uploadFile(block.file, "organizer-portfolio");
+            if (!up) { setSavingArticle(false); return; }
+            url = up;
+          }
+          if (url) finalBlocks.push({ type: "image", url: withPos(url.split("#")[0], block.position || { x: 50, y: 50 }), caption: block.caption || "" });
+        }
+      }
+
+      const articleData = { title: articleTitle.trim(), cover_image_url: coverUrl, content_blocks: finalBlocks, updated_at: new Date().toISOString() };
+
+      if (editingArticleId) {
+        const { error } = await supabase.from("community_news").update(articleData).eq("id", editingArticleId);
+        if (error) throw error;
+        setNewsArticles(newsArticles.map(a => a.id === editingArticleId ? { ...a, ...articleData } : a));
+      } else {
+        const { data, error } = await supabase.from("community_news").insert([{ ...articleData, published: true }]).select().single();
+        if (error) throw error;
+        if (data) setNewsArticles([data, ...newsArticles]);
+      }
+      resetArticleForm();
+      setMessage("✅ Article saved!");
+    } catch (err) {
+      setMessage("❌ Error saving article: " + err.message);
+    }
+    setSavingArticle(false);
+  };
+
+  const togglePublished = async (article) => {
+    const { error } = await supabase.from("community_news").update({ published: !article.published }).eq("id", article.id);
+    if (!error) setNewsArticles(newsArticles.map(a => a.id === article.id ? { ...a, published: !a.published } : a));
+  };
+
+  const deleteArticle = async (id) => {
+    if (!confirm("Delete this article? This cannot be undone.")) return;
+    await supabase.from("community_news").delete().eq("id", id);
+    setNewsArticles(newsArticles.filter(a => a.id !== id));
   };
 
   const suspendUser = async (userId, suspended) => {
@@ -911,6 +1022,108 @@ export default function AdminDashboard() {
         )}
 
         {/* ── MESSAGING TAB ── */}
+        {/* ── COMMUNITY & NEWS TAB ── */}
+        {activeTab === "Community & News" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>📰 Community & News</h2>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Articles published here appear on the Homepage's Community & News section.</p>
+
+            {!composingArticle && (
+              <button onClick={startNewArticle} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, marginBottom: 20 }}>✏️ Write New Article</button>
+            )}
+
+            {composingArticle && (
+              <div style={{ backgroundColor: "white", border: "2px solid #701890", borderRadius: 10, padding: 20, marginBottom: 24 }}>
+                <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>{editingArticleId ? "✏️ Edit Article" : "📝 New Article"}</p>
+                <input placeholder="Article Title *" value={articleTitle} onChange={e => setArticleTitle(e.target.value)} style={inputStyle} />
+
+                <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>Cover Image</label>
+                {(articleCoverFile || articleCoverUrl) ? (
+                  <div style={{ marginBottom: 10, maxWidth: 320 }}>
+                    <PositionableImage
+                      src={articleCoverFile ? URL.createObjectURL(articleCoverFile) : articleCoverUrl}
+                      position={articleCoverPosition}
+                      onChange={setArticleCoverPosition}
+                      height={180}
+                    />
+                    <button onClick={() => { setArticleCoverFile(null); setArticleCoverUrl(""); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove cover</button>
+                  </div>
+                ) : (
+                  <input type="file" accept="image/*" onChange={e => { setArticleCoverFile(e.target.files[0]); setArticleCoverPosition({ x: 50, y: 50 }); }} style={{ display: "block", marginBottom: 16 }} />
+                )}
+
+                <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8, display: "block", marginTop: 8 }}>Story Content</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 }}>
+                  {articleBlocks.map((block, i) => (
+                    <div key={i} style={{ border: "1px solid #eee", borderRadius: 8, padding: 12, backgroundColor: "#fafafa" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: "bold", color: "#888", textTransform: "uppercase" }}>{block.type === "paragraph" ? "📝 Paragraph" : "🖼️ Image"} #{i + 1}</span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => moveBlock(i, -1)} disabled={i === 0} style={{ padding: "3px 8px", backgroundColor: "#eee", border: "none", borderRadius: 6, cursor: i === 0 ? "default" : "pointer", fontSize: 11, opacity: i === 0 ? 0.4 : 1 }}>↑</button>
+                          <button onClick={() => moveBlock(i, 1)} disabled={i === articleBlocks.length - 1} style={{ padding: "3px 8px", backgroundColor: "#eee", border: "none", borderRadius: 6, cursor: i === articleBlocks.length - 1 ? "default" : "pointer", fontSize: 11, opacity: i === articleBlocks.length - 1 ? 0.4 : 1 }}>↓</button>
+                          <button onClick={() => removeBlock(i)} style={{ padding: "3px 8px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>✕</button>
+                        </div>
+                      </div>
+                      {block.type === "paragraph" ? (
+                        <textarea value={block.text} onChange={e => updateBlock(i, { text: e.target.value })} placeholder="Write a paragraph..." rows={4} style={{ ...inputStyle, marginBottom: 0, resize: "vertical" }} />
+                      ) : (
+                        <div>
+                          {(block.file || block.url || block._displaySrc) ? (
+                            <div style={{ maxWidth: 280, marginBottom: 8 }}>
+                              <PositionableImage
+                                src={block.file ? URL.createObjectURL(block.file) : (block._displaySrc || block.url)}
+                                position={block.position || { x: 50, y: 50 }}
+                                onChange={pos => updateBlock(i, { position: pos })}
+                                height={160}
+                              />
+                              <button onClick={() => updateBlock(i, { file: null, url: "", _displaySrc: null })} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove image</button>
+                            </div>
+                          ) : (
+                            <input type="file" accept="image/*" onChange={e => updateBlock(i, { file: e.target.files[0], position: { x: 50, y: 50 } })} style={{ display: "block", marginBottom: 8 }} />
+                          )}
+                          <input placeholder="Caption (optional)" value={block.caption || ""} onChange={e => updateBlock(i, { caption: e.target.value })} style={{ ...inputStyle, marginBottom: 0, fontSize: 13 }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  <button onClick={addParagraphBlock} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>+ Paragraph</button>
+                  <button onClick={addImageBlock} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>+ Image</button>
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button onClick={resetArticleForm} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
+                  <button onClick={saveArticle} disabled={savingArticle} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingArticle ? "Saving..." : editingArticleId ? "Update Article" : "Publish Article"}</button>
+                </div>
+              </div>
+            )}
+
+            {loadingNews ? <p style={{ color: "#888" }}>Loading...</p> : newsArticles.length === 0 ? (
+              <p style={{ color: "#888", fontSize: 13 }}>No articles yet. Write your first one above!</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {newsArticles.map(article => {
+                  const cover = parsePos(article.cover_image_url || "");
+                  return (
+                    <div key={article.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 14, display: "flex", gap: 12, alignItems: "center" }}>
+                      {cover.src && <div style={{ width: 60, height: 60, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: "1px solid #e5e7eb" }}><img src={cover.src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%` }} /></div>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{article.title}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 11, color: article.published ? "#166534" : "#991b1b", fontWeight: "bold" }}>{article.published ? "✅ Published" : "⏸️ Hidden"} · {article.content_blocks?.length || 0} blocks</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        <button onClick={() => startEditArticle(article)} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Edit</button>
+                        <button onClick={() => togglePublished(article)} style={{ padding: "6px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>{article.published ? "Hide" : "Publish"}</button>
+                        <button onClick={() => deleteArticle(article.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === "Messaging" && (
           <div>
             <h2 style={{ marginBottom: 6 }}>✉️ Message Vendors & Organizers</h2>
@@ -1055,97 +1268,4 @@ export default function AdminDashboard() {
                       {report.message?.content && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#444", fontStyle: "italic" }}>"{report.message.content}"</p>}
                     </div>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      <button onClick={async () => { await supabase.from("reports").update({ status: "reviewed" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "reviewed" } : r)); setMessage("✅ Marked as reviewed"); }} style={{ padding: "7px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Mark Reviewed</button>
-                      <button onClick={async () => { await supabase.from("reports").update({ status: "resolved" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "resolved" } : r)); setMessage("✅ Resolved"); }} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Resolve</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── EXPORTS TAB ── */}
-        {activeTab === "Exports" && (
-          <div>
-            <h2 style={{ marginBottom: 6 }}>📥 Export User Data</h2>
-            <p style={{ color: "#888", fontSize: 14, marginBottom: 28 }}>Download spreadsheets (.csv) directly to your phone or computer. Opens in Excel, Google Sheets, or any spreadsheet app.</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
-              {[
-                { type: "vendors", label: "Vendors", icon: "🛒", color: "#701890", bg: "#f3e8ff", desc: "All vendors — name, handle, email, tier, city, state, category, signup date" },
-                { type: "organizers", label: "Organizers", icon: "🎪", color: "#AABB23", bg: "#f9ffe8", desc: "All organizers — name, handle, email, tier, city, state, category, signup date" },
-                { type: "public", label: "Public Users", icon: "👤", color: "#555", bg: "#f5f5f5", desc: "Public accounts with no role — email and signup date" },
-              ].map(({ type, label, icon, color, bg, desc }) => (
-                <div key={type} style={{ backgroundColor: "white", border: `1px solid ${color}30`, borderRadius: 12, padding: 24 }}>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: bg, borderRadius: 20, padding: "5px 14px", marginBottom: 14 }}>
-                    <span>{icon}</span>
-                    <span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label}</span>
-                  </div>
-                  <p style={{ color: "#666", fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>{desc}</p>
-                  <button
-                    onClick={() => downloadCSV(type, `entrepromarket-${type}-${new Date().toISOString().split("T")[0]}.csv`)}
-                    disabled={exportLoading === type}
-                    style={{ width: "100%", padding: "12px", backgroundColor: color, color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14, opacity: exportLoading === type ? 0.7 : 1 }}
-                  >
-                    {exportLoading === type ? "Preparing..." : `⬇️ Download ${label} CSV`}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "14px 20px", marginTop: 24 }}>
-              <p style={{ margin: 0, fontSize: 13, color: "#166534" }}>
-                ✅ Files download directly to your device. On mobile they save to your Downloads folder. On desktop they save to your Downloads folder automatically.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "Settings" && (
-          <div>
-            <h2 style={{ marginBottom: 6 }}>⚙️ Settings</h2>
-            <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, marginBottom: 20 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 4 }}>📸 Photo & Video Upload Limits</h3>
-              <h4 style={{ color: "#701890", marginBottom: 12, marginTop: 16 }}>💜 Vendor Limits</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-                {[{ key: "vendor_free_photos", label: "Free Photos" }, { key: "vendor_premium_photos", label: "Premium Photos" }, { key: "vendor_featured_photos", label: "Featured Photos" }, { key: "vendor_free_videos", label: "Free Videos" }, { key: "vendor_premium_videos", label: "Premium Videos" }, { key: "vendor_featured_videos", label: "Featured Videos" }].map(({ key, label }) => (
-                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
-                ))}
-              </div>
-              <h4 style={{ color: "#AABB23", marginBottom: 12, marginTop: 0 }}>🏆 Organizer Limits</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
-                {[{ key: "organizer_basic_photos", label: "Basic Photos" }, { key: "organizer_pro_photos", label: "Pro Photos" }, { key: "organizer_elite_photos", label: "Elite Photos" }].map(({ key, label }) => (
-                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button onClick={saveLimits} disabled={saving} style={{ padding: "12px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15 }}>{saving ? "Saving..." : "💾 Save All Limits"}</button>
-              </div>
-            </div>
-            <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 20, marginBottom: 16 }}>
-              <h3 style={{ marginTop: 0 }}>App Links</h3>
-              <p style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>Opens in a new tab so the Admin panel stays open.</p>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => window.open('/home', '_blank')} style={smallBtnStyle}>Homepage</button>
-                <button onClick={() => window.open('/marketplace', '_blank')} style={smallBtnStyle}>Marketplace</button>
-                <button onClick={() => window.open('/vendor-info', '_blank')} style={smallBtnStyle}>Vendor Info</button>
-                <button onClick={() => window.open('/organizer-info', '_blank')} style={smallBtnStyle}>Organizer Info</button>
-              </div>
-            </div>
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 10, padding: 20 }}>
-              <h3 style={{ marginTop: 0, color: "#856404" }}>⚠️ Danger Zone</h3>
-              <button onClick={async () => { if (confirm("Delete all NULL profiles? Cannot be undone.")) { await supabase.from("profiles").delete().is("business_name", null).eq("role", "vendor"); setMessage("✅ Null profiles deleted"); await loadAllData(); } }} style={{ padding: "10px 18px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🗑️ Delete Incomplete Profiles</button>
-            </div>
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
-
-const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
-const labelStyle = { display: "block", fontWeight: "bold", marginBottom: 5, fontSize: 13, color: "#333" };
-const thStyle = { padding: "12px 14px", textAlign: "left", fontWeight: "bold", whiteSpace: "nowrap" };
-const tdStyle = { padding: "12px 14px", borderBottom: "1px solid #eee", verticalAlign: "middle" };
-const smallBtnStyle = { padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 };
-const smallSelectStyle = { padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, backgroundColor: "white" };
+                      <button onClick={async () => { await supabase.from("reports").update({ status: "reviewed" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "r
