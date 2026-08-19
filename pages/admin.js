@@ -253,261 +253,387 @@ export default function AdminDashboard() {
     }
   };
 
-// pages/admin.js
-import { useEffect, useState, useRef } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { useRouter } from "next/router";
-
-const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Community & News", "Messaging", "Business Email", "Reports", "Exports", "Settings"];
-const BUSINESS_MAILBOXES = ["noreply", "support", "events", "shop", "services"];
-const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
-const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
-const BLANK_EPM_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
-function parsePos(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
-  const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
-  const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
-}
-function withPos(url, pos, zoom = 1) {
-  if (!url) return url;
-  const base = url.split("#")[0];
-  if (!pos) return base;
-  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
-}
-function formatEpmUrl(v) { if (!v || !v.trim()) return ""; const s = v.trim(); return s.startsWith("https://") || s.startsWith("http://") ? s : `https://${s}`; }
-function formatEventTime(t) { if (!t) return ""; const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; }
-const SEARCHABLE_TABS = ["Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers"];
-// ── Cover images use this exact aspect ratio everywhere (editor preview, homepage
-// card, and full article header) so the crop position/zoom you set always matches
-// what actually displays — no more preview-vs-final mismatch. ──
-const COVER_ASPECT_RATIO = "8 / 5";
-
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height }) {
-  const ref = useRef(null);
-  const dragState = useRef(null);
-  const handlePointerDown = (e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.target.setPointerCapture?.(e.pointerId); };
-  const handlePointerMove = (e) => {
-    if (!dragState.current || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
-    onChange({ x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)), y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)) });
+// ── EPM EVENTS (Admin-created, shown mixed with Elite Organizer events on the Homepage) ──
+  const saveEpmEvent = async () => {
+    if (!epmEventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
+    if (!epmEventForm.flyer_url && !epmFlyerFile) { setMessage("⚠️ A flyer image is required."); return; }
+    setSavingEpmEvent(true); setMessage("");
+    let flyerUrl = epmEventForm.flyer_url || "";
+    if (epmFlyerFile) {
+      const up = await uploadFile(epmFlyerFile, "organizer-portfolio");
+      if (!up) { setSavingEpmEvent(false); return; }
+      flyerUrl = withPos(up, epmFlyerPosition);
+    }
+    const eventData = {
+      event_name: epmEventForm.event_name, event_date: epmEventForm.event_date || null,
+      event_end_date: epmEventForm.event_end_date || null, event_start_time: epmEventForm.event_start_time || null,
+      event_end_time: epmEventForm.event_end_time || null, venue: epmEventForm.venue, venue_address: epmEventForm.venue_address || "",
+      event_type: epmEventForm.event_type, category: epmEventForm.category, price: epmEventForm.price || "",
+      description: epmEventForm.description, info_url: formatEpmUrl(epmEventForm.info_url), flyer_url: flyerUrl,
+    };
+    try {
+      if (editingEpmEvent) {
+        const { error } = await supabase.from("epm_events").update(eventData).eq("id", editingEpmEvent);
+        if (error) throw error;
+        setEpmEvents(epmEvents.map(e => e.id === editingEpmEvent ? { ...e, ...eventData } : e));
+      } else {
+        const { data, error } = await supabase.from("epm_events").insert([eventData]).select().single();
+        if (error) throw error;
+        if (data) setEpmEvents([...epmEvents, data]);
+      }
+      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false);
+      setMessage("✅ EPM Event saved!");
+    } catch (err) {
+      setMessage("❌ Error saving EPM event: " + err.message);
+    }
+    setSavingEpmEvent(false);
   };
-  const handlePointerUp = () => { dragState.current = null; };
-  return (
-    <div>
-      <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
-        style={{ width: "100%", aspectRatio: aspectRatio || undefined, height: aspectRatio ? undefined : height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
-      </div>
-      {onZoomChange && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 16 }}>🔍</span>
-          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => onZoomChange(parseFloat(e.target.value))} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{zoom.toFixed(1)}x</span>
-        </div>
-      )}
-    </div>
-  );
-}
 
-export default function AdminDashboard() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("Overview");
-  // stats is now computed live from `users` below (see const stats = ... near render) so it never goes stale after in-session upgrades/downgrades
-  const [plans, setPlans] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [ads, setAds] = useState([]);
-  const [reports, setReports] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [adminId, setAdminId] = useState(null);
-  const [downgradeModal, setDowngradeModal] = useState(null);
-  const [downgradeReason, setDowngradeReason] = useState("");
-  const [downgrading, setDowngrading] = useState(false);
-  const [userInfoModal, setUserInfoModal] = useState(null);
-  const [exportLoading, setExportLoading] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [rolePicks, setRolePicks] = useState({});
-  const [epmEvents, setEpmEvents] = useState([]);
-  const [editingEpmEvent, setEditingEpmEvent] = useState(null);
-  const [epmEventForm, setEpmEventForm] = useState(BLANK_EPM_EVENT);
-  const [savingEpmEvent, setSavingEpmEvent] = useState(false);
-  const [epmFlyerFile, setEpmFlyerFile] = useState(null);
-  const [showEpmFlyerPicker, setShowEpmFlyerPicker] = useState(false);
-  const [epmFlyerFullscreen, setEpmFlyerFullscreen] = useState(false);
-  const [epmFlyerPosition, setEpmFlyerPosition] = useState({ x: 50, y: 50 });
-  const [broadcastSearch, setBroadcastSearch] = useState("");
-  const [selectedRecipients, setSelectedRecipients] = useState([]);
-  const [broadcastMessage, setBroadcastMessage] = useState("");
-  const [sendingBroadcast, setSendingBroadcast] = useState(false);
-  const [messagingView, setMessagingView] = useState("compose"); // "compose" | "sent"
-  const [sentMessages, setSentMessages] = useState([]);
-  const [loadingSent, setLoadingSent] = useState(false);
-  const [activeMailbox, setActiveMailbox] = useState("support");
-  const [businessEmails, setBusinessEmails] = useState([]);
-  const [loadingBusinessEmails, setLoadingBusinessEmails] = useState(false);
-  const [composeOpen, setComposeOpen] = useState(false);
-  const [composeTo, setComposeTo] = useState("");
-  const [composeSubject, setComposeSubject] = useState("");
-  const [composeBody, setComposeBody] = useState("");
-  const [composeReplyId, setComposeReplyId] = useState(null);
-  const [sendingBusinessEmail, setSendingBusinessEmail] = useState(false);
-  const [newsArticles, setNewsArticles] = useState([]);
-  const [loadingNews, setLoadingNews] = useState(false);
-  const [editingArticleId, setEditingArticleId] = useState(null);
-  const [articleTitle, setArticleTitle] = useState("");
-  const [articleCoverUrl, setArticleCoverUrl] = useState("");
-  const [articleCoverFile, setArticleCoverFile] = useState(null);
-  const [articleCoverPosition, setArticleCoverPosition] = useState({ x: 50, y: 50 });
-  const [articleCoverZoom, setArticleCoverZoom] = useState(1);
-  const [articleBlocks, setArticleBlocks] = useState([{ type: "paragraph", text: "" }]);
-  const [savingArticle, setSavingArticle] = useState(false);
-  const [composingArticle, setComposingArticle] = useState(false);
-  const [limits, setLimits] = useState({
-    vendor_free_photos: "5", vendor_premium_photos: "20", vendor_featured_photos: "40",
-    vendor_free_videos: "0", vendor_premium_videos: "5", vendor_featured_videos: "10",
-    organizer_basic_photos: "10", organizer_pro_photos: "20", organizer_elite_photos: "40",
+  const deleteEpmEvent = async (id) => {
+    if (!confirm("Delete this EPM event? This cannot be undone.")) return;
+    await supabase.from("epm_events").delete().eq("id", id);
+    setEpmEvents(epmEvents.filter(e => e.id !== id));
+  };
+
+  // ── ADMIN BULK MESSAGING ──
+  const broadcastRecipients = users.filter(u => (u.role === "vendor" || u.role === "organizer") && (u.business_name || u.organizer_name || u.handle));
+  const filteredRecipients = broadcastRecipients.filter(u => {
+    if (!broadcastSearch.trim()) return true;
+    const q = broadcastSearch.toLowerCase();
+    return [u.business_name, u.organizer_name, u.handle, u.category, u.city].some(f => f && f.toLowerCase().includes(q));
   });
+  const toggleRecipient = (id) => setSelectedRecipients(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const selectAllFiltered = () => setSelectedRecipients(Array.from(new Set([...selectedRecipients, ...filteredRecipients.map(u => u.id)])));
+  const sendBroadcastMessage = async () => {
+    if (!broadcastMessage.trim()) { setMessage("⚠️ Please write a message."); return; }
+    if (selectedRecipients.length === 0) { setMessage("⚠️ Select at least one recipient."); return; }
+    setSendingBroadcast(true); setMessage("");
+    try {
+      const rows = selectedRecipients.map(id => ({ sender_id: adminId, recipient_id: id, content: broadcastMessage.trim(), read: false }));
+      const { error } = await supabase.from("messages").insert(rows);
+      if (error) throw error;
+      setMessage(`✅ Message sent to ${selectedRecipients.length} recipient${selectedRecipients.length !== 1 ? "s" : ""}!`);
+      setSelectedRecipients([]); setBroadcastMessage("");
+      if (messagingView === "sent") loadSentMessages();
+    } catch (err) { setMessage("❌ Error sending message: " + err.message); }
+    setSendingBroadcast(false);
+  };
 
-  useEffect(() => {
-    checkAdmin();
-    const freezeBack = () => { window.history.pushState(null, document.title, window.location.href); };
-    freezeBack();
-    window.addEventListener("popstate", freezeBack);
-    return () => window.removeEventListener("popstate", freezeBack);
-  }, []);
+  const loadSentMessages = async () => {
+    if (!adminId) return;
+    setLoadingSent(true);
+    const { data } = await supabase.from("messages").select("*, recipient:recipient_id(business_name, organizer_name, handle, role)").eq("sender_id", adminId).order("created_at", { ascending: false });
+    setSentMessages(data || []);
+    setLoadingSent(false);
+  };
 
-  useEffect(() => {
-    if (router.query.tab && TABS.includes(router.query.tab)) setActiveTab(router.query.tab);
-  }, [router.query.tab]);
+  const deleteSentMessage = async (id) => {
+    if (!confirm("Delete this sent message?")) return;
+    await supabase.from("messages").delete().eq("id", id);
+    setSentMessages(sentMessages.filter(m => m.id !== id));
+  };
 
-  useEffect(() => {
-    if (activeTab === "Business Email") loadBusinessEmails(activeMailbox);
-    if (activeTab === "Community & News") loadNewsArticles();
-  }, [activeTab]);
+  const resendMessage = async (msg) => {
+    try {
+      const { error } = await supabase.from("messages").insert([{ sender_id: adminId, recipient_id: msg.recipient_id, content: msg.content, read: false }]);
+      if (error) throw error;
+      setMessage("✅ Message resent!");
+      loadSentMessages();
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+  };
 
-  const checkAdmin = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if (!user) { router.replace("/"); return; }
-    setAdminId(user.id);
-    const { data: profile } = await supabase.from("profiles").select("is_admin, role").eq("id", user.id).single();
-    if (profile && profile.is_admin !== true) {
-      if (profile.role === "organizer") router.replace("/organizer-dashboard");
-      else if (profile.role === "vendor") router.replace("/vendor-dashboard");
-      else router.replace("/");
+  const replyToRecipient = (msg) => {
+    setMessagingView("compose");
+    setSelectedRecipients([msg.recipient_id]);
+    setBroadcastMessage("");
+  };
+
+  // ── BUSINESS EMAIL (Resend-powered mailboxes) ──
+  const loadBusinessEmails = async (mailbox) => {
+    setLoadingBusinessEmails(true);
+    const { data } = await supabase.from("business_emails").select("*").eq("mailbox", mailbox).order("created_at", { ascending: false }).limit(200);
+    setBusinessEmails(data || []);
+    setLoadingBusinessEmails(false);
+  };
+
+  const openCompose = (prefill) => {
+    setComposeTo(prefill?.to || "");
+    setComposeSubject(prefill?.subject || "");
+    setComposeBody("");
+    setComposeReplyId(prefill?.replyId || null);
+    setComposeOpen(true);
+  };
+
+  const sendBusinessEmail = async () => {
+    if (!composeTo.trim() || !composeSubject.trim() || !composeBody.trim()) {
+      setMessage("⚠️ To, subject, and message are all required.");
       return;
     }
-    await loadAllData();
-    setLoading(false);
-  };
-
-  const loadAllData = async () => {
-    const { data: plansData } = await supabase.from("plans").select("*").order("role", { ascending: true }).order("sort_order", { ascending: true });
-    setPlans(plansData || []);
-    const { data: usersData } = await supabase.rpc("get_all_profiles");
-    const dedupedUsers = Array.from(new Map((usersData || []).map(u => [u.id, u])).values());
-    setUsers(dedupedUsers);
-    const { data: adsData } = await supabase.from("ads").select("*").order("created_at", { ascending: false });
-    setAds(adsData || []);
-    const { data: reportsData } = await supabase.from("reports").select("*, reporter:reporter_id(business_name, organizer_name, handle), message:message_id(content, sender_id, recipient_id)").order("created_at", { ascending: false });
-    setReports(reportsData || []);
-    const { data: epmData } = await supabase.from("epm_events").select("*").order("event_date", { ascending: true });
-    setEpmEvents(epmData || []);
-    const { data: settingsData } = await supabase.from("app_settings").select("*");
-    if (settingsData?.length) { const m = {}; settingsData.forEach(s => { m[s.key] = s.value; }); setLimits(prev => ({ ...prev, ...m })); }
-  };
-
-  // ── SEARCH ──
-  const matchesSearch = (u) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return [u.business_name, u.organizer_name, u.handle, u.category, u.city, u.state].some(f => f && f.toLowerCase().includes(q));
-  };
-
-  const PAID_TIERS = ["premium", "featured", "pro", "elite"];
-  const handleTierChange = (user, newTier) => {
-    if (user.account_type === newTier) return;
-    const isDowngrade = PAID_TIERS.includes(user.account_type) && !PAID_TIERS.includes(newTier);
-    if (isDowngrade) { setDowngradeModal({ userId: user.id, userName: user.business_name || user.organizer_name || user.handle, fromTier: user.account_type, toTier: newTier }); setDowngradeReason(""); }
-    else updateUserTier(user.id, newTier);
-  };
-
-  const confirmDowngrade = async () => {
-    if (!downgradeModal) return;
-    setDowngrading(true);
+    setSendingBusinessEmail(true); setMessage("");
     try {
-      const res = await fetch("/api/admin-downgrade", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: downgradeModal.userId, newTier: downgradeModal.toTier, reason: downgradeReason, adminId }) });
+      const res = await fetch("/api/send-business-email", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mailbox: activeMailbox, to: composeTo.trim(), subject: composeSubject.trim(), body: composeBody.trim(), adminId, replyToEmailId: composeReplyId }),
+      });
       const data = await res.json();
-      if (data.success) { setUsers(users.map(u => u.id === downgradeModal.userId ? { ...u, account_type: downgradeModal.toTier } : u)); setMessage(`✅ ${downgradeModal.userName} downgraded → ${downgradeModal.toTier}${data.stripeCancelled ? " · Stripe cancelled" : ""}`); }
-      else setMessage("❌ Error: " + data.error);
-    } catch (err) { setMessage("❌ Error: " + err.message); }
-    setDowngrading(false); setDowngradeModal(null); setDowngradeReason("");
-  };
-
-  const updateUserTier = async (userId, newAccountType) => {
-    try {
-      const res = await fetch("/api/admin-update-tier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, newTier: newAccountType }) });
-      const data = await res.json();
-      if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, account_type: newAccountType } : u)); setMessage("✅ Tier updated!"); }
-      else setMessage("❌ Error: " + data.error);
-    } catch (err) { setMessage("❌ Error: " + err.message); }
-  };
-
-  // ── SET ROLE + TIER (for Public Users → Vendor/Organizer) ──
-  const setUserRoleTier = async (userId, role, tier) => {
-    try {
-      const res = await fetch("/api/admin-set-role-tier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, role, tier }) });
-      const data = await res.json();
-      if (data.success) {
-        setUsers(users.map(u => u.id === userId ? { ...u, role, account_type: tier } : u));
-        setMessage(`✅ Upgraded to ${role === "vendor" ? "Vendor" : "Organizer"} (${tier})`);
-      } else setMessage("❌ Error: " + data.error);
-    } catch (err) { setMessage("❌ Error: " + err.message); }
-  };
-
-  // ── DEMOTE TO PUBLIC USER (for Free Vendors / Basic Organizers, and reversing accidental upgrades) ──
-  const demoteToPublic = async (user) => {
-    const name = user.business_name || user.organizer_name || user.handle || "this user";
-    if (!confirm(`Demote ${name} back to a Public User? This removes their vendor/organizer profile role and tier. This cannot be undone from here.`)) return;
-    try {
-      const res = await fetch("/api/admin-demote-to-public", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user.id }) });
-      const data = await res.json();
-      if (data.success) {
-        setUsers(users.map(u => u.id === user.id ? { ...u, role: null, account_type: null } : u));
-        setMessage(`✅ ${name} demoted to Public User`);
-      } else setMessage("❌ Error: " + data.error);
-    } catch (err) { setMessage("❌ Error: " + err.message); }
-  };
-
-  // ── FILE UPLOAD (for EPM event flyers) ──
-  const uploadFile = async (file, bucket, attempt = 1) => {
-    const fileName = `${Date.now()}-${file.name}`;
-    try {
-      const { error } = await supabase.storage.from(bucket).upload(fileName, file);
-      if (error) {
-        if (attempt < 3 && /fetch|network|timeout/i.test(error.message || "")) {
-          await new Promise(r => setTimeout(r, 1500 * attempt));
-          return uploadFile(file, bucket, attempt + 1);
-        }
-        setMessage("❌ Upload error: " + error.message);
-        return null;
-      }
-      return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
+      if (!data.success) throw new Error(data.error || "Failed to send");
+      setMessage("✅ Email sent!");
+      setComposeOpen(false); setComposeTo(""); setComposeSubject(""); setComposeBody(""); setComposeReplyId(null);
+      loadBusinessEmails(activeMailbox);
     } catch (err) {
-      if (attempt < 3) {
-        await new Promise(r => setTimeout(r, 1500 * attempt));
-        return uploadFile(file, bucket, attempt + 1);
-      }
-      setMessage("❌ Upload error: " + err.message);
-      return null;
+      setMessage("❌ Error sending email: " + err.message);
+    }
+    setSendingBusinessEmail(false);
+  };
 
-      
-    }{/* DOWNGRADE MODAL */}
+  const markEmailRead = async (id) => {
+    await supabase.from("business_emails").update({ read: true }).eq("id", id);
+    setBusinessEmails(businessEmails.map(e => e.id === id ? { ...e, read: true } : e));
+  };
+
+  const deleteBusinessEmail = async (id) => {
+    if (!confirm("Delete this email from your records? This cannot be undone.")) return;
+    await supabase.from("business_emails").delete().eq("id", id);
+    setBusinessEmails(businessEmails.filter(e => e.id !== id));
+  };
+
+  // ── COMMUNITY & NEWS ──
+  const BLANK_ARTICLE_BLOCKS = [{ type: "paragraph", text: "" }];
+
+  const loadNewsArticles = async () => {
+    setLoadingNews(true);
+    const { data } = await supabase.from("community_news").select("*").order("created_at", { ascending: false });
+    setNewsArticles(data || []);
+    setLoadingNews(false);
+  };
+
+  const resetArticleForm = () => {
+    setEditingArticleId(null); setArticleTitle(""); setArticleCoverUrl(""); setArticleCoverFile(null);
+    setArticleCoverPosition({ x: 50, y: 50 }); setArticleCoverZoom(1); setArticleBlocks(BLANK_ARTICLE_BLOCKS); setComposingArticle(false);
+  };
+
+  const startNewArticle = () => { resetArticleForm(); setComposingArticle(true); };
+
+  const startEditArticle = (article) => {
+    setEditingArticleId(article.id);
+    setArticleTitle(article.title || "");
+    const cover = parsePos(article.cover_image_url || "");
+    setArticleCoverUrl(cover.src || ""); setArticleCoverPosition(cover.position); setArticleCoverZoom(cover.zoom);
+    setArticleCoverFile(null);
+    setArticleBlocks((article.content_blocks?.length ? article.content_blocks : BLANK_ARTICLE_BLOCKS).map(b =>
+      b.type === "image" ? { ...b, file: null, _displaySrc: parsePos(b.url).src } : b
+    ));
+    setComposingArticle(true);
+  };
+
+  const addParagraphBlock = () => setArticleBlocks([...articleBlocks, { type: "paragraph", text: "" }]);
+  const addImageBlock = () => setArticleBlocks([...articleBlocks, { type: "image", url: "", file: null, caption: "" }]);
+  const updateBlock = (index, updates) => setArticleBlocks(articleBlocks.map((b, i) => i === index ? { ...b, ...updates } : b));
+  const removeBlock = (index) => setArticleBlocks(articleBlocks.filter((_, i) => i !== index));
+  const moveBlock = (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= articleBlocks.length) return;
+    const copy = [...articleBlocks];
+    [copy[index], copy[newIndex]] = [copy[newIndex], copy[index]];
+    setArticleBlocks(copy);
+  };
+
+  const saveArticle = async () => {
+    if (!articleTitle.trim()) { setMessage("⚠️ Article title is required."); return; }
+    const hasContent = articleBlocks.some(b => (b.type === "paragraph" && b.text.trim()) || (b.type === "image" && (b.url || b.file)));
+    if (!hasContent) { setMessage("⚠️ Add at least one paragraph or image to the article."); return; }
+    setSavingArticle(true); setMessage("");
+    try {
+      let coverUrl = articleCoverUrl;
+      if (articleCoverFile) {
+        const up = await uploadFile(articleCoverFile, "organizer-portfolio");
+        if (!up) { setSavingArticle(false); return; }
+        coverUrl = up;
+      }
+      coverUrl = coverUrl ? withPos(coverUrl.split("#")[0], articleCoverPosition, articleCoverZoom) : "";
+
+      const finalBlocks = [];
+      for (const block of articleBlocks) {
+        if (block.type === "paragraph") {
+          if (block.text.trim()) finalBlocks.push({ type: "paragraph", text: block.text.trim() });
+        } else if (block.type === "image") {
+          let url = block.url;
+          if (block.file) {
+            const up = await uploadFile(block.file, "organizer-portfolio");
+            if (!up) { setSavingArticle(false); return; }
+            url = up;
+          }
+          if (url) finalBlocks.push({ type: "image", url: url.split("#")[0], caption: block.caption || "" });
+        }
+      }
+
+      const articleData = { title: articleTitle.trim(), cover_image_url: coverUrl, content_blocks: finalBlocks, updated_at: new Date().toISOString() };
+
+      if (editingArticleId) {
+        const { error } = await supabase.from("community_news").update(articleData).eq("id", editingArticleId);
+        if (error) throw error;
+        setNewsArticles(newsArticles.map(a => a.id === editingArticleId ? { ...a, ...articleData } : a));
+      } else {
+        const { data, error } = await supabase.from("community_news").insert([{ ...articleData, published: true }]).select().single();
+        if (error) throw error;
+        if (data) setNewsArticles([data, ...newsArticles]);
+      }
+      resetArticleForm();
+      setMessage("✅ Article saved!");
+    } catch (err) {
+      setMessage("❌ Error saving article: " + err.message);
+    }
+    setSavingArticle(false);
+  };
+
+  const togglePublished = async (article) => {
+    const { error } = await supabase.from("community_news").update({ published: !article.published }).eq("id", article.id);
+    if (!error) setNewsArticles(newsArticles.map(a => a.id === article.id ? { ...a, published: !a.published } : a));
+  };
+
+  const deleteArticle = async (id) => {
+    if (!confirm("Delete this article? This cannot be undone.")) return;
+    await supabase.from("community_news").delete().eq("id", id);
+    setNewsArticles(newsArticles.filter(a => a.id !== id));
+  };
+
+  const suspendUser = async (userId, suspended) => {
+    try {
+      const res = await fetch("/api/admin-suspend-user", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, suspended }) });
+      const data = await res.json();
+      if (data.success) { setUsers(users.map(u => u.id === userId ? { ...u, suspended } : u)); setMessage(suspended ? "✅ User suspended" : "✅ User reinstated"); }
+      else setMessage("❌ Error: " + data.error);
+    } catch (err) { setMessage("❌ Error: " + err.message); }
+  };
+
+  const viewUserInfo = async (userId) => {
+    setUserInfoModal({ loading: true });
+    try {
+      const res = await fetch("/api/admin-get-user-info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
+      const data = await res.json();
+      setUserInfoModal(data.success ? data : { error: data.error });
+    } catch (err) { setUserInfoModal({ error: err.message }); }
+  };
+
+  // ── CSV EXPORT ──
+  const downloadCSV = async (type, filename) => {
+    setExportLoading(type);
+    try {
+      const res = await fetch("/api/admin-export-users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) });
+      const data = await res.json();
+      if (!data.success) { setMessage("❌ Export failed: " + data.error); return; }
+      const rows = data.rows;
+      if (rows.length === 0) { setMessage("⚠️ No data to export."); return; }
+      const headers = Object.keys(rows[0]);
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => headers.map(h => `"${(row[h] || "").toString().replace(/"/g, '""')}"`).join(","))
+      ].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      setMessage(`✅ Downloaded ${rows.length} records as ${filename}`);
+    } catch (err) { setMessage("❌ Export error: " + err.message); }
+    setExportLoading(null);
+  };
+
+  const saveLimits = async () => {
+    setSaving(true); setMessage("");
+    let hasError = false;
+    for (const [key, value] of Object.entries(limits)) {
+      const { error } = await supabase.from("app_settings").update({ value: String(value) }).eq("key", key);
+      if (error) hasError = true;
+    }
+    setMessage(hasError ? "❌ Some limits failed." : "✅ Limits saved!"); setSaving(false);
+  };
+
+  const savePlan = async (plan) => {
+    setSaving(true); setMessage("");
+    const { error } = await supabase.from("plans").update({ name: plan.name, price: plan.price, description: plan.description, features: plan.features }).eq("id", plan.id);
+    setMessage(error ? "❌ " + error.message : "✅ Plan saved!"); setSaving(false);
+  };
+
+  const saveAd = async (ad) => {
+    setSaving(true);
+    const { error } = await supabase.from("ads").update({ title: ad.title, body: ad.body, link: ad.link, active: ad.active }).eq("id", ad.id);
+    setMessage(!error ? "✅ Ad saved!" : "❌ " + error.message); setSaving(false);
+  };
+
+  const logout = async () => { await supabase.auth.signOut(); router.replace("/"); };
+  const tierColor = (t) => ({ premium: "#701890", featured: "#AABB23", pro: "#701890", elite: "#AABB23", basic: "#888", free: "#aaa" }[t] || "#aaa");
+  const formatLastLogin = (d) => d ? new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Never logged in";
+
+  const getPick = (userId) => rolePicks[userId] || { role: "vendor", tier: "free" };
+  const updatePick = (userId, field, value) => {
+    setRolePicks(prev => {
+      const cur = prev[userId] || { role: "vendor", tier: "free" };
+      const next = { ...cur, [field]: value };
+      if (field === "role") next.tier = value === "vendor" ? "free" : "basic";
+      return { ...prev, [userId]: next };
+    });
+  };
+
+  // ── Computed live from `users` so Overview always matches every other tab instantly, even mid-session after upgrades/downgrades ──
+  // ── Excludes incomplete/nameless profiles (leftover test accounts) so Overview matches real listings ──
+  const isRealVendor = u => u.role === "vendor" && (u.business_name || u.logo_url);
+  const isRealOrganizer = u => u.role === "organizer" && (u.organizer_name || u.logo_url);
+  const stats = {
+    totalVendors: users.filter(isRealVendor).length,
+    totalOrganizers: users.filter(isRealOrganizer).length,
+    publicUsers: users.filter(u => !u.role).length,
+    freeVendors: users.filter(u => isRealVendor(u) && (!u.account_type || u.account_type === "free")).length,
+    premiumVendors: users.filter(u => isRealVendor(u) && u.account_type === "premium").length,
+    featuredVendors: users.filter(u => isRealVendor(u) && u.account_type === "featured").length,
+    basicOrganizers: users.filter(u => isRealOrganizer(u) && (!u.account_type || u.account_type === "basic")).length,
+    proOrganizers: users.filter(u => isRealOrganizer(u) && (u.account_type === "pro" || u.account_type === "premium")).length,
+    eliteOrganizers: users.filter(u => isRealOrganizer(u) && u.account_type === "elite").length,
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading Admin Panel...</div>;
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", fontFamily: "sans-serif" }}>
+
+      {/* USER INFO MODAL */}
+      {userInfoModal && (
+        <div onClick={() => setUserInfoModal(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999 }}>
+          <div onClick={e => e.stopPropagation()} style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 440, width: "calc(100% - 40px)", maxHeight: "80vh", overflowY: "auto", overflowX: "hidden", boxSizing: "border-box" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0 }}>👤 User Info</h3>
+              <button onClick={() => setUserInfoModal(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
+            </div>
+            {userInfoModal.loading ? <p style={{ color: "#888" }}>Loading...</p> : userInfoModal.error ? <p style={{ color: "#cc0000" }}>❌ {userInfoModal.error}</p> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {userInfoModal.profile?.logo_url && <div style={{ width: 70, height: 70, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", marginBottom: 10 }}><img src={userInfoModal.profile.logo_url} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                {[
+                  ["Name", userInfoModal.profile?.business_name || userInfoModal.profile?.organizer_name || "—"],
+                  ["Handle", "@" + (userInfoModal.profile?.handle || "—")],
+                  ["Email", userInfoModal.email || "—"],
+                  ["Role", userInfoModal.profile?.role || "—"],
+                  ["Tier", userInfoModal.profile?.account_type || "—"],
+                  ["City", userInfoModal.profile?.city || "—"],
+                  ["State", userInfoModal.profile?.state || "—"],
+                  ["Category", userInfoModal.profile?.category || "—"],
+                  ["Suspended", userInfoModal.profile?.suspended ? "Yes" : "No"],
+                  ["Email Verified", userInfoModal.emailConfirmed ? "Yes ✅" : "Not verified ❌"],
+                  ["Signed Up", userInfoModal.createdAt ? new Date(userInfoModal.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
+                  ["Last Login", userInfoModal.lastSignIn ? new Date(userInfoModal.lastSignIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"],
+                  ["Stripe Customer", userInfoModal.profile?.stripe_customer_id || "—"],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: "grid", gridTemplateColumns: "120px minmax(0, 1fr)", alignItems: "start", padding: "8px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
+                    <span style={{ fontSize: 13, color: "#888", fontWeight: "bold" }}>{label}</span>
+                    <span style={{ fontSize: 13, color: "#333", textAlign: "left", wordBreak: "break-all" }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+{/* DOWNGRADE MODAL */}
       {downgradeModal && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ backgroundColor: "white", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%" }}>
@@ -722,7 +848,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-
 
 {activeTab === "Basic Organizers" && (
           <div>
@@ -1253,12 +1378,3 @@ const thStyle = { padding: "12px 14px", textAlign: "left", fontWeight: "bold", w
 const tdStyle = { padding: "12px 14px", borderBottom: "1px solid #eee", verticalAlign: "middle" };
 const smallBtnStyle = { padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 };
 const smallSelectStyle = { padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, backgroundColor: "white" };
-
-
-
-
-
-
-
-  };
-
