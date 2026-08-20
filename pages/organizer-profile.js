@@ -3,22 +3,22 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
-// ── IMAGE POSITIONING: position stored as a #pos=X,Y fragment on the URL itself, no DB changes needed ──
-function withPosition(url, pos) {
+// ── IMAGE POSITIONING: position+zoom stored as a #pos=X,Y,Z fragment on the URL itself, no DB changes needed ──
+function withPosition(url, pos, zoom = 1) {
   if (!url) return url;
   const base = url.split("#")[0];
   if (!pos) return base;
-  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
+  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
 function parsePosition(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
   const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 } };
-  const [x, y] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
 }
 
-function PositionableImage({ src, position, onChange, height = 200 }) {
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 200 }) {
   const ref = useRef(null);
   const dragState = useRef(null);
 
@@ -38,16 +38,25 @@ function PositionableImage({ src, position, onChange, height = 200 }) {
   const handlePointerUp = () => { dragState.current = null; };
 
   return (
-    <div
-      ref={ref}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      style={{ width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
-    >
-      <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
+    <div>
+      <div
+        ref={ref}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        style={{ width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#f0f0f0" }}
+      >
+        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
+      </div>
+      {onZoomChange && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <span style={{ fontSize: 16 }}>🔍</span>
+          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => onZoomChange(parseFloat(e.target.value))} style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{zoom.toFixed(1)}x</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -136,8 +145,10 @@ export default function OrganizerProfile() {
   const [showFlyerPicker, setShowFlyerPicker] = useState(false);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
+  const [logoZoom, setLogoZoom] = useState(1);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
   const [flyerPosition, setFlyerPosition] = useState({ x: 50, y: 50 });
+  const [flyerZoom, setFlyerZoom] = useState(1);
 
   useEffect(() => {
     const load = async () => {
@@ -228,8 +239,8 @@ export default function OrganizerProfile() {
     try {
       const { data: ex } = await supabase.from("profiles").select("logo_url").eq("id", user.id).single();
       let uploadedLogoUrl = ex?.logo_url || logoUrl;
-      if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = withPosition(up, logoPosition); }
-      else if (logoUrl) { uploadedLogoUrl = withPosition(uploadedLogoUrl.split("#")[0], logoPosition); }
+      if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = withPosition(up, logoPosition, logoZoom); }
+      else if (logoUrl) { uploadedLogoUrl = withPosition(uploadedLogoUrl.split("#")[0], logoPosition, logoZoom); }
       let updatedPortfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
         const remaining = (imageLimits[accountType] ?? 10) - updatedPortfolio.length;
@@ -274,7 +285,7 @@ export default function OrganizerProfile() {
     if (flyerFile) {
       const up = await uploadFile(flyerFile, "organizer-portfolio");
       if (!up) { setSavingEvent(false); return; } // uploadFile already set an error message
-      flyerUrl = withPosition(up, flyerPosition);
+      flyerUrl = withPosition(up, flyerPosition, flyerZoom);
     }
     const eventData = {
       event_name: eventForm.event_name, event_date: eventForm.event_date || null,
@@ -364,7 +375,7 @@ export default function OrganizerProfile() {
         <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
         {logoUrl ? (
           <div style={{ maxWidth: 220, marginBottom: 8 }}>
-            <PositionableImage src={logoUrl} position={logoPosition} onChange={setLogoPosition} height={160} />
+            <PositionableImage src={logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} height={160} />
           </div>
         ) : (
           <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
@@ -372,12 +383,12 @@ export default function OrganizerProfile() {
           </div>
         )}
         {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-        <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); }} style={{ display: "block", marginBottom: 10 }} />
+        <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); }} style={{ display: "block", marginBottom: 10 }} />
         <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
         {showLogoPicker && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
             {DEFAULT_LOGOS.map((src, i) => (
-              <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setShowLogoPicker(false); }}
+              <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setShowLogoPicker(false); }}
                 style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
                 <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
@@ -513,9 +524,12 @@ export default function OrganizerProfile() {
               <div style={{ marginBottom: 10, maxWidth: 300 }}>
                 <PositionableImage src={flyerFile ? flyerPreviewSrc : parsePosition(flyerPreviewSrc).src} position={flyerFile ? flyerPosition : parsePosition(flyerPreviewSrc).position} onChange={pos => {
                   setFlyerPosition(pos);
-                  if (!flyerFile) setEventForm(prev => ({ ...prev, flyer_url: withPosition(parsePosition(prev.flyer_url).src, pos) }));
+                  if (!flyerFile) setEventForm(prev => ({ ...prev, flyer_url: withPosition(parsePosition(prev.flyer_url).src, pos, flyerZoom) }));
+                }} zoom={flyerFile ? flyerZoom : parsePosition(flyerPreviewSrc).zoom} onZoomChange={z => {
+                  setFlyerZoom(z);
+                  if (!flyerFile) setEventForm(prev => ({ ...prev, flyer_url: withPosition(parsePosition(prev.flyer_url).src, flyerPosition, z) }));
                 }} height={200} />
-                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); setFlyerPosition({ x: 50, y: 50 }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
+                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); setFlyerPosition({ x: 50, y: 50 }); setFlyerZoom(1); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
