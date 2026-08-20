@@ -12,12 +12,15 @@ function formatTime(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 function parsePos(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
   const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 } };
-  const [x, y] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
 }
+// ── Must match the same constant in admin.js exactly, so the crop you set in the
+// editor is guaranteed to look identical here. ──
+const COVER_ASPECT_RATIO = "8 / 5";
 
 export default function HomePage() {
   const router = useRouter();
@@ -192,8 +195,8 @@ export default function HomePage() {
                 const firstParagraph = article.content_blocks?.find(b => b.type === "paragraph")?.text || "";
                 return (
                   <div key={article.id} onClick={() => setSelectedArticle(article)} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
-                    <div style={{ height: 140, overflow: "hidden" }}>
-                      {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
+                    <div style={{ aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden" }}>
+                      {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
                     </div>
                     <div style={{ padding: 12 }}>
                       <h3 style={{ margin: "0 0 6px", fontSize: 14 }}>{article.title}</h3>
@@ -254,7 +257,9 @@ export default function HomePage() {
         <div onClick={() => setSelectedArticle(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
-              <img src={cover.src} alt={selectedArticle.title} style={{ width: "100%", maxHeight: 260, objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, borderRadius: "16px 16px 0 0", display: "block" }} />
+              <div style={{ width: "100%", aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden", borderRadius: "16px 16px 0 0" }}>
+                <img src={cover.src} alt={selectedArticle.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} />
+              </div>
             ); })()}
             <div style={{ padding: 24 }}>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
@@ -262,12 +267,12 @@ export default function HomePage() {
               </div>
               <h2 style={{ margin: "0 0 16px", fontSize: 20 }}>{selectedArticle.title}</h2>
               {(selectedArticle.content_blocks || []).map((block, i) => block.type === "paragraph" ? (
-                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7 }}>{block.text}</p>
+                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7, whiteSpace: "pre-line" }}>{block.text}</p>
               ) : (() => {
                 const img = parsePos(block.url);
                 return (
                   <div key={i} style={{ marginBottom: 16 }}>
-                    <img src={img.src} alt={block.caption || ""} style={{ width: "100%", borderRadius: 8, objectFit: "cover", objectPosition: `${img.position.x}% ${img.position.y}%`, display: "block" }} />
+                    <img src={img.src} alt={block.caption || ""} style={{ width: "100%", height: "auto", borderRadius: 8, objectFit: "contain", display: "block" }} />
                     {block.caption && <p style={{ margin: "6px 0 0", fontSize: 12, color: "#888", textAlign: "center", fontStyle: "italic" }}>{block.caption}</p>}
                   </div>
                 );
