@@ -239,7 +239,7 @@ export default function HomePage() {
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
               {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
                 <div style={{ position: "relative" }}>
-                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "contain", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block", backgroundColor: "#f5f5f5" }} />
+                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "auto", maxWidth: "100%", maxHeight: 400, objectFit: "contain", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block", margin: "0 auto", backgroundColor: "#f5f5f5" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
               ); })()}
@@ -269,8 +269,8 @@ export default function HomePage() {
         <div onClick={() => setSelectedArticle(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
-              <div style={{ width: "100%", aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden", borderRadius: "16px 16px 0 0", backgroundColor: "#f0f0f0" }}>
-                <img src={cover.src} alt={selectedArticle.title} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} />
+              <div style={{ width: "100%", backgroundColor: "#f0f0f0", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "center" }}>
+                <img src={cover.src} alt={selectedArticle.title} style={{ width: "auto", maxWidth: "100%", maxHeight: 400, objectFit: "contain", display: "block" }} />
               </div>
             ); })()}
             <div style={{ padding: 24 }}>
