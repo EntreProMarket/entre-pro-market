@@ -11,6 +11,18 @@ function formatTime(t) {
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
+// ── Turns plain URLs typed in article text into real clickable links ──
+function linkify(text) {
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      const href = part.startsWith("http") ? part : `https://${part}`;
+      return <a key={i} href={href} target="_blank" rel="noreferrer" style={{ color: "#701890", fontWeight: "bold", textDecoration: "underline" }}>{part}</a>;
+    }
+    return part;
+  });
+}
 function parsePos(url) {
   if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
   const [base, frag] = url.split("#pos=");
@@ -166,7 +178,7 @@ export default function HomePage() {
                 <div key={`${event._source}-${event.id}`} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
                   {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
                   <div style={{ height: 150, overflow: "hidden" }}>
-                    {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
+                    {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                   </div>
                   <div style={{ padding: 12 }}>
                     <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h3>
@@ -195,7 +207,7 @@ export default function HomePage() {
                 const firstParagraph = article.content_blocks?.find(b => b.type === "paragraph")?.text || "";
                 return (
                   <div key={article.id} onClick={() => setSelectedArticle(article)} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
-                    <div style={{ aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden" }}>
+                    <div style={{ aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
                       {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
                     </div>
                     <div style={{ padding: 12 }}>
@@ -227,7 +239,7 @@ export default function HomePage() {
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
               {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
                 <div style={{ position: "relative" }}>
-                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
+                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "contain", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block", backgroundColor: "#f5f5f5" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
               ); })()}
@@ -257,8 +269,8 @@ export default function HomePage() {
         <div onClick={() => setSelectedArticle(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
-              <div style={{ width: "100%", aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden", borderRadius: "16px 16px 0 0" }}>
-                <img src={cover.src} alt={selectedArticle.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} />
+              <div style={{ width: "100%", aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden", borderRadius: "16px 16px 0 0", backgroundColor: "#f0f0f0" }}>
+                <img src={cover.src} alt={selectedArticle.title} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} />
               </div>
             ); })()}
             <div style={{ padding: 24 }}>
@@ -267,7 +279,7 @@ export default function HomePage() {
               </div>
               <h2 style={{ margin: "0 0 16px", fontSize: 20 }}>{selectedArticle.title}</h2>
               {(selectedArticle.content_blocks || []).map((block, i) => block.type === "paragraph" ? (
-                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7, whiteSpace: "pre-line" }}>{block.text}</p>
+                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7, whiteSpace: "pre-line" }}>{linkify(block.text)}</p>
               ) : (() => {
                 const img = parsePos(block.url);
                 return (
