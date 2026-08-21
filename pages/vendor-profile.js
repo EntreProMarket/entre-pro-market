@@ -1,5 +1,5 @@
 // pages/vendor-profile.js
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 
@@ -46,64 +46,6 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-// ── IMAGE POSITIONING: position+zoom stored as a #pos=X,Y,Z fragment on the URL itself, no DB changes needed ──
-function withPosition(url, pos, zoom = 1) {
-  if (!url) return url;
-  const base = url.split("#")[0];
-  if (!pos) return base;
-  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
-}
-function parsePosition(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
-  const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
-  const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
-}
-
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 200 }) {
-  const ref = useRef(null);
-  const dragState = useRef(null);
-
-  const handlePointerDown = (e) => {
-    dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
-    e.target.setPointerCapture?.(e.pointerId);
-  };
-  const handlePointerMove = (e) => {
-    if (!dragState.current || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const dx = e.clientX - dragState.current.x;
-    const dy = e.clientY - dragState.current.y;
-    const newX = Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100));
-    const newY = Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100));
-    onChange({ x: newX, y: newY });
-  };
-  const handlePointerUp = () => { dragState.current = null; };
-
-  return (
-    <div>
-      <div
-        ref={ref}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        style={{ width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#f0f0f0" }}
-      >
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
-      </div>
-      {onZoomChange && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 16 }}>🔍</span>
-          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => onZoomChange(parseFloat(e.target.value))} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{zoom.toFixed(1)}x</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
 
@@ -130,11 +72,8 @@ export default function VendorProfile() {
   const [venmoHandle, setVenmoHandle] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
-  const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
-  const [logoZoom, setLogoZoom] = useState(1);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
-  const [repositioningIndex, setRepositioningIndex] = useState(null);
   const [accountType, setAccountType] = useState("free");
   const [videoUrls, setVideoUrls] = useState(["","","","","","","","","",""]);
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
@@ -175,8 +114,7 @@ export default function VendorProfile() {
         setCity(p.city || ""); setState(p.state || ""); setDescription(p.description || "");
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
-        setPortfolioImages(p.portfolio_images || []);
-        { const parsed = parsePosition(p.logo_url || ""); setLogoUrl(parsed.src || ""); setLogoPosition(parsed.position); setLogoZoom(parsed.zoom); }
+        setPortfolioImages(p.portfolio_images || []); setLogoUrl(p.logo_url || "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
       await loadProducts(user.id);
@@ -206,13 +144,13 @@ export default function VendorProfile() {
     setSaving(true); setMessage("");
     const user = authData.user;
     try {
-      let finalLogoUrl = logoUrl ? withPosition(logoUrl.split("#")[0], logoPosition, logoZoom) : null;
+      let finalLogoUrl = logoUrl || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
         const comp = await compressImage(logoFile, 800, 0.85);
         setMessage("⏳ Uploading logo...");
         const up = await uploadFile(comp, "vendor-logos");
-        if (up) finalLogoUrl = withPosition(up, logoPosition, logoZoom);
+        if (up) finalLogoUrl = up;
       }
       let portfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
@@ -247,8 +185,6 @@ export default function VendorProfile() {
     } catch (err) { setMessage("❌ Error: " + err.message); }
     setSaving(false);
   };
-
-  const removePortfolioImage = (url) => setPortfolioImages(portfolioImages.filter(x => x !== url));
 
   const addProduct = async () => {
     if (!newProduct.title || !newProduct.price) { alert("Title and price are required."); return; }
@@ -328,15 +264,10 @@ export default function VendorProfile() {
 
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
-            {logoUrl ? (
-              <div style={{ maxWidth: 220, marginBottom: 8 }}>
-                <PositionableImage src={logoFile ? URL.createObjectURL(logoFile) : logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} height={160} />
-              </div>
-            ) : (
-              <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p></div>
-            )}
+            {logoUrl && !logoFile && <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", marginBottom: 8 }}><img src={logoUrl} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+            {!logoUrl && !logoFile && <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p></div>}
             {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-            <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); }} />
+            <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} />
           </div>
 
           <div style={{ marginTop: 20, marginBottom: 8 }}>
@@ -345,29 +276,14 @@ export default function VendorProfile() {
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
             {portfolioImages.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-                {portfolioImages.map((img, i) => {
-                  const { src, position } = parsePosition(img);
-                  return (
-                    <div key={i} style={{ position: "relative" }}>
-                      <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block" }} /></div>
-                      <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                      <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Position</button>
-                    </div>
-                  );
-                })}
+                {portfolioImages.map((img, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                    <button onClick={() => setPortfolioImages(portfolioImages.filter(x => x !== img))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+                  </div>
+                ))}
               </div>
             )}
-            {repositioningIndex !== null && portfolioImages[repositioningIndex] && (() => {
-              const { src, position } = parsePosition(portfolioImages[repositioningIndex]);
-              return (
-                <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                  <PositionableImage src={src} position={position} onChange={pos => {
-                    setPortfolioImages(prev => prev.map((u, idx) => idx === repositioningIndex ? withPosition(u, pos) : u));
-                  }} height={180} />
-                  <button onClick={() => setRepositioningIndex(null)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
-                </div>
-              );
-            })()}
             {portfolioImages.length < photoLimit && (
               /* ── FIXED: accept="image/*" ── */
               <input type="file" accept="image/*" multiple onChange={e => {
