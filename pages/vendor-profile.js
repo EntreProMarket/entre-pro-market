@@ -61,7 +61,12 @@ function parsePosition(url) {
   return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
 }
 
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 200 }) {
+// ── Logos display as a square everywhere in the app (vendor card, public profile, admin panel),
+// so the editor crop box below MUST also be square — otherwise what you drag/zoom into position
+// while editing won't match what actually gets shown after saving. ──
+const LOGO_ASPECT_RATIO = "1 / 1";
+
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 200, aspectRatio }) {
   const ref = useRef(null);
   const dragState = useRef(null);
 
@@ -88,9 +93,11 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        style={{ width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#f0f0f0" }}
+        style={{ width: "100%", aspectRatio: aspectRatio || undefined, height: aspectRatio ? undefined : height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
       >
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        {/* ── FIXED: objectFit was "contain" (letterboxed, no real crop) — now "cover" so the drag/zoom preview
+            matches the actual cropped square that gets saved and displayed everywhere else. ── */}
+        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
       </div>
       {onZoomChange && (
@@ -330,7 +337,8 @@ export default function VendorProfile() {
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
             {logoUrl ? (
               <div style={{ maxWidth: 220, marginBottom: 8 }}>
-                <PositionableImage src={logoFile ? URL.createObjectURL(logoFile) : logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} height={160} />
+                <PositionableImage src={logoFile ? URL.createObjectURL(logoFile) : logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} aspectRatio={LOGO_ASPECT_RATIO} />
+                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>This square crop is exactly what shows on your profile — drag to reposition, use the slider to zoom in.</p>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p></div>
