@@ -44,7 +44,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, as
     <div>
       <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
         style={{ width: "100%", aspectRatio: aspectRatio || undefined, height: aspectRatio ? undefined : height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
       </div>
       {onZoomChange && (
@@ -253,7 +253,7 @@ export default function AdminDashboard() {
     }
   };
 
-── EPM EVENTS (Admin-created, shown mixed with Elite Organizer events on the Homepage) ──
+// ── EPM EVENTS (Admin-created, shown mixed with Elite Organizer events on the Homepage) ──
   const saveEpmEvent = async () => {
     if (!epmEventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
     if (!epmEventForm.flyer_url && !epmFlyerFile) { setMessage("⚠️ A flyer image is required."); return; }
