@@ -27,15 +27,19 @@ function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
   const wrapRef = useRef(null);
-  const pointers = useRef(new Map());
+  const canvasRef = useRef(null);
   const dragStart = useRef(null);
   const pinchStart = useRef(null);
   const initedFor = useRef(null);
+  const stateRef = useRef({ imgCenter: null, pinchZoom: 1 });
 
   const [natural, setNatural] = useState(null);
   const [availW, setAvailW] = useState(280);
   const [imgCenter, setImgCenter] = useState(null);
   const [pinchZoom, setPinchZoom] = useState(1);
+
+  stateRef.current.imgCenter = imgCenter;
+  stateRef.current.pinchZoom = pinchZoom;
 
   useEffect(() => {
     const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 280); };
@@ -95,55 +99,91 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     setImgCenter({ x: relLeft + gLeft + iw / 2, y: relTop + gTop + ih / 2 });
   }, [natural, src]); // eslint-disable-line
 
-  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 
-  const handlePointerDown = (e) => {
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    e.target.setPointerCapture?.(e.pointerId);
-    if (pointers.current.size === 2 && onZoomChange) {
-      const [p1, p2] = Array.from(pointers.current.values());
-      pinchStart.current = { startDist: dist(p1, p2), startZoom: pinchZoom };
-      dragStart.current = null;
-    } else if (pointers.current.size === 1 && imgCenter) {
-      dragStart.current = { x: e.clientX, y: e.clientY, cx: imgCenter.x, cy: imgCenter.y };
-    }
-  };
-  const handlePointerMove = (e) => {
-    if (!pointers.current.has(e.pointerId) || !imgCenter || !natural) return;
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  // ── Native touch listeners, attached manually (not via React's onTouch* props) so
+  // preventDefault reliably blocks the browser's own pinch/scroll and lets our two-finger
+  // zoom actually take over. React's synthetic touch handlers are passive by default on
+  // mobile and can silently fail to stop the native gesture. ──
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
 
-    if (pointers.current.size === 2 && pinchStart.current && onZoomChange) {
-      const [p1, p2] = Array.from(pointers.current.values());
-      const nextPz = clampNum(pinchStart.current.startZoom * (dist(p1, p2) / pinchStart.current.startDist), 1, 3);
-      const nextIw = natural.w * hugScale * nextPz, nextIh = natural.h * hugScale * nextPz;
-      const nextCenter = clampCenter(imgCenter.x, imgCenter.y, nextIw, nextIh);
-      setPinchZoom(nextPz);
+    const onStart = (e) => {
+      const t = e.touches;
+      if (t.length === 2 && onZoomChange) {
+        pinchStart.current = { startDist: dist(t[0], t[1]), startZoom: stateRef.current.pinchZoom };
+        dragStart.current = null;
+      } else if (t.length === 1 && stateRef.current.imgCenter) {
+        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: stateRef.current.imgCenter.x, cy: stateRef.current.imgCenter.y };
+        pinchStart.current = null;
+      }
+    };
+
+    const onMove = (e) => {
+      if (!natural) return;
+      const t = e.touches;
+      if (t.length === 2 && pinchStart.current && onZoomChange) {
+        e.preventDefault();
+        const nextPz = clampNum(pinchStart.current.startZoom * (dist(t[0], t[1]) / pinchStart.current.startDist), 1, 3);
+        const nextIw = natural.w * hugScale * nextPz, nextIh = natural.h * hugScale * nextPz;
+        const center = stateRef.current.imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+        const nextCenter = clampCenter(center.x, center.y, nextIw, nextIh);
+        setPinchZoom(nextPz);
+        setImgCenter(nextCenter);
+        emit(nextCenter, nextPz);
+        return;
+      }
+      if (t.length === 1 && dragStart.current) {
+        e.preventDefault();
+        const nextCenter = clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), imgW, imgH);
+        setImgCenter(nextCenter);
+        emit(nextCenter, stateRef.current.pinchZoom);
+      }
+    };
+
+    const onEnd = (e) => {
+      if (e.touches.length < 2) pinchStart.current = null;
+      if (e.touches.length === 0) dragStart.current = null;
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [natural, hugScale, canvasW, canvasH, imgW, imgH, guideLeft, guideTop, guideSize, coverScaleSquare, onZoomChange]); // eslint-disable-line
+
+  // ── Mouse support (desktop testing): left-drag to pan ──
+  const handleMouseDown = (e) => {
+    if (!imgCenter) return;
+    dragStart.current = { x: e.clientX, y: e.clientY, cx: imgCenter.x, cy: imgCenter.y };
+    const onMove = (ev) => {
+      const nextCenter = clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), imgW, imgH);
       setImgCenter(nextCenter);
-      emit(nextCenter, nextPz);
-      return;
-    }
-    if (!dragStart.current || pointers.current.size !== 1) return;
-    const nextCenter = clampCenter(dragStart.current.cx + (e.clientX - dragStart.current.x), dragStart.current.cy + (e.clientY - dragStart.current.y), imgW, imgH);
-    setImgCenter(nextCenter);
-    emit(nextCenter, pinchZoom);
-  };
-  const handlePointerUp = (e) => {
-    pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinchStart.current = null;
-    if (pointers.current.size === 0) dragStart.current = null;
+      emit(nextCenter, pinchZoom);
+    };
+    const onUp = () => {
+      dragStart.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
-  // ── Always render a real, visible image (never hidden) — if the async load/init hasn't
-  // finished yet, fall back to centering it in the canvas so nothing ever goes blank. ──
   const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
 
   return (
     <div ref={wrapRef}>
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
         style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
       >
         <img src={src} onLoad={handleImageLoad} draggable={false} style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }} />
