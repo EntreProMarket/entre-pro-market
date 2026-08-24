@@ -23,23 +23,77 @@ function parsePosition(url) {
 // while editing won't match what actually gets shown after saving. ──
 const LOGO_ASPECT_RATIO = "1 / 1";
 
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 200, aspectRatio }) {
-  const ref = useRef(null);
-  const dragState = useRef(null);
+function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 220 }) {
+  const wrapRef = useRef(null);
   const pointers = useRef(new Map());
-  const pinchState = useRef(null);
-  const [minZoom, setMinZoom] = useState(0.3);
+  const dragStart = useRef(null);
+  const pinchStart = useRef(null);
+  const initedFor = useRef(null);
+
+  const [natural, setNatural] = useState(null);
+  const [availW, setAvailW] = useState(280);
+  const [imgCenter, setImgCenter] = useState(null);
+  const [pinchZoom, setPinchZoom] = useState(1);
+
+  useEffect(() => {
+    const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 280); };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const maxCanvasH = height;
+  const hugScale = natural ? Math.min(availW / natural.w, maxCanvasH / natural.h) : 1;
+  const canvasW = natural ? natural.w * hugScale : availW;
+  const canvasH = natural ? natural.h * hugScale : maxCanvasH;
+  const guideSize = Math.min(canvasW, canvasH);
+  const guideLeft = (canvasW - guideSize) / 2;
+  const guideTop = (canvasH - guideSize) / 2;
+  const coverScaleSquare = natural ? Math.max(guideSize / natural.w, guideSize / natural.h) : 1;
+  const currentScale = hugScale * pinchZoom;
+  const imgW = natural ? natural.w * currentScale : canvasW;
+  const imgH = natural ? natural.h * currentScale : canvasH;
+
+  const clampCenter = (cx, cy, iw, ih) => ({
+    x: clampNum(cx, canvasW - iw / 2, iw / 2),
+    y: clampNum(cy, canvasH - ih / 2, ih / 2),
+  });
+
+  const emit = (center, pz) => {
+    if (!natural) return;
+    const scale = hugScale * pz;
+    const iw = natural.w * scale, ih = natural.h * scale;
+    const imgLeft = center.x - iw / 2, imgTop = center.y - ih / 2;
+    const relLeft = imgLeft - guideLeft, relTop = imgTop - guideTop;
+    const xPct = iw > guideSize ? clampNum((-relLeft / (iw - guideSize)) * 100, 0, 100) : 50;
+    const yPct = ih > guideSize ? clampNum((-relTop / (ih - guideSize)) * 100, 0, 100) : 50;
+    onChange({ x: xPct, y: yPct });
+    if (onZoomChange) onZoomChange(scale / coverScaleSquare);
+  };
 
   const handleImageLoad = (e) => {
     const img = e.target;
-    const box = ref.current;
-    if (!box || !img.naturalWidth || !img.naturalHeight) return;
-    const cw = box.clientWidth, ch = box.clientHeight;
-    if (!cw || !ch) return;
-    const coverScale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
-    const containScale = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
-    setMinZoom(Math.max(0.15, Math.min(1, containScale / coverScale)));
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
   };
+
+  useEffect(() => {
+    if (!natural || initedFor.current === src) return;
+    initedFor.current = src;
+    const gS = Math.min(natural.w * hugScale, natural.h * hugScale);
+    const coverSq = Math.max(gS / natural.w, gS / natural.h);
+    const scale = coverSq * (zoom || 1);
+    const pz = Math.max(1, scale / hugScale);
+    const finalScale = hugScale * pz;
+    const iw = natural.w * finalScale, ih = natural.h * finalScale;
+    const gLeft = (natural.w * hugScale - gS) / 2, gTop = (natural.h * hugScale - gS) / 2;
+    const relLeft = iw > gS ? -((position.x || 50) / 100) * (iw - gS) : 0;
+    const relTop = ih > gS ? -((position.y || 50) / 100) * (ih - gS) : 0;
+    setPinchZoom(pz);
+    setImgCenter({ x: relLeft + gLeft + iw / 2, y: relTop + gTop + ih / 2 });
+  }, [natural, src]); // eslint-disable-line
 
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -48,49 +102,54 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     e.target.setPointerCapture?.(e.pointerId);
     if (pointers.current.size === 2 && onZoomChange) {
       const [p1, p2] = Array.from(pointers.current.values());
-      pinchState.current = { startDist: dist(p1, p2), startZoom: zoom };
-      dragState.current = null;
-    } else if (pointers.current.size === 1) {
-      dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
+      pinchStart.current = { startDist: dist(p1, p2), startZoom: pinchZoom };
+      dragStart.current = null;
+    } else if (pointers.current.size === 1 && imgCenter) {
+      dragStart.current = { x: e.clientX, y: e.clientY, cx: imgCenter.x, cy: imgCenter.y };
     }
   };
   const handlePointerMove = (e) => {
-    if (!pointers.current.has(e.pointerId)) return;
+    if (!pointers.current.has(e.pointerId) || !imgCenter || !natural) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    if (pointers.current.size === 2 && pinchState.current && onZoomChange) {
+    if (pointers.current.size === 2 && pinchStart.current && onZoomChange) {
       const [p1, p2] = Array.from(pointers.current.values());
-      const scale = dist(p1, p2) / pinchState.current.startDist;
-      onZoomChange(Math.min(3, Math.max(minZoom, pinchState.current.startZoom * scale)));
+      const nextPz = clampNum(pinchStart.current.startZoom * (dist(p1, p2) / pinchStart.current.startDist), 1, 3);
+      const nextIw = natural.w * hugScale * nextPz, nextIh = natural.h * hugScale * nextPz;
+      const nextCenter = clampCenter(imgCenter.x, imgCenter.y, nextIw, nextIh);
+      setPinchZoom(nextPz);
+      setImgCenter(nextCenter);
+      emit(nextCenter, nextPz);
       return;
     }
-    if (!dragState.current || !ref.current || pointers.current.size !== 1) return;
-    const rect = ref.current.getBoundingClientRect();
-    const dx = e.clientX - dragState.current.x;
-    const dy = e.clientY - dragState.current.y;
-    const newX = Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100));
-    const newY = Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100));
-    onChange({ x: newX, y: newY });
+    if (!dragStart.current || pointers.current.size !== 1) return;
+    const nextCenter = clampCenter(dragStart.current.cx + (e.clientX - dragStart.current.x), dragStart.current.cy + (e.clientY - dragStart.current.y), imgW, imgH);
+    setImgCenter(nextCenter);
+    emit(nextCenter, pinchZoom);
   };
   const handlePointerUp = (e) => {
     pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinchState.current = null;
-    if (pointers.current.size === 0) dragState.current = null;
+    if (pointers.current.size < 2) pinchStart.current = null;
+    if (pointers.current.size === 0) dragStart.current = null;
   };
 
   return (
-    <div>
+    <div ref={wrapRef}>
       <div
-        ref={ref}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        style={{ width: "100%", aspectRatio: aspectRatio || undefined, height: aspectRatio ? undefined : height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
+        style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
       >
-        <img src={src} onLoad={handleImageLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag{onZoomChange ? " · pinch to zoom" : ""}</div>
-        {onZoomChange && <div style={{ position: "absolute", top: 6, left: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>{zoom.toFixed(1)}x</div>}
+        {imgCenter ? (
+          <img src={src} onLoad={handleImageLoad} draggable={false} style={{ position: "absolute", left: imgCenter.x, top: imgCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }} />
+        ) : (
+          <img src={src} onLoad={handleImageLoad} style={{ width: "100%", height: "100%", objectFit: "contain", opacity: 0 }} />
+        )}
+        <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>✋ Drag{onZoomChange ? " · pinch to zoom" : ""}</div>
+        {onZoomChange && <div style={{ position: "absolute", top: 6, left: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>{pinchZoom.toFixed(1)}x</div>}
       </div>
     </div>
   );
