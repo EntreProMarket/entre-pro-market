@@ -68,7 +68,7 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 
 function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 220 }) {
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
   const wrapRef = useRef(null);
   const pointers = useRef(new Map());
   const dragStart = useRef(null);
@@ -176,6 +176,10 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     if (pointers.current.size === 0) dragStart.current = null;
   };
 
+  // ── Always render a real, visible image (never hidden) — if the async load/init hasn't
+  // finished yet, fall back to centering it in the canvas so nothing ever goes blank. ──
+  const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+
   return (
     <div ref={wrapRef}>
       <div
@@ -185,11 +189,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
         onPointerLeave={handlePointerUp}
         style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
       >
-        {imgCenter ? (
-          <img src={src} onLoad={handleImageLoad} draggable={false} style={{ position: "absolute", left: imgCenter.x, top: imgCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }} />
-        ) : (
-          <img src={src} onLoad={handleImageLoad} style={{ width: "100%", height: "100%", objectFit: "contain", opacity: 0 }} />
-        )}
+        <img src={src} onLoad={handleImageLoad} draggable={false} style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }} />
         <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>✋ Drag{onZoomChange ? " · pinch to zoom" : ""}</div>
         {onZoomChange && <div style={{ position: "absolute", top: 6, left: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>{pinchZoom.toFixed(1)}x</div>}
@@ -223,6 +223,7 @@ export default function VendorProfile() {
   const [cashappHandle, setCashappHandle] = useState("");
   const [venmoHandle, setVenmoHandle] = useState("");
   const [logoFile, setLogoFile] = useState(null);
+  const [logoFilePreview, setLogoFilePreview] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
   const [logoZoom, setLogoZoom] = useState(1);
@@ -283,6 +284,13 @@ export default function VendorProfile() {
     const { data } = await supabase.from("vendor_products").select("*").eq("vendor_id", uid).order("created_at", { ascending: false });
     setShopProducts(data || []);
   };
+
+  useEffect(() => {
+    if (!logoFile) { setLogoFilePreview(null); return; }
+    const url = URL.createObjectURL(logoFile);
+    setLogoFilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
 
   const uploadFile = async (file, bucket) => {
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.jpg`;
@@ -424,7 +432,7 @@ export default function VendorProfile() {
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
             {logoUrl ? (
               <div style={{ maxWidth: 220, marginBottom: 8 }}>
-                <PositionableImage src={logoFile ? URL.createObjectURL(logoFile) : logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} aspectRatio={LOGO_ASPECT_RATIO} />
+                <PositionableImage src={logoFilePreview || logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} aspectRatio={LOGO_ASPECT_RATIO} />
                 <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>This square crop is exactly what shows on your profile — drag to reposition, use the slider to zoom in.</p>
               </div>
             ) : (
