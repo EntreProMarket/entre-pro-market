@@ -7,6 +7,14 @@ import { SocialLinks } from "../../components/SocialIcons";
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 
+function parsePos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
+}
+
 export default function VendorPublicProfile() {
   const router = useRouter();
   const { handle, tab, from: fromParam } = router.query;
@@ -64,7 +72,6 @@ export default function VendorPublicProfile() {
         viewerIsAdmin = vp?.is_admin === true;
       }
 
-      // ── Count all views except owner and admin (anonymous visitors tracked too) ──
       if (!ownerViewing && !viewerIsAdmin) {
         await supabase.from("profile_views").insert([{ profile_id: data.id, viewer_id: user?.id || null }]);
       }
@@ -132,7 +139,11 @@ export default function VendorPublicProfile() {
 
       {activeTab === "profile" && (
         <>
-          {vendor.logo_url && <div onClick={() => setSelectedImage(vendor.logo_url)} style={thumbStyle(160, 160, 12)}><img src={vendor.logo_url} alt="logo" style={thumbImg} /></div>}
+          {vendor.logo_url && (() => { const p = parsePos(vendor.logo_url); return (
+            <div onClick={() => setSelectedImage(p.src)} style={thumbStyle(160, 160, 12)}>
+              <img src={p.src} alt="logo" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+            </div>
+          ); })()}
           <div style={{ marginTop: 16 }}>
             <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
             <p><strong>Location:</strong> {vendor.city}{vendor.state ? `, ${vendor.state}` : ""}</p>
@@ -142,7 +153,6 @@ export default function VendorPublicProfile() {
             </div>
           </div>
 
-          {/* ── Real social icons from shared component ── */}
           <div style={{ marginTop: 20 }}>
             <h3 style={{ marginBottom: 12 }}>Links</h3>
             <SocialLinks profile={vendor} size={32} />
@@ -152,7 +162,11 @@ export default function VendorPublicProfile() {
             <h3>Portfolio</h3>
             {vendor.portfolio_images?.length > 0 ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-                {vendor.portfolio_images.map((img, i) => <div key={i} onClick={() => setSelectedImage(img)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}><img src={img} alt="portfolio" style={thumbImg} /></div>)}
+                {vendor.portfolio_images.map((img, i) => { const p = parsePos(img); return (
+                  <div key={i} onClick={() => setSelectedImage(p.src)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}>
+                    <img src={p.src} alt="portfolio" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+                  </div>
+                ); })}
               </div>
             ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
           </div>
@@ -215,7 +229,6 @@ export default function VendorPublicProfile() {
         </div>
       )}
 
-      {/* ── Back button uses router.back() so it always returns to where user came from ── */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button onClick={handleBack} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
       </div>
