@@ -29,17 +29,12 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const dragStart = useRef(null);
-  const pinchStart = useRef(null);
   const initedFor = useRef(null);
-  const stateRef = useRef({ imgCenter: null, pinchZoom: 1 });
 
   const [natural, setNatural] = useState(null);
   const [availW, setAvailW] = useState(280);
   const [imgCenter, setImgCenter] = useState(null);
   const [pinchZoom, setPinchZoom] = useState(1);
-
-  stateRef.current.imgCenter = imgCenter;
-  stateRef.current.pinchZoom = pinchZoom;
 
   useEffect(() => {
     const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 280); };
@@ -99,82 +94,55 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     setImgCenter({ x: relLeft + gLeft + iw / 2, y: relTop + gTop + ih / 2 });
   }, [natural, src]); // eslint-disable-line
 
-  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-
-  // ── Native touch listeners, attached manually (not via React's onTouch* props) so
-  // preventDefault reliably blocks the browser's own pinch/scroll and lets our two-finger
-  // zoom actually take over. React's synthetic touch handlers are passive by default on
-  // mobile and can silently fail to stop the native gesture. ──
+  // ── Drag to reposition — single touch/mouse point only, no gesture math needed ──
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
 
-    const onStart = (e) => {
-      const t = e.touches;
-      if (t.length === 2 && onZoomChange) {
-        pinchStart.current = { startDist: dist(t[0], t[1]), startZoom: stateRef.current.pinchZoom };
-        dragStart.current = null;
-      } else if (t.length === 1 && stateRef.current.imgCenter) {
-        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: stateRef.current.imgCenter.x, cy: stateRef.current.imgCenter.y };
-        pinchStart.current = null;
-      }
+    const startDrag = (x, y) => {
+      if (!imgCenter) return;
+      dragStart.current = { x, y, cx: imgCenter.x, cy: imgCenter.y };
     };
-
-    const onMove = (e) => {
-      if (!natural) return;
-      const t = e.touches;
-      if (t.length === 2 && pinchStart.current && onZoomChange) {
-        e.preventDefault();
-        const nextPz = clampNum(pinchStart.current.startZoom * (dist(t[0], t[1]) / pinchStart.current.startDist), 1, 3);
-        const nextIw = natural.w * hugScale * nextPz, nextIh = natural.h * hugScale * nextPz;
-        const center = stateRef.current.imgCenter || { x: canvasW / 2, y: canvasH / 2 };
-        const nextCenter = clampCenter(center.x, center.y, nextIw, nextIh);
-        setPinchZoom(nextPz);
-        setImgCenter(nextCenter);
-        emit(nextCenter, nextPz);
-        return;
-      }
-      if (t.length === 1 && dragStart.current) {
-        e.preventDefault();
-        const nextCenter = clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), imgW, imgH);
-        setImgCenter(nextCenter);
-        emit(nextCenter, stateRef.current.pinchZoom);
-      }
-    };
-
-    const onEnd = (e) => {
-      if (e.touches.length < 2) pinchStart.current = null;
-      if (e.touches.length === 0) dragStart.current = null;
-    };
-
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: false });
-    el.addEventListener("touchend", onEnd, { passive: true });
-    el.addEventListener("touchcancel", onEnd, { passive: true });
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("touchcancel", onEnd);
-    };
-  }, [natural, hugScale, canvasW, canvasH, imgW, imgH, guideLeft, guideTop, guideSize, coverScaleSquare, onZoomChange]); // eslint-disable-line
-
-  // ── Mouse support (desktop testing): left-drag to pan ──
-  const handleMouseDown = (e) => {
-    if (!imgCenter) return;
-    dragStart.current = { x: e.clientX, y: e.clientY, cx: imgCenter.x, cy: imgCenter.y };
-    const onMove = (ev) => {
-      const nextCenter = clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), imgW, imgH);
+    const moveDrag = (x, y) => {
+      if (!dragStart.current) return;
+      const nextCenter = clampCenter(dragStart.current.cx + (x - dragStart.current.x), dragStart.current.cy + (y - dragStart.current.y), imgW, imgH);
       setImgCenter(nextCenter);
       emit(nextCenter, pinchZoom);
     };
-    const onUp = () => {
-      dragStart.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+    const endDrag = () => { dragStart.current = null; };
+
+    const onTouchStart = (e) => { if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY); };
+    const onTouchMove = (e) => { if (e.touches.length === 1 && dragStart.current) { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); } };
+    const onMouseDown = (e) => {
+      startDrag(e.clientX, e.clientY);
+      const onMouseMove = (ev) => moveDrag(ev.clientX, ev.clientY);
+      const onMouseUp = () => { endDrag(); window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", endDrag, { passive: true });
+    el.addEventListener("touchcancel", endDrag, { passive: true });
+    el.addEventListener("mousedown", onMouseDown);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", endDrag);
+      el.removeEventListener("touchcancel", endDrag);
+      el.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [imgCenter, pinchZoom, imgW, imgH, canvasW, canvasH, natural, hugScale, guideLeft, guideTop, guideSize, coverScaleSquare]); // eslint-disable-line
+
+  const handleSliderChange = (e) => {
+    const nextPz = parseFloat(e.target.value);
+    const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+    const nextIw = natural.w * hugScale * nextPz, nextIh = natural.h * hugScale * nextPz;
+    const nextCenter = clampCenter(center.x, center.y, nextIw, nextIh);
+    setPinchZoom(nextPz);
+    setImgCenter(nextCenter);
+    emit(nextCenter, nextPz);
   };
 
   const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
@@ -183,14 +151,19 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     <div ref={wrapRef}>
       <div
         ref={canvasRef}
-        onMouseDown={handleMouseDown}
         style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
       >
         <img src={src} onLoad={handleImageLoad} draggable={false} style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }} />
         <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>✋ Drag{onZoomChange ? " · pinch to zoom" : ""}</div>
-        {onZoomChange && <div style={{ position: "absolute", top: 6, left: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>{pinchZoom.toFixed(1)}x</div>}
+        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>✋ Drag to reposition</div>
       </div>
+      {onZoomChange && natural && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <span style={{ fontSize: 16 }}>🔍</span>
+          <input type="range" min="1" max="3" step="0.01" value={pinchZoom} onChange={handleSliderChange} style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{pinchZoom.toFixed(1)}x</span>
+        </div>
+      )}
     </div>
   );
 }
