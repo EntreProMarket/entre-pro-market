@@ -7,11 +7,11 @@ import { SocialLinks } from "../../components/SocialIcons";
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 function parsePos(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
   const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 } };
-  const [x, y] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
 }
 
 function formatTime(t) {
@@ -139,7 +139,11 @@ export default function OrganizerPublicProfile() {
       <h1 style={{ marginBottom: 4 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
 
-      {organizer.logo_url && (() => { const p = parsePos(organizer.logo_url); return <div onClick={() => setSelectedImage(p.src)} style={thumbStyle(160, 160, 12)}><img src={p.src} alt="logo" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%` }} /></div>; })()}
+      {organizer.logo_url && (() => { const p = parsePos(organizer.logo_url); return (
+        <div onClick={() => setSelectedImage(p.src)} style={thumbStyle(160, 160, 12)}>
+          <img src={p.src} alt="logo" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+        </div>
+      ); })()}
 
       <div style={{ marginTop: 16 }}>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
@@ -159,7 +163,11 @@ export default function OrganizerPublicProfile() {
         <h3>Portfolio</h3>
         {organizer.portfolio_images?.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => { const p = parsePos(img); return <div key={i} onClick={() => setSelectedImage(p.src)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}><img src={p.src} alt="portfolio" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%` }} /></div>; })}
+            {organizer.portfolio_images.map((img, i) => { const p = parsePos(img); return (
+              <div key={i} onClick={() => setSelectedImage(p.src)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}>
+                <img src={p.src} alt="portfolio" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+              </div>
+            ); })}
           </div>
         ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
@@ -169,15 +177,12 @@ export default function OrganizerPublicProfile() {
           <h3 style={{ marginBottom: 12 }}>🎬 Videos</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {organizer.video_urls.filter(v => v).map((url, i) => {
-              // ── Uploaded video file ──
               if (isUploadedVideoUrl(url)) {
                 return <video key={i} src={url} controls style={{ width: "100%", maxHeight: 360, borderRadius: 8, backgroundColor: "#000", display: "block" }} />;
               }
-              // ── Uploaded GIF ──
               if (isUploadedGifUrl(url)) {
                 return <img key={i} src={url} alt={`video-gif-${i}`} style={{ width: "100%", borderRadius: 8, display: "block" }} />;
               }
-              // ── Pasted links: YouTube / Instagram / TikTok / generic embed ──
               let embedUrl = url;
               if (url.includes("youtube.com/watch")) { const id = new URL(url).searchParams.get("v"); embedUrl = `https://www.youtube.com/embed/${id}`; }
               else if (url.includes("youtu.be/")) { const id = url.split("youtu.be/")[1].split("?")[0]; embedUrl = `https://www.youtube.com/embed/${id}`; }
@@ -196,7 +201,7 @@ export default function OrganizerPublicProfile() {
             {events.map(event => (
               <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
                 <div style={{ height: 130, overflow: "hidden" }}>
-                  {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
+                  {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                 </div>
                 <div style={{ padding: 12 }}>
                   <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h4>
@@ -244,8 +249,8 @@ export default function OrganizerPublicProfile() {
           ) : (
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
               {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
-                <div style={{ position: "relative" }}>
-                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, borderRadius: "16px 16px 0 0", cursor: "zoom-in", display: "block" }} />
+                <div style={{ position: "relative", overflow: "hidden", borderRadius: "16px 16px 0 0" }}>
+                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, height: 260, objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", cursor: "zoom-in", display: "block" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
               ); })()}
