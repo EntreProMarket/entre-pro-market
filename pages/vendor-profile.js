@@ -58,7 +58,7 @@ function parsePosition(url) {
   const [base, frag] = url.split("#pos=");
   if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
   const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
 }
 
 // ── Logos display as a square everywhere in the app (vendor card, public profile, admin panel),
@@ -69,13 +69,45 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 200, aspectRatio }) {
   const ref = useRef(null);
   const dragState = useRef(null);
+  const pointers = useRef(new Map());
+  const pinchState = useRef(null);
+  const [minZoom, setMinZoom] = useState(0.3);
+
+  const handleImageLoad = (e) => {
+    const img = e.target;
+    const box = ref.current;
+    if (!box || !img.naturalWidth || !img.naturalHeight) return;
+    const cw = box.clientWidth, ch = box.clientHeight;
+    if (!cw || !ch) return;
+    const coverScale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+    const containScale = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+    setMinZoom(Math.max(0.15, Math.min(1, containScale / coverScale)));
+  };
+
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
   const handlePointerDown = (e) => {
-    dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     e.target.setPointerCapture?.(e.pointerId);
+    if (pointers.current.size === 2 && onZoomChange) {
+      const [p1, p2] = Array.from(pointers.current.values());
+      pinchState.current = { startDist: dist(p1, p2), startZoom: zoom };
+      dragState.current = null;
+    } else if (pointers.current.size === 1) {
+      dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
+    }
   };
   const handlePointerMove = (e) => {
-    if (!dragState.current || !ref.current) return;
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.current.size === 2 && pinchState.current && onZoomChange) {
+      const [p1, p2] = Array.from(pointers.current.values());
+      const scale = dist(p1, p2) / pinchState.current.startDist;
+      onZoomChange(Math.min(3, Math.max(minZoom, pinchState.current.startZoom * scale)));
+      return;
+    }
+    if (!dragState.current || !ref.current || pointers.current.size !== 1) return;
     const rect = ref.current.getBoundingClientRect();
     const dx = e.clientX - dragState.current.x;
     const dy = e.clientY - dragState.current.y;
@@ -83,7 +115,11 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     const newY = Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100));
     onChange({ x: newX, y: newY });
   };
-  const handlePointerUp = () => { dragState.current = null; };
+  const handlePointerUp = (e) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchState.current = null;
+    if (pointers.current.size === 0) dragState.current = null;
+  };
 
   return (
     <div>
@@ -95,18 +131,10 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
         onPointerLeave={handlePointerUp}
         style={{ width: "100%", aspectRatio: aspectRatio || undefined, height: aspectRatio ? undefined : height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
       >
-        {/* ── FIXED: objectFit was "contain" (letterboxed, no real crop) — now "cover" so the drag/zoom preview
-            matches the actual cropped square that gets saved and displayed everywhere else. ── */}
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
+        <img src={src} onLoad={handleImageLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag{onZoomChange ? " · pinch to zoom" : ""}</div>
+        {onZoomChange && <div style={{ position: "absolute", top: 6, left: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>{zoom.toFixed(1)}x</div>}
       </div>
-      {onZoomChange && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 16 }}>🔍</span>
-          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => onZoomChange(parseFloat(e.target.value))} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{zoom.toFixed(1)}x</span>
-        </div>
-      )}
     </div>
   );
 }
