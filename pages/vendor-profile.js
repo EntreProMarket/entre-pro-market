@@ -68,8 +68,6 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 
 function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
-function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
-
 function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
