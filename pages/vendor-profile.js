@@ -72,36 +72,13 @@ function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [localZoom, setLocalZoom] = useState(zoom || 1);
-  const [initialCrop, setInitialCrop] = useState(null);
   const naturalRef = useRef(null);
   const loadedFor = useRef(null);
 
-  // ── Load the image ourselves first so we know its real pixel size, then convert the
-  // previously-saved x%/y%/zoom back into the crop rect react-easy-crop needs to restore
-  // the exact same view on reopen — otherwise it always starts from a blank default. ──
-  useEffect(() => {
-    if (!src || loadedFor.current === src) return;
+  // Reset the local editing state only when a genuinely different image is loaded.
+  if (loadedFor.current !== src) {
     loadedFor.current = src;
-    setInitialCrop(null);
-    const img = new Image();
-    img.onload = () => {
-      const nat = { w: img.naturalWidth, h: img.naturalHeight };
-      naturalRef.current = nat;
-      const minSide = Math.min(nat.w, nat.h);
-      const cropSize = minSide / (zoom || 1);
-      const maxOffX = nat.w - cropSize, maxOffY = nat.h - cropSize;
-      const pxX = maxOffX > 0 ? ((position?.x ?? 50) / 100) * maxOffX : 0;
-      const pxY = maxOffY > 0 ? ((position?.y ?? 50) / 100) * maxOffY : 0;
-      setLocalZoom(zoom || 1);
-      setInitialCrop({
-        x: (pxX / nat.w) * 100,
-        y: (pxY / nat.h) * 100,
-        width: (cropSize / nat.w) * 100,
-        height: (cropSize / nat.h) * 100,
-      });
-    };
-    img.src = src;
-  }, [src]); // eslint-disable-line
+  }
 
   const handleMediaLoaded = (mediaSize) => {
     naturalRef.current = { w: mediaSize.naturalWidth, h: mediaSize.naturalHeight };
@@ -118,10 +95,6 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     if (onZoomChange) onZoomChange(Math.min(nat.w, nat.h) / cropSize);
   };
 
-  if (!initialCrop) {
-    return <div style={{ width: "100%", height, borderRadius: 8, border: "2px solid #701890", background: "#111" }} />;
-  }
-
   return (
     <div style={{ position: "relative", width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", background: "#111" }}>
       <Cropper
@@ -131,14 +104,13 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
         aspect={1}
         minZoom={0.2}
         maxZoom={3}
+        objectFit="cover"
         restrictPosition={true}
-        initialCroppedAreaPercentages={initialCrop}
         onCropChange={setCrop}
         onZoomChange={setLocalZoom}
         onCropComplete={handleCropComplete}
         onMediaLoaded={handleMediaLoaded}
         showGrid={false}
-        objectFit="cover"
       />
     </div>
   );
