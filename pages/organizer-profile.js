@@ -1,4 +1,5 @@
 // pages/organizer-profile.js
+import Cropper from "react-easy-crop";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -26,144 +27,41 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
 function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
-  const wrapRef = useRef(null);
-  const canvasRef = useRef(null);
-  const dragStart = useRef(null);
-  const initedFor = useRef(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [localZoom, setLocalZoom] = useState(zoom || 1);
+  const naturalRef = useRef(null);
 
-  const [natural, setNatural] = useState(null);
-  const [availW, setAvailW] = useState(280);
-  const [imgCenter, setImgCenter] = useState(null);
-  const [pinchZoom, setPinchZoom] = useState(1);
+  const handleMediaLoaded = (mediaSize) => {
+    naturalRef.current = { w: mediaSize.naturalWidth, h: mediaSize.naturalHeight };
+  };
 
-  useEffect(() => {
-    const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 280); };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  const maxCanvasH = height;
-  const hugScale = natural ? Math.min(availW / natural.w, maxCanvasH / natural.h) : 1;
-  const canvasW = natural ? natural.w * hugScale : availW;
-  const canvasH = natural ? natural.h * hugScale : maxCanvasH;
-  const guideSize = Math.min(canvasW, canvasH);
-  const guideLeft = (canvasW - guideSize) / 2;
-  const guideTop = (canvasH - guideSize) / 2;
-  const coverScaleSquare = natural ? Math.max(guideSize / natural.w, guideSize / natural.h) : 1;
-  const currentScale = hugScale * pinchZoom;
-  const imgW = natural ? natural.w * currentScale : canvasW;
-  const imgH = natural ? natural.h * currentScale : canvasH;
-
-  const clampCenter = (cx, cy, iw, ih) => ({
-    x: clampNum(cx, canvasW - iw / 2, iw / 2),
-    y: clampNum(cy, canvasH - ih / 2, ih / 2),
-  });
-
-  const emit = (center, pz) => {
-    if (!natural) return;
-    const scale = hugScale * pz;
-    const iw = natural.w * scale, ih = natural.h * scale;
-    const imgLeft = center.x - iw / 2, imgTop = center.y - ih / 2;
-    const relLeft = imgLeft - guideLeft, relTop = imgTop - guideTop;
-    const xPct = iw > guideSize ? clampNum((-relLeft / (iw - guideSize)) * 100, 0, 100) : 50;
-    const yPct = ih > guideSize ? clampNum((-relTop / (ih - guideSize)) * 100, 0, 100) : 50;
+  const handleCropComplete = (_area, pixels) => {
+    const nat = naturalRef.current;
+    if (!nat || !pixels.width) return;
+    const cropSize = pixels.width;
+    const maxOffX = nat.w - cropSize, maxOffY = nat.h - cropSize;
+    const xPct = maxOffX > 0 ? clampNum((pixels.x / maxOffX) * 100, 0, 100) : 50;
+    const yPct = maxOffY > 0 ? clampNum((pixels.y / maxOffY) * 100, 0, 100) : 50;
     onChange({ x: xPct, y: yPct });
-    if (onZoomChange) onZoomChange(scale / coverScaleSquare);
+    if (onZoomChange) onZoomChange(Math.min(nat.w, nat.h) / cropSize);
   };
-
-  const handleImageLoad = (e) => {
-    const img = e.target;
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-  };
-
-  useEffect(() => {
-    if (!natural || initedFor.current === src) return;
-    initedFor.current = src;
-    const gS = Math.min(natural.w * hugScale, natural.h * hugScale);
-    const coverSq = Math.max(gS / natural.w, gS / natural.h);
-    const scale = coverSq * (zoom || 1);
-    const pz = Math.max(1, scale / hugScale);
-    const finalScale = hugScale * pz;
-    const iw = natural.w * finalScale, ih = natural.h * finalScale;
-    const gLeft = (natural.w * hugScale - gS) / 2, gTop = (natural.h * hugScale - gS) / 2;
-    const relLeft = iw > gS ? -((position.x || 50) / 100) * (iw - gS) : 0;
-    const relTop = ih > gS ? -((position.y || 50) / 100) * (ih - gS) : 0;
-    setPinchZoom(pz);
-    setImgCenter({ x: relLeft + gLeft + iw / 2, y: relTop + gTop + ih / 2 });
-  }, [natural, src]); // eslint-disable-line
-
-  // ── Drag to reposition — single touch/mouse point only, no gesture math needed ──
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-
-    const startDrag = (x, y) => {
-      if (!imgCenter) return;
-      dragStart.current = { x, y, cx: imgCenter.x, cy: imgCenter.y };
-    };
-    const moveDrag = (x, y) => {
-      if (!dragStart.current) return;
-      const nextCenter = clampCenter(dragStart.current.cx + (x - dragStart.current.x), dragStart.current.cy + (y - dragStart.current.y), imgW, imgH);
-      setImgCenter(nextCenter);
-      emit(nextCenter, pinchZoom);
-    };
-    const endDrag = () => { dragStart.current = null; };
-
-    const onTouchStart = (e) => { if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY); };
-    const onTouchMove = (e) => { if (e.touches.length === 1 && dragStart.current) { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); } };
-    const onMouseDown = (e) => {
-      startDrag(e.clientX, e.clientY);
-      const onMouseMove = (ev) => moveDrag(ev.clientX, ev.clientY);
-      const onMouseUp = () => { endDrag(); window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
-    };
-
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", endDrag, { passive: true });
-    el.addEventListener("touchcancel", endDrag, { passive: true });
-    el.addEventListener("mousedown", onMouseDown);
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", endDrag);
-      el.removeEventListener("touchcancel", endDrag);
-      el.removeEventListener("mousedown", onMouseDown);
-    };
-  }, [imgCenter, pinchZoom, imgW, imgH, canvasW, canvasH, natural, hugScale, guideLeft, guideTop, guideSize, coverScaleSquare]); // eslint-disable-line
-
-  const handleSliderChange = (e) => {
-    const nextPz = parseFloat(e.target.value);
-    const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
-    const nextIw = natural.w * hugScale * nextPz, nextIh = natural.h * hugScale * nextPz;
-    const nextCenter = clampCenter(center.x, center.y, nextIw, nextIh);
-    setPinchZoom(nextPz);
-    setImgCenter(nextCenter);
-    emit(nextCenter, nextPz);
-  };
-
-  const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
 
   return (
-    <div ref={wrapRef}>
-      <div
-        ref={canvasRef}
-        style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
-      >
-        <img src={src} onLoad={handleImageLoad} draggable={false} style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10, pointerEvents: "none" }}>✋ Drag to reposition</div>
-      </div>
-      {onZoomChange && natural && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 16 }}>🔍</span>
-          <input type="range" min="1" max="3" step="0.01" value={pinchZoom} onChange={handleSliderChange} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{pinchZoom.toFixed(1)}x</span>
-        </div>
-      )}
+    <div style={{ position: "relative", width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", background: "#111" }}>
+      <Cropper
+        image={src}
+        crop={crop}
+        zoom={localZoom}
+        aspect={1}
+        minZoom={1}
+        maxZoom={3}
+        restrictPosition={true}
+        onCropChange={setCrop}
+        onZoomChange={setLocalZoom}
+        onCropComplete={handleCropComplete}
+        onMediaLoaded={handleMediaLoaded}
+        showGrid={false}
+      />
     </div>
   );
 }
