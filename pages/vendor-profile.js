@@ -75,10 +75,16 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   const naturalRef = useRef(null);
   const loadedFor = useRef(null);
 
-  // Reset the local editing state only when a genuinely different image is loaded.
-  if (loadedFor.current !== src) {
+  // ── Resync when a genuinely different image loads — useState's initial value only applies
+  // on first mount, so without this, picking a new photo kept using the OLD internal zoom/crop
+  // even after the parent correctly reset its own state to defaults. ──
+  useEffect(() => {
+    if (loadedFor.current === src) return;
     loadedFor.current = src;
-  }
+    naturalRef.current = null;
+    setCrop({ x: 0, y: 0 });
+    setLocalZoom(zoom || 1);
+  }, [src]); // eslint-disable-line
 
   const handleMediaLoaded = (mediaSize) => {
     naturalRef.current = { w: mediaSize.naturalWidth, h: mediaSize.naturalHeight };
