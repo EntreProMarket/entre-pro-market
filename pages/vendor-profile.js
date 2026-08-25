@@ -138,6 +138,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
         onCropComplete={handleCropComplete}
         onMediaLoaded={handleMediaLoaded}
         showGrid={false}
+        objectFit="cover"
       />
     </div>
   );
