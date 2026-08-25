@@ -83,7 +83,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     loadedFor.current = src;
     naturalRef.current = null;
     setCrop({ x: 0, y: 0 });
-    setLocalZoom(zoom || 1);
+    setLocalZoom(1);
   }, [src]); // eslint-disable-line
 
   const handleMediaLoaded = (mediaSize) => {
@@ -122,6 +122,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   );
 }
 
+const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
 
@@ -147,6 +148,7 @@ export default function VendorProfile() {
   const [cashappHandle, setCashappHandle] = useState("");
   const [venmoHandle, setVenmoHandle] = useState("");
   const [logoFile, setLogoFile] = useState(null);
+  const [showLogoPicker, setShowLogoPicker] = useState(false);
   const [logoFilePreview, setLogoFilePreview] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
   const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
@@ -363,7 +365,18 @@ export default function VendorProfile() {
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p></div>
             )}
             {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-            <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); }} />
+            <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); }} style={{ display: "block", marginBottom: 10 }} />
+            <button type="button" onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
+            {showLogoPicker && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                {DEFAULT_LOGOS.map((src, i) => (
+                  <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setShowLogoPicker(false); }}
+                    style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
+                    <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: 20, marginBottom: 8 }}>
