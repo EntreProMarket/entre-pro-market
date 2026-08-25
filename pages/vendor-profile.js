@@ -74,6 +74,10 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   const [localZoom, setLocalZoom] = useState(zoom || 1);
   const naturalRef = useRef(null);
   const loadedFor = useRef(null);
+  // ── react-easy-crop fires onCropComplete once automatically right after mount/layout,
+  // even with zero user interaction. Without this guard, merely opening the editor would
+  // silently report a default crop and overwrite the real saved position on Save. ──
+  const skipNextComplete = useRef(true);
 
   // ── Resync when a genuinely different image loads — useState's initial value only applies
   // on first mount, so without this, picking a new photo kept using the OLD internal zoom/crop
@@ -84,6 +88,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     naturalRef.current = null;
     setCrop({ x: 0, y: 0 });
     setLocalZoom(1);
+    skipNextComplete.current = true;
   }, [src]); // eslint-disable-line
 
   const handleMediaLoaded = (mediaSize) => {
@@ -91,6 +96,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   };
 
   const handleCropComplete = (_area, pixels) => {
+    if (skipNextComplete.current) { skipNextComplete.current = false; return; }
     const nat = naturalRef.current;
     if (!nat || !pixels.width) return;
     const cropSize = pixels.width;
@@ -153,6 +159,7 @@ export default function VendorProfile() {
   const [logoUrl, setLogoUrl] = useState("");
   const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
   const [logoZoom, setLogoZoom] = useState(1);
+  const [repositioningLogo, setRepositioningLogo] = useState(false);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
@@ -357,20 +364,28 @@ export default function VendorProfile() {
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
             {logoUrl ? (
-              <div style={{ maxWidth: 220, marginBottom: 8 }}>
-                <PositionableImage src={logoFilePreview || logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} aspectRatio={LOGO_ASPECT_RATIO} />
-                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>This square crop is exactly what shows on your profile — drag to reposition, use the slider to zoom in.</p>
+              <div style={{ maxWidth: 220, marginBottom: 8, position: "relative" }}>
+                <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#eee" }}>
+                  <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${logoPosition.x}% ${logoPosition.y}%`, transform: `scale(${logoZoom})`, transformOrigin: "center", display: "block" }} />
+                </div>
+                <button type="button" onClick={() => setRepositioningLogo(true)} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Position</button>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p></div>
             )}
+            {repositioningLogo && logoUrl && (
+              <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                <PositionableImage src={logoFilePreview || logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} height={320} />
+                <button type="button" onClick={() => setRepositioningLogo(false)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
+              </div>
+            )}
             {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-            <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); }} style={{ display: "block", marginBottom: 10 }} />
+            <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setRepositioningLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
             <button type="button" onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
             {showLogoPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
                 {DEFAULT_LOGOS.map((src, i) => (
-                  <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setShowLogoPicker(false); }}
+                  <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setShowLogoPicker(false); setRepositioningLogo(true); }}
                     style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
                     <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
