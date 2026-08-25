@@ -40,7 +40,7 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     loadedFor.current = src;
     naturalRef.current = null;
     setCrop({ x: 0, y: 0 });
-    setLocalZoom(zoom || 1);
+    setLocalZoom(1);
   }, [src]); // eslint-disable-line
 
   const handleMediaLoaded = (mediaSize) => {
@@ -264,10 +264,12 @@ export default function OrganizerProfile() {
     if (!user) return;
     setSaving(true); setMessage("");
     try {
-      const { data: ex } = await supabase.from("profiles").select("logo_url").eq("id", user.id).single();
-      let uploadedLogoUrl = ex?.logo_url || logoUrl;
+      // ── FIXED: this used to fetch the OLD saved logo_url from the DB and prefer it over
+      // whatever the user just picked (a placeholder, or an unchanged existing logo), which
+      // silently discarded placeholder selections on save. Now it always uses current state. ──
+      let uploadedLogoUrl = logoUrl;
       if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = withPosition(up, logoPosition, logoZoom); }
-      else if (logoUrl) { uploadedLogoUrl = withPosition(uploadedLogoUrl.split("#")[0], logoPosition, logoZoom); }
+      else if (logoUrl) { uploadedLogoUrl = withPosition(logoUrl.split("#")[0], logoPosition, logoZoom); }
       let updatedPortfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
         const remaining = (imageLimits[accountType] ?? 10) - updatedPortfolio.length;
