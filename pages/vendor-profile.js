@@ -3,6 +3,7 @@ import Cropper from "react-easy-crop";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
+import useInactivityLogout from "../hooks/useInactivityLogout";
 
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -74,10 +75,6 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   const [localZoom, setLocalZoom] = useState(zoom || 1);
   const naturalRef = useRef(null);
   const loadedFor = useRef(null);
-  // ── react-easy-crop fires onCropComplete once automatically right after mount/layout,
-  // even with zero user interaction. Without this guard, merely opening the editor would
-  // silently report a default crop and overwrite the real saved position on Save. ──
-  const skipNextComplete = useRef(true);
 
   // ── Resync when a genuinely different image loads — useState's initial value only applies
   // on first mount, so without this, picking a new photo kept using the OLD internal zoom/crop
@@ -88,7 +85,6 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
     naturalRef.current = null;
     setCrop({ x: 0, y: 0 });
     setLocalZoom(1);
-    skipNextComplete.current = true;
   }, [src]); // eslint-disable-line
 
   const handleMediaLoaded = (mediaSize) => {
@@ -96,7 +92,6 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, he
   };
 
   const handleCropComplete = (_area, pixels) => {
-    if (skipNextComplete.current) { skipNextComplete.current = false; return; }
     const nat = naturalRef.current;
     if (!nat || !pixels.width) return;
     const cropSize = pixels.width;
@@ -133,6 +128,7 @@ const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
 
 export default function VendorProfile() {
+  useInactivityLogout();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
