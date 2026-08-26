@@ -74,8 +74,23 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 // Whatever square comes out of here is exactly and permanently what gets uploaded. ──
 function LogoEditor({ src, onDone, onCancel }) {
   const editorRef = useRef(null);
+  const [natural, setNatural] = useState(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0.5, y: 0.5 });
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const coverMult = Math.max(w, h) / Math.min(w, h);
+      setNatural({ w, h, coverMult });
+      setScale(coverMult);
+    };
+    img.src = src;
+  }, [src]);
+
+  const minZoom = 1;
+  const maxZoom = natural ? natural.coverMult * 3 : 3;
 
   const handleUseCrop = () => {
     if (!editorRef.current) return;
@@ -105,7 +120,7 @@ function LogoEditor({ src, onDone, onCancel }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 16 }}>🔍</span>
-        <input type="range" min="1" max="3" step="0.01" value={scale} onChange={e => setScale(parseFloat(e.target.value))} style={{ flex: 1 }} />
+        <input type="range" min={minZoom} max={maxZoom} step="0.01" value={scale} onChange={e => setScale(parseFloat(e.target.value))} style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{scale.toFixed(1)}x</span>
       </div>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
