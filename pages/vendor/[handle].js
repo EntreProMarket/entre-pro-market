@@ -1,5 +1,6 @@
 // pages/vendor/[handle].js
 import { useRouter } from "next/router";
+import useInactivityLogout from "../../hooks/useInactivityLogout";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
@@ -16,6 +17,7 @@ function parsePos(url) {
 }
 
 export default function VendorPublicProfile() {
+  useInactivityLogout();
   const router = useRouter();
   const { handle, tab, from: fromParam } = router.query;
   const [vendor, setVendor] = useState(null);
