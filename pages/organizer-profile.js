@@ -1,5 +1,6 @@
 // pages/organizer-profile.js
 import Cropper from "react-easy-crop";
+import AvatarEditor from "react-avatar-editor";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -24,6 +25,68 @@ function parsePosition(url) {
 // so the editor crop box below MUST also be square — otherwise what you drag/zoom into position
 // while editing won't match what actually gets shown after saving. ──
 const LOGO_ASPECT_RATIO = "1 / 1";
+
+// ── Logo editor: exports the actual cropped square pixels directly (via canvas), instead
+// of storing crop instructions that every display page has to replay with matching math.
+// Whatever square comes out of here is exactly and permanently what gets uploaded. ──
+function LogoEditor({ src, onDone, onCancel }) {
+  const editorRef = useRef(null);
+  const [natural, setNatural] = useState(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0.5, y: 0.5 });
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const coverMult = Math.max(w, h) / Math.min(w, h);
+      setNatural({ w, h, coverMult });
+      setScale(coverMult);
+    };
+    img.src = src;
+  }, [src]);
+
+  const minZoom = 1;
+  const maxZoom = natural ? natural.coverMult * 3 : 3;
+
+  const handleUseCrop = () => {
+    if (!editorRef.current) return;
+    const canvas = editorRef.current.getImage();
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], "logo.jpg", { type: "image/jpeg" });
+      onDone(file, URL.createObjectURL(blob));
+    }, "image/jpeg", 0.9);
+  };
+
+  return (
+    <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+        <AvatarEditor
+          ref={editorRef}
+          image={src}
+          width={260}
+          height={260}
+          border={20}
+          borderRadius={8}
+          color={[0, 0, 0, 0.6]}
+          scale={scale}
+          position={position}
+          onPositionChange={setPosition}
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 16 }}>🔍</span>
+        <input type="range" min={minZoom} max={maxZoom} step="0.01" value={scale} onChange={e => setScale(parseFloat(e.target.value))} style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{scale.toFixed(1)}x</span>
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
+        <button type="button" onClick={handleUseCrop} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
+      </div>
+    </div>
+  );
+}
 
 function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
@@ -166,9 +229,8 @@ export default function OrganizerProfile() {
   const [flyerFilePreview, setFlyerFilePreview] = useState(null);
   const [showFlyerPicker, setShowFlyerPicker] = useState(false);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
-  const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
-  const [logoZoom, setLogoZoom] = useState(1);
-  const [repositioningLogo, setRepositioningLogo] = useState(false);
+  const [editingLogo, setEditingLogo] = useState(false);
+  const [logoEditSrc, setLogoEditSrc] = useState(null);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
   const [flyerPosition, setFlyerPosition] = useState({ x: 50, y: 50 });
   const [flyerZoom, setFlyerZoom] = useState(1);
@@ -193,7 +255,7 @@ export default function OrganizerProfile() {
         setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
         setTags(p.tags ? p.tags.join(", ") : "");
-        { const parsed = parsePosition(p.logo_url || ""); setLogoUrl(parsed.src || ""); setLogoPosition(parsed.position); setLogoZoom(parsed.zoom); }
+        setLogoUrl(p.logo_url ? p.logo_url.split("#")[0] : "");
         setPortfolioImages(p.portfolio_images || []); setAccountType(p.account_type || "basic");
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","",""]).slice(0, 5));
         if (p.account_type === "elite") {
@@ -205,13 +267,6 @@ export default function OrganizerProfile() {
     };
     load();
   }, [router]);
-
-  useEffect(() => {
-    if (!logoFile) { setLogoFilePreview(null); return; }
-    const url = URL.createObjectURL(logoFile);
-    setLogoFilePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [logoFile]);
 
   const uploadFile = async (file, bucket, attempt = 1) => {
     const fileName = `${Date.now()}-${file.name}`;
@@ -267,12 +322,10 @@ export default function OrganizerProfile() {
     if (!user) return;
     setSaving(true); setMessage("");
     try {
-      // ── FIXED: this used to fetch the OLD saved logo_url from the DB and prefer it over
-      // whatever the user just picked (a placeholder, or an unchanged existing logo), which
-      // silently discarded placeholder selections on save. Now it always uses current state. ──
+      // ── Logo is now saved as an already-cropped square image (via LogoEditor's canvas
+      // export), so no position/zoom instructions need to be stored or replayed anywhere. ──
       let uploadedLogoUrl = logoUrl;
-      if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = withPosition(up, logoPosition, logoZoom); }
-      else if (logoUrl) { uploadedLogoUrl = withPosition(logoUrl.split("#")[0], logoPosition, logoZoom); }
+      if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = up; }
       let updatedPortfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
         const remaining = (imageLimits[accountType] ?? 10) - updatedPortfolio.length;
@@ -301,7 +354,7 @@ export default function OrganizerProfile() {
         role: "organizer",
       });
       if (error) throw error;
-      setPortfolioImages(updatedPortfolio); setPortfolioFiles([]); setLogoUrl(uploadedLogoUrl);
+      setPortfolioImages(updatedPortfolio); setPortfolioFiles([]); setLogoUrl(uploadedLogoUrl); setLogoFile(null); setLogoFilePreview(null);
       setVideoUrls(finalVideoUrls); setVideoFiles([null, null, null, null, null]);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/organizer/${handle}`), 1200);
@@ -411,36 +464,40 @@ export default function OrganizerProfile() {
       {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
         <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
-        {logoUrl ? (
+        {editingLogo ? (
+          <LogoEditor
+            src={logoEditSrc}
+            onCancel={() => setEditingLogo(false)}
+            onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
+          />
+        ) : (logoFilePreview || logoUrl) ? (
           <div style={{ maxWidth: 220, marginBottom: 8, position: "relative" }}>
             <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#eee" }}>
-              <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${logoPosition.x}% ${logoPosition.y}%`, transform: `scale(${logoZoom})`, transformOrigin: "center", display: "block" }} />
+              <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             </div>
-            <button type="button" onClick={() => setRepositioningLogo(true)} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Position</button>
+            <button type="button" onClick={() => { setLogoEditSrc(logoFilePreview || logoUrl); setEditingLogo(true); }} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Reposition</button>
           </div>
         ) : (
           <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
             <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ Upload a logo or choose a placeholder below.</p>
           </div>
         )}
-        {repositioningLogo && logoUrl && (
-          <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-            <PositionableImage src={logoFilePreview || logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} height={320} />
-            <button type="button" onClick={() => setRepositioningLogo(false)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
-          </div>
-        )}
-        {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-        <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setRepositioningLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
-        <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
-        {showLogoPicker && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-            {DEFAULT_LOGOS.map((src, i) => (
-              <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setShowLogoPicker(false); setRepositioningLogo(true); }}
-                style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
-                <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        {!editingLogo && (
+          <>
+            {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
+            <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
+            <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
+            {showLogoPicker && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                {DEFAULT_LOGOS.map((src, i) => (
+                  <div key={i} onClick={() => { setLogoEditSrc(src); setShowLogoPicker(false); setEditingLogo(true); }}
+                    style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: "2px solid transparent" }}>
+                    <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
