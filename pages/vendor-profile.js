@@ -1,5 +1,6 @@
 // pages/vendor-profile.js
 import Cropper from "react-easy-crop";
+import AvatarEditor from "react-avatar-editor";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -67,6 +68,53 @@ function parsePosition(url) {
 // so the editor crop box below MUST also be square — otherwise what you drag/zoom into position
 // while editing won't match what actually gets shown after saving. ──
 const LOGO_ASPECT_RATIO = "1 / 1";
+
+// ── Logo editor: exports the actual cropped square pixels directly (via canvas), instead
+// of storing crop instructions that every display page has to replay with matching math.
+// Whatever square comes out of here is exactly and permanently what gets uploaded. ──
+function LogoEditor({ src, onDone, onCancel }) {
+  const editorRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0.5, y: 0.5 });
+
+  const handleUseCrop = () => {
+    if (!editorRef.current) return;
+    const canvas = editorRef.current.getImage();
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], "logo.jpg", { type: "image/jpeg" });
+      onDone(file, URL.createObjectURL(blob));
+    }, "image/jpeg", 0.9);
+  };
+
+  return (
+    <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+        <AvatarEditor
+          ref={editorRef}
+          image={src}
+          width={260}
+          height={260}
+          border={20}
+          borderRadius={8}
+          color={[0, 0, 0, 0.6]}
+          scale={scale}
+          position={position}
+          onPositionChange={setPosition}
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 16 }}>🔍</span>
+        <input type="range" min="1" max="3" step="0.01" value={scale} onChange={e => setScale(parseFloat(e.target.value))} style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{scale.toFixed(1)}x</span>
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
+        <button type="button" onClick={handleUseCrop} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
+      </div>
+    </div>
+  );
+}
 
 function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
@@ -153,9 +201,8 @@ export default function VendorProfile() {
   const [showLogoPicker, setShowLogoPicker] = useState(false);
   const [logoFilePreview, setLogoFilePreview] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
-  const [logoPosition, setLogoPosition] = useState({ x: 50, y: 50 });
-  const [logoZoom, setLogoZoom] = useState(1);
-  const [repositioningLogo, setRepositioningLogo] = useState(false);
+  const [editingLogo, setEditingLogo] = useState(false);
+  const [logoEditSrc, setLogoEditSrc] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
@@ -200,7 +247,9 @@ export default function VendorProfile() {
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
         setPortfolioImages(p.portfolio_images || []);
-        { const parsed = parsePosition(p.logo_url || ""); setLogoUrl(parsed.src || ""); setLogoPosition(parsed.position); setLogoZoom(parsed.zoom); }
+        // ── Logo no longer stores position/zoom — strip any legacy #pos= fragment from
+        // old data and just use the plain image URL directly. ──
+        setLogoUrl(p.logo_url ? p.logo_url.split("#")[0] : "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
       await loadProducts(user.id);
@@ -213,13 +262,6 @@ export default function VendorProfile() {
     const { data } = await supabase.from("vendor_products").select("*").eq("vendor_id", uid).order("created_at", { ascending: false });
     setShopProducts(data || []);
   };
-
-  useEffect(() => {
-    if (!logoFile) { setLogoFilePreview(null); return; }
-    const url = URL.createObjectURL(logoFile);
-    setLogoFilePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [logoFile]);
 
   const uploadFile = async (file, bucket) => {
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.jpg`;
@@ -237,13 +279,15 @@ export default function VendorProfile() {
     setSaving(true); setMessage("");
     const user = authData.user;
     try {
-      let finalLogoUrl = logoUrl ? withPosition(logoUrl.split("#")[0], logoPosition, logoZoom) : null;
+      // ── Logo is now saved as an already-cropped square image (via LogoEditor's canvas
+      // export), so no position/zoom instructions need to be stored or replayed anywhere. ──
+      let finalLogoUrl = logoUrl || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
         const comp = await compressImage(logoFile, 800, 0.85);
         setMessage("⏳ Uploading logo...");
         const up = await uploadFile(comp, "vendor-logos");
-        if (up) finalLogoUrl = withPosition(up, logoPosition, logoZoom);
+        if (up) finalLogoUrl = up;
       }
       let portfolio = [...portfolioImages];
       if (portfolioFiles.length > 0) {
@@ -272,7 +316,7 @@ export default function VendorProfile() {
         logo_url: finalLogoUrl, portfolio_images: portfolio,
       }).eq("id", user.id);
       if (error) throw error;
-      setPortfolioImages(portfolio); setPortfolioFiles([]); setLogoUrl(finalLogoUrl);
+      setPortfolioImages(portfolio); setPortfolioFiles([]); setLogoUrl(finalLogoUrl); setLogoFile(null); setLogoFilePreview(null);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace("/vendor-dashboard"), 1200);
     } catch (err) { setMessage("❌ Error: " + err.message); }
@@ -359,34 +403,38 @@ export default function VendorProfile() {
 
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
-            {logoUrl ? (
+            {editingLogo ? (
+              <LogoEditor
+                src={logoEditSrc}
+                onCancel={() => setEditingLogo(false)}
+                onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
+              />
+            ) : (logoFilePreview || logoUrl) ? (
               <div style={{ maxWidth: 220, marginBottom: 8, position: "relative" }}>
                 <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#eee" }}>
-                  <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${logoPosition.x}% ${logoPosition.y}%`, transform: `scale(${logoZoom})`, transformOrigin: "center", display: "block" }} />
+                  <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
-                <button type="button" onClick={() => setRepositioningLogo(true)} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Position</button>
+                <button type="button" onClick={() => { setLogoEditSrc(logoFilePreview || logoUrl); setEditingLogo(true); }} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Reposition</button>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}><p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A logo image is required to save your profile.</p></div>
             )}
-            {repositioningLogo && logoUrl && (
-              <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                <PositionableImage src={logoFilePreview || logoUrl} position={logoPosition} onChange={setLogoPosition} zoom={logoZoom} onZoomChange={setLogoZoom} height={320} />
-                <button type="button" onClick={() => setRepositioningLogo(false)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
-              </div>
-            )}
-            {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-            <input type="file" accept="image/*" onChange={e => { setLogoFile(e.target.files[0]); setLogoUrl(URL.createObjectURL(e.target.files[0])); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setRepositioningLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
-            <button type="button" onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
-            {showLogoPicker && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                {DEFAULT_LOGOS.map((src, i) => (
-                  <div key={i} onClick={() => { setLogoUrl(src); setLogoFile(null); setLogoPosition({ x: 50, y: 50 }); setLogoZoom(1); setShowLogoPicker(false); setRepositioningLogo(true); }}
-                    style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: logoUrl === src ? "3px solid #701890" : "2px solid transparent" }}>
-                    <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            {!editingLogo && (
+              <>
+                {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
+                <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
+                <button type="button" onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
+                {showLogoPicker && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                    {DEFAULT_LOGOS.map((src, i) => (
+                      <div key={i} onClick={() => { setLogoEditSrc(src); setShowLogoPicker(false); setEditingLogo(true); }}
+                        style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: "2px solid transparent" }}>
+                        <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
 
