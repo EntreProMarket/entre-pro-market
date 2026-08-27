@@ -36,13 +36,17 @@ function LogoEditor({ src, onDone, onCancel }) {
   const [position, setPosition] = useState({ x: 0.5, y: 0.5 });
 
   useEffect(() => {
+    setNatural(null);
+    setScale(1);
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       const w = img.naturalWidth, h = img.naturalHeight;
-      const coverMult = Math.max(w, h) / Math.min(w, h);
+      const coverMult = w && h ? Math.max(w, h) / Math.min(w, h) : 1;
       setNatural({ w, h, coverMult });
       setScale(coverMult);
     };
+    img.onerror = () => { setNatural({ w: 1, h: 1, coverMult: 1 }); setScale(1); };
     img.src = src;
   }, [src]);
 
@@ -65,6 +69,7 @@ function LogoEditor({ src, onDone, onCancel }) {
         <AvatarEditor
           ref={editorRef}
           image={src}
+          crossOrigin="anonymous"
           width={260}
           height={260}
           border={20}
