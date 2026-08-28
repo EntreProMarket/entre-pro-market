@@ -1,6 +1,5 @@
 // pages/organizer-profile.js
 import Cropper from "react-easy-crop";
-import { Cropper as ReactCropper } from "react-cropper";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -29,58 +28,161 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 // ── Logo editor: exports the actual cropped square pixels directly (via canvas), instead
 // of storing crop instructions that every display page has to replay with matching math.
 // Whatever square comes out of here is exactly and permanently what gets uploaded. ──
+function clampNum2(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
 function LogoEditor({ src, onDone, onCancel }) {
   const wrapRef = useRef(null);
-  const cropperRef = useRef(null);
-  // ── Container is sized to match each image's own proportions (like Instagram's crop
-  // screen), not forced into a fixed height. That way the square crop guide always fills
-  // edge-to-edge with no dead gray margins, and the whole image is visible by default. ──
-  const [canvasHeight, setCanvasHeight] = useState(320);
+  const canvasRef = useRef(null);
+  const imgRef = useRef(null);
+  const dragStart = useRef(null);
+  const pinchStart = useRef(null);
+
+  const [natural, setNatural] = useState(null);
+  const [availW, setAvailW] = useState(320);
+  const [imgCenter, setImgCenter] = useState(null);
+  const [scale, setScale] = useState(1);
 
   useEffect(() => {
-    const availW = wrapRef.current ? wrapRef.current.clientWidth : 320;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const w = img.naturalWidth, h = img.naturalHeight;
-      const ratio = w && h ? h / w : 1;
-      setCanvasHeight(Math.min(600, Math.max(220, availW * ratio)));
+    const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 320); };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const maxCanvasH = 520;
+  const hugScale = natural ? Math.min(availW / natural.w, maxCanvasH / natural.h) : 1;
+  const canvasW = natural ? natural.w * hugScale : availW;
+  const canvasH = natural ? natural.h * hugScale : maxCanvasH;
+  const guideSize = Math.min(canvasW, canvasH);
+  const guideLeft = (canvasW - guideSize) / 2;
+  const guideTop = (canvasH - guideSize) / 2;
+  const imgW = natural ? natural.w * hugScale * scale : canvasW;
+  const imgH = natural ? natural.h * hugScale * scale : canvasH;
+
+  const clampCenter = (cx, cy, iw, ih) => ({
+    x: clampNum2(cx, canvasW - iw / 2, iw / 2),
+    y: clampNum2(cy, canvasH - ih / 2, ih / 2),
+  });
+
+  const handleImageLoad = (e) => {
+    const img = e.target;
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+    setScale(1);
+    setImgCenter(null);
+  };
+
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const pointers = new Map();
+
+    const onStart = (e) => {
+      const t = e.touches;
+      if (t.length === 2) {
+        pointers.set(0, { x: t[0].clientX, y: t[0].clientY });
+        pointers.set(1, { x: t[1].clientX, y: t[1].clientY });
+        pinchStart.current = { startDist: dist(pointers.get(0), pointers.get(1)), startScale: scale };
+        dragStart.current = null;
+      } else if (t.length === 1 && imgCenter) {
+        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: imgCenter.x, cy: imgCenter.y };
+        pinchStart.current = null;
+      }
     };
-    img.onerror = () => setCanvasHeight(availW || 320);
-    img.src = src;
-  }, [src]);
+    const onMove = (e) => {
+      if (!natural) return;
+      const t = e.touches;
+      if (t.length === 2 && pinchStart.current) {
+        e.preventDefault();
+        const p1 = { x: t[0].clientX, y: t[0].clientY }, p2 = { x: t[1].clientX, y: t[1].clientY };
+        const nextScale = clampNum2(pinchStart.current.startScale * (dist(p1, p2) / pinchStart.current.startDist), 1, 3);
+        const nextIw = natural.w * hugScale * nextScale, nextIh = natural.h * hugScale * nextScale;
+        const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+        setScale(nextScale);
+        setImgCenter(clampCenter(center.x, center.y, nextIw, nextIh));
+        return;
+      }
+      if (t.length === 1 && dragStart.current) {
+        e.preventDefault();
+        const nextCenter = clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), imgW, imgH);
+        setImgCenter(nextCenter);
+      }
+    };
+    const onEnd = (e) => {
+      if (e.touches.length < 2) pinchStart.current = null;
+      if (e.touches.length === 0) dragStart.current = null;
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [natural, hugScale, canvasW, canvasH, imgW, imgH, imgCenter, scale]); // eslint-disable-line
+
+  const handleMouseDown = (e) => {
+    if (!imgCenter) return;
+    dragStart.current = { x: e.clientX, y: e.clientY, cx: imgCenter.x, cy: imgCenter.y };
+    const onMove = (ev) => {
+      const nextCenter = clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), imgW, imgH);
+      setImgCenter(nextCenter);
+    };
+    const onUp = () => { dragStart.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const handleUseCrop = () => {
-    const cropper = cropperRef.current?.cropper;
-    if (!cropper) return;
-    const canvas = cropper.getCroppedCanvas({ width: 800, height: 800, imageSmoothingQuality: "high" });
-    canvas.toBlob((blob) => {
+    if (!natural || !imgRef.current) return;
+    const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+    const sourceScale = hugScale * scale;
+    const iw = natural.w * sourceScale, ih = natural.h * sourceScale;
+    const imgLeft = center.x - iw / 2, imgTop = center.y - ih / 2;
+    const srcX = (guideLeft - imgLeft) / sourceScale;
+    const srcY = (guideTop - imgTop) / sourceScale;
+    const srcSize = guideSize / sourceScale;
+
+    const outSize = 800;
+    const off = document.createElement("canvas");
+    off.width = outSize; off.height = outSize;
+    const ctx = off.getContext("2d");
+    ctx.drawImage(imgRef.current, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
+    off.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], "logo.jpg", { type: "image/jpeg" });
       onDone(file, URL.createObjectURL(blob));
     }, "image/jpeg", 0.9);
   };
 
+  const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+
   return (
     <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
       <div ref={wrapRef}>
-        <ReactCropper
-          ref={cropperRef}
-          src={src}
-          style={{ width: "100%", height: canvasHeight }}
-          aspectRatio={1}
-          viewMode={1}
-          dragMode="move"
-          cropBoxResizable={false}
-          cropBoxMovable={false}
-          autoCropArea={1}
-          background={false}
-          responsive={true}
-          checkOrientation={false}
-          crossOrigin="anonymous"
-        />
+        <div
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            crossOrigin="anonymous"
+            onLoad={handleImageLoad}
+            draggable={false}
+            style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }}
+          />
+          <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+        </div>
       </div>
-      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Pinch or scroll to zoom, drag to reposition.</p>
+      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Pinch or drag with two fingers to zoom, drag with one finger to reposition.</p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
         <button type="button" onClick={handleUseCrop} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
