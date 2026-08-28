@@ -30,7 +30,25 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 // of storing crop instructions that every display page has to replay with matching math.
 // Whatever square comes out of here is exactly and permanently what gets uploaded. ──
 function LogoEditor({ src, onDone, onCancel }) {
+  const wrapRef = useRef(null);
   const cropperRef = useRef(null);
+  // ── Container is sized to match each image's own proportions (like Instagram's crop
+  // screen), not forced into a fixed height. That way the square crop guide always fills
+  // edge-to-edge with no dead gray margins, and the whole image is visible by default. ──
+  const [canvasHeight, setCanvasHeight] = useState(320);
+
+  useEffect(() => {
+    const availW = wrapRef.current ? wrapRef.current.clientWidth : 320;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const ratio = w && h ? h / w : 1;
+      setCanvasHeight(Math.min(460, Math.max(220, availW * ratio)));
+    };
+    img.onerror = () => setCanvasHeight(availW || 320);
+    img.src = src;
+  }, [src]);
 
   const handleUseCrop = () => {
     const cropper = cropperRef.current?.cropper;
@@ -45,21 +63,23 @@ function LogoEditor({ src, onDone, onCancel }) {
 
   return (
     <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-      <ReactCropper
-        ref={cropperRef}
-        src={src}
-        style={{ height: 320, width: "100%" }}
-        aspectRatio={1}
-        viewMode={1}
-        dragMode="move"
-        cropBoxResizable={false}
-        cropBoxMovable={false}
-        autoCropArea={1}
-        background={false}
-        responsive={true}
-        checkOrientation={false}
-        crossOrigin="anonymous"
-      />
+      <div ref={wrapRef}>
+        <ReactCropper
+          ref={cropperRef}
+          src={src}
+          style={{ width: "100%", height: canvasHeight }}
+          aspectRatio={1}
+          viewMode={1}
+          dragMode="move"
+          cropBoxResizable={false}
+          cropBoxMovable={false}
+          autoCropArea={1}
+          background={false}
+          responsive={true}
+          checkOrientation={false}
+          crossOrigin="anonymous"
+        />
+      </div>
       <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Pinch or scroll to zoom, drag to reposition.</p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
