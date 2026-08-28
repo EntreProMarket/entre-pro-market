@@ -1,6 +1,6 @@
 // pages/organizer-profile.js
 import Cropper from "react-easy-crop";
-import AvatarEditor from "react-avatar-editor";
+import { Cropper as ReactCropper } from "react-cropper";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
@@ -30,32 +30,12 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 // of storing crop instructions that every display page has to replay with matching math.
 // Whatever square comes out of here is exactly and permanently what gets uploaded. ──
 function LogoEditor({ src, onDone, onCancel }) {
-  const editorRef = useRef(null);
-  const [natural, setNatural] = useState(null);
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0.5, y: 0.5 });
-
-  useEffect(() => {
-    setNatural(null);
-    setScale(1);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const w = img.naturalWidth, h = img.naturalHeight;
-      const coverMult = w && h ? Math.max(w, h) / Math.min(w, h) : 1;
-      setNatural({ w, h, coverMult });
-      setScale(coverMult);
-    };
-    img.onerror = () => { setNatural({ w: 1, h: 1, coverMult: 1 }); setScale(1); };
-    img.src = src;
-  }, [src]);
-
-  const minZoom = 1;
-  const maxZoom = natural ? natural.coverMult * 3 : 3;
+  const cropperRef = useRef(null);
 
   const handleUseCrop = () => {
-    if (!editorRef.current) return;
-    const canvas = editorRef.current.getImage();
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) return;
+    const canvas = cropper.getCroppedCanvas({ width: 800, height: 800, imageSmoothingQuality: "high" });
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], "logo.jpg", { type: "image/jpeg" });
@@ -65,26 +45,22 @@ function LogoEditor({ src, onDone, onCancel }) {
 
   return (
     <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
-        <AvatarEditor
-          ref={editorRef}
-          image={src}
-          crossOrigin="anonymous"
-          width={260}
-          height={260}
-          border={20}
-          borderRadius={8}
-          color={[0, 0, 0, 0.6]}
-          scale={scale}
-          position={position}
-          onPositionChange={setPosition}
-        />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 16 }}>🔍</span>
-        <input type="range" min={minZoom} max={maxZoom} step="0.01" value={scale} onChange={e => setScale(parseFloat(e.target.value))} style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{scale.toFixed(1)}x</span>
-      </div>
+      <ReactCropper
+        ref={cropperRef}
+        src={src}
+        style={{ height: 320, width: "100%" }}
+        aspectRatio={1}
+        viewMode={1}
+        dragMode="move"
+        cropBoxResizable={false}
+        cropBoxMovable={false}
+        autoCropArea={1}
+        background={false}
+        responsive={true}
+        checkOrientation={false}
+        crossOrigin="anonymous"
+      />
+      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Pinch or scroll to zoom, drag to reposition.</p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
         <button type="button" onClick={handleUseCrop} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
