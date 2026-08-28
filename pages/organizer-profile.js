@@ -44,7 +44,7 @@ function LogoEditor({ src, onDone, onCancel }) {
     img.onload = () => {
       const w = img.naturalWidth, h = img.naturalHeight;
       const ratio = w && h ? h / w : 1;
-      setCanvasHeight(Math.min(460, Math.max(220, availW * ratio)));
+      setCanvasHeight(Math.min(600, Math.max(220, availW * ratio)));
     };
     img.onerror = () => setCanvasHeight(availW || 320);
     img.src = src;
