@@ -28,14 +28,13 @@ const LOGO_ASPECT_RATIO = "1 / 1";
 // ── Logo editor: exports the actual cropped square pixels directly (via canvas), instead
 // of storing crop instructions that every display page has to replay with matching math.
 // Whatever square comes out of here is exactly and permanently what gets uploaded. ──
-function clampNum2(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
-
 function LogoEditor({ src, onDone, onCancel }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const dragStart = useRef(null);
   const pinchStart = useRef(null);
+  const stateRef = useRef({});
 
   const [natural, setNatural] = useState(null);
   const [availW, setAvailW] = useState(320);
@@ -59,9 +58,17 @@ function LogoEditor({ src, onDone, onCancel }) {
   const imgW = natural ? natural.w * hugScale * scale : canvasW;
   const imgH = natural ? natural.h * hugScale * scale : canvasH;
 
-  const clampCenter = (cx, cy, iw, ih) => ({
-    x: clampNum2(cx, canvasW - iw / 2, iw / 2),
-    y: clampNum2(cy, canvasH - ih / 2, ih / 2),
+  // ── Keep a live snapshot of everything the touch handlers need to read, updated every
+  // render via plain assignment (not an effect). The listeners themselves attach ONCE below
+  // and read from this ref — this is what makes two-finger pinch actually reliable: the
+  // browser's touch sequence is never interrupted by listeners being torn down and
+  // re-attached mid-gesture, which is what a changing effect-dependency array would do. ──
+  stateRef.current = { natural, hugScale, canvasW, canvasH, guideSize, guideLeft, guideTop, imgW, imgH, imgCenter, scale };
+
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const clampCenter = (cx, cy, iw, ih, cw, ch) => ({
+    x: Math.min(iw / 2, Math.max(cw - iw / 2, cx)),
+    y: Math.min(ih / 2, Math.max(ch - ih / 2, cy)),
   });
 
   const handleImageLoad = (e) => {
@@ -72,42 +79,38 @@ function LogoEditor({ src, onDone, onCancel }) {
     setImgCenter(null);
   };
 
-  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-    const pointers = new Map();
 
     const onStart = (e) => {
       const t = e.touches;
+      const s = stateRef.current;
       if (t.length === 2) {
-        pointers.set(0, { x: t[0].clientX, y: t[0].clientY });
-        pointers.set(1, { x: t[1].clientX, y: t[1].clientY });
-        pinchStart.current = { startDist: dist(pointers.get(0), pointers.get(1)), startScale: scale };
+        pinchStart.current = { startDist: dist({ x: t[0].clientX, y: t[0].clientY }, { x: t[1].clientX, y: t[1].clientY }), startScale: s.scale };
         dragStart.current = null;
-      } else if (t.length === 1 && imgCenter) {
-        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: imgCenter.x, cy: imgCenter.y };
+      } else if (t.length === 1 && s.imgCenter) {
+        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: s.imgCenter.x, cy: s.imgCenter.y };
         pinchStart.current = null;
       }
     };
     const onMove = (e) => {
-      if (!natural) return;
+      const s = stateRef.current;
+      if (!s.natural) return;
       const t = e.touches;
       if (t.length === 2 && pinchStart.current) {
         e.preventDefault();
         const p1 = { x: t[0].clientX, y: t[0].clientY }, p2 = { x: t[1].clientX, y: t[1].clientY };
-        const nextScale = clampNum2(pinchStart.current.startScale * (dist(p1, p2) / pinchStart.current.startDist), 1, 3);
-        const nextIw = natural.w * hugScale * nextScale, nextIh = natural.h * hugScale * nextScale;
-        const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
+        const nextScale = Math.min(3, Math.max(1, pinchStart.current.startScale * (dist(p1, p2) / pinchStart.current.startDist)));
+        const nextIw = s.natural.w * s.hugScale * nextScale, nextIh = s.natural.h * s.hugScale * nextScale;
+        const center = s.imgCenter || { x: s.canvasW / 2, y: s.canvasH / 2 };
         setScale(nextScale);
-        setImgCenter(clampCenter(center.x, center.y, nextIw, nextIh));
+        setImgCenter(clampCenter(center.x, center.y, nextIw, nextIh, s.canvasW, s.canvasH));
         return;
       }
       if (t.length === 1 && dragStart.current) {
         e.preventDefault();
-        const nextCenter = clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), imgW, imgH);
-        setImgCenter(nextCenter);
+        setImgCenter(clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), s.imgW, s.imgH, s.canvasW, s.canvasH));
       }
     };
     const onEnd = (e) => {
@@ -125,14 +128,15 @@ function LogoEditor({ src, onDone, onCancel }) {
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onEnd);
     };
-  }, [natural, hugScale, canvasW, canvasH, imgW, imgH, imgCenter, scale]); // eslint-disable-line
+  }, []); // eslint-disable-line — intentionally empty: handlers read live values via stateRef
 
   const handleMouseDown = (e) => {
-    if (!imgCenter) return;
-    dragStart.current = { x: e.clientX, y: e.clientY, cx: imgCenter.x, cy: imgCenter.y };
+    const s = stateRef.current;
+    if (!s.imgCenter) return;
+    dragStart.current = { x: e.clientX, y: e.clientY, cx: s.imgCenter.x, cy: s.imgCenter.y };
     const onMove = (ev) => {
-      const nextCenter = clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), imgW, imgH);
-      setImgCenter(nextCenter);
+      const s2 = stateRef.current;
+      setImgCenter(clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), s2.imgW, s2.imgH, s2.canvasW, s2.canvasH));
     };
     const onUp = () => { dragStart.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
     window.addEventListener("mousemove", onMove);
