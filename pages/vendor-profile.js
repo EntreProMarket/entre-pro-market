@@ -1,9 +1,9 @@
 // pages/vendor-profile.js
-import Cropper from "react-easy-crop";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import useInactivityLogout from "../hooks/useInactivityLogout";
+import ImageEditor from "../components/ImageEditor";
 
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -48,251 +48,6 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   });
 }
 
-// ── IMAGE POSITIONING: position+zoom stored as a #pos=X,Y,Z fragment on the URL itself, no DB changes needed ──
-function withPosition(url, pos, zoom = 1) {
-  if (!url) return url;
-  const base = url.split("#")[0];
-  if (!pos) return base;
-  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
-}
-function parsePosition(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
-  const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
-  const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
-}
-
-// ── Logos display as a square everywhere in the app (vendor card, public profile, admin panel),
-// so the editor crop box below MUST also be square — otherwise what you drag/zoom into position
-// while editing won't match what actually gets shown after saving. ──
-const LOGO_ASPECT_RATIO = "1 / 1";
-
-// ── Logo editor: exports the actual cropped square pixels directly (via canvas), instead
-// of storing crop instructions that every display page has to replay with matching math.
-// Whatever square comes out of here is exactly and permanently what gets uploaded. ──
-function LogoEditor({ src, onDone, onCancel }) {
-  const wrapRef = useRef(null);
-  const canvasRef = useRef(null);
-  const imgRef = useRef(null);
-  const dragStart = useRef(null);
-  const pinchStart = useRef(null);
-  const stateRef = useRef({});
-
-  const [natural, setNatural] = useState(null);
-  const [availW, setAvailW] = useState(320);
-  const [imgCenter, setImgCenter] = useState(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 320); };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  const maxCanvasH = 520;
-  const hugScale = natural ? Math.min(availW / natural.w, maxCanvasH / natural.h) : 1;
-  const canvasW = natural ? natural.w * hugScale : availW;
-  const canvasH = natural ? natural.h * hugScale : maxCanvasH;
-  const guideSize = Math.min(canvasW, canvasH);
-  const guideLeft = (canvasW - guideSize) / 2;
-  const guideTop = (canvasH - guideSize) / 2;
-  const imgW = natural ? natural.w * hugScale * scale : canvasW;
-  const imgH = natural ? natural.h * hugScale * scale : canvasH;
-
-  // ── Keep a live snapshot of everything the touch handlers need to read, updated every
-  // render via plain assignment (not an effect). The listeners themselves attach ONCE below
-  // and read from this ref — this is what makes two-finger pinch actually reliable: the
-  // browser's touch sequence is never interrupted by listeners being torn down and
-  // re-attached mid-gesture, which is what a changing effect-dependency array would do. ──
-  stateRef.current = { natural, hugScale, canvasW, canvasH, guideSize, guideLeft, guideTop, imgW, imgH, imgCenter, scale };
-
-  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const clampCenter = (cx, cy, iw, ih, cw, ch) => ({
-    x: Math.min(iw / 2, Math.max(cw - iw / 2, cx)),
-    y: Math.min(ih / 2, Math.max(ch - ih / 2, cy)),
-  });
-
-  const handleImageLoad = (e) => {
-    const img = e.target;
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    setScale(1);
-    setImgCenter(null);
-  };
-
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-
-    const onStart = (e) => {
-      const t = e.touches;
-      const s = stateRef.current;
-      if (t.length === 2) {
-        pinchStart.current = { startDist: dist({ x: t[0].clientX, y: t[0].clientY }, { x: t[1].clientX, y: t[1].clientY }), startScale: s.scale };
-        dragStart.current = null;
-      } else if (t.length === 1 && s.imgCenter) {
-        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: s.imgCenter.x, cy: s.imgCenter.y };
-        pinchStart.current = null;
-      }
-    };
-    const onMove = (e) => {
-      const s = stateRef.current;
-      if (!s.natural) return;
-      const t = e.touches;
-      if (t.length === 2 && pinchStart.current) {
-        e.preventDefault();
-        const p1 = { x: t[0].clientX, y: t[0].clientY }, p2 = { x: t[1].clientX, y: t[1].clientY };
-        const nextScale = Math.min(3, Math.max(1, pinchStart.current.startScale * (dist(p1, p2) / pinchStart.current.startDist)));
-        const nextIw = s.natural.w * s.hugScale * nextScale, nextIh = s.natural.h * s.hugScale * nextScale;
-        const center = s.imgCenter || { x: s.canvasW / 2, y: s.canvasH / 2 };
-        setScale(nextScale);
-        setImgCenter(clampCenter(center.x, center.y, nextIw, nextIh, s.canvasW, s.canvasH));
-        return;
-      }
-      if (t.length === 1 && dragStart.current) {
-        e.preventDefault();
-        setImgCenter(clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), s.imgW, s.imgH, s.canvasW, s.canvasH));
-      }
-    };
-    const onEnd = (e) => {
-      if (e.touches.length < 2) pinchStart.current = null;
-      if (e.touches.length === 0) dragStart.current = null;
-    };
-
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: false });
-    el.addEventListener("touchend", onEnd, { passive: true });
-    el.addEventListener("touchcancel", onEnd, { passive: true });
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("touchcancel", onEnd);
-    };
-  }, []); // eslint-disable-line — intentionally empty: handlers read live values via stateRef
-
-  const handleMouseDown = (e) => {
-    const s = stateRef.current;
-    if (!s.imgCenter) return;
-    dragStart.current = { x: e.clientX, y: e.clientY, cx: s.imgCenter.x, cy: s.imgCenter.y };
-    const onMove = (ev) => {
-      const s2 = stateRef.current;
-      setImgCenter(clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), s2.imgW, s2.imgH, s2.canvasW, s2.canvasH));
-    };
-    const onUp = () => { dragStart.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-
-  const handleUseCrop = () => {
-    if (!natural || !imgRef.current) return;
-    const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
-    const sourceScale = hugScale * scale;
-    const iw = natural.w * sourceScale, ih = natural.h * sourceScale;
-    const imgLeft = center.x - iw / 2, imgTop = center.y - ih / 2;
-    const srcX = (guideLeft - imgLeft) / sourceScale;
-    const srcY = (guideTop - imgTop) / sourceScale;
-    const srcSize = guideSize / sourceScale;
-
-    const outSize = 800;
-    const off = document.createElement("canvas");
-    off.width = outSize; off.height = outSize;
-    const ctx = off.getContext("2d");
-    ctx.drawImage(imgRef.current, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
-    off.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], "logo.jpg", { type: "image/jpeg" });
-      onDone(file, URL.createObjectURL(blob));
-    }, "image/jpeg", 0.9);
-  };
-
-  const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
-
-  return (
-    <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-      <div ref={wrapRef}>
-        <div
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
-        >
-          <img
-            ref={imgRef}
-            src={src}
-            crossOrigin="anonymous"
-            onLoad={handleImageLoad}
-            draggable={false}
-            style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }}
-          />
-          <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-        </div>
-      </div>
-      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Pinch or drag with two fingers to zoom, drag with one finger to reposition.</p>
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
-        <button type="button" onClick={handleUseCrop} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
-      </div>
-    </div>
-  );
-}
-
-function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
-
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [localZoom, setLocalZoom] = useState(zoom || 1);
-  const naturalRef = useRef(null);
-  const loadedFor = useRef(null);
-
-  // ── Resync when a genuinely different image loads — useState's initial value only applies
-  // on first mount, so without this, picking a new photo kept using the OLD internal zoom/crop
-  // even after the parent correctly reset its own state to defaults. ──
-  useEffect(() => {
-    if (loadedFor.current === src) return;
-    loadedFor.current = src;
-    naturalRef.current = null;
-    setCrop({ x: 0, y: 0 });
-    setLocalZoom(1);
-  }, [src]); // eslint-disable-line
-
-  const handleMediaLoaded = (mediaSize) => {
-    naturalRef.current = { w: mediaSize.naturalWidth, h: mediaSize.naturalHeight };
-  };
-
-  const handleCropComplete = (_area, pixels) => {
-    const nat = naturalRef.current;
-    if (!nat || !pixels.width) return;
-    const cropSize = pixels.width;
-    const maxOffX = nat.w - cropSize, maxOffY = nat.h - cropSize;
-    const xPct = maxOffX > 0 ? clampNum((pixels.x / maxOffX) * 100, 0, 100) : 50;
-    const yPct = maxOffY > 0 ? clampNum((pixels.y / maxOffY) * 100, 0, 100) : 50;
-    onChange({ x: xPct, y: yPct });
-    if (onZoomChange) onZoomChange(Math.min(nat.w, nat.h) / cropSize);
-  };
-
-  return (
-    <div style={{ position: "relative", width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", background: "#111" }}>
-      <Cropper
-        image={src}
-        crop={crop}
-        zoom={localZoom}
-        aspect={1}
-        minZoom={0.2}
-        maxZoom={3}
-        objectFit="auto-cover"
-        restrictPosition={true}
-        onCropChange={setCrop}
-        onZoomChange={setLocalZoom}
-        onCropComplete={handleCropComplete}
-        onMediaLoaded={handleMediaLoaded}
-        showGrid={false}
-      />
-    </div>
-  );
-}
-
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
@@ -328,6 +83,9 @@ export default function VendorProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
+  const [pfQueue, setPfQueue] = useState([]);
+  const [pfIndex, setPfIndex] = useState(0);
+  const [pfEditSrc, setPfEditSrc] = useState(null);
   const [accountType, setAccountType] = useState("free");
   const [videoUrls, setVideoUrls] = useState(["","","","","","","","","",""]);
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
@@ -369,8 +127,6 @@ export default function VendorProfile() {
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
         setPortfolioImages(p.portfolio_images || []);
-        // ── Logo no longer stores position/zoom — strip any legacy #pos= fragment from
-        // old data and just use the plain image URL directly. ──
         setLogoUrl(p.logo_url ? p.logo_url.split("#")[0] : "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
@@ -401,8 +157,6 @@ export default function VendorProfile() {
     setSaving(true); setMessage("");
     const user = authData.user;
     try {
-      // ── Logo is now saved as an already-cropped square image (via LogoEditor's canvas
-      // export), so no position/zoom instructions need to be stored or replayed anywhere. ──
       let finalLogoUrl = logoUrl || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
@@ -526,8 +280,9 @@ export default function VendorProfile() {
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
             {editingLogo ? (
-              <LogoEditor
+              <ImageEditor
                 src={logoEditSrc}
+                aspect={1}
                 onCancel={() => setEditingLogo(false)}
                 onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
               />
@@ -543,8 +298,7 @@ export default function VendorProfile() {
             )}
             {!editingLogo && (
               <>
-                {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-                <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
+                <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); e.target.value = ""; }} style={{ display: "block", marginBottom: 10 }} />
                 <button type="button" onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
                 {showLogoPicker && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
@@ -566,36 +320,56 @@ export default function VendorProfile() {
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
             {portfolioImages.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-                {portfolioImages.map((img, i) => {
-                  const { src, position } = parsePosition(img);
-                  return (
-                    <div key={i} style={{ position: "relative" }}>
-                      <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block" }} /></div>
-                      <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                      <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Position</button>
-                    </div>
-                  );
-                })}
+                {portfolioImages.map((img, i) => (
+                  <div key={i} style={{ position: "relative" }}>
+                    <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                    <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+                    <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Crop</button>
+                  </div>
+                ))}
               </div>
             )}
-            {repositioningIndex !== null && portfolioImages[repositioningIndex] && (() => {
-              const { src, position } = parsePosition(portfolioImages[repositioningIndex]);
-              return (
-                <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                  <PositionableImage src={src} position={position} onChange={pos => {
-                    setPortfolioImages(prev => prev.map((u, idx) => idx === repositioningIndex ? withPosition(u, pos) : u));
-                  }} height={180} />
-                  <button onClick={() => setRepositioningIndex(null)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
-                </div>
-              );
-            })()}
+            {repositioningIndex !== null && portfolioImages[repositioningIndex] && (
+              <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                <ImageEditor
+                  src={portfolioImages[repositioningIndex]}
+                  aspect={null}
+                  onCancel={() => setRepositioningIndex(null)}
+                  onDone={async (file) => {
+                    const idx = repositioningIndex;
+                    setRepositioningIndex(null);
+                    setMessage("⏳ Updating image...");
+                    const comp = await compressImage(file, 1200, 0.8);
+                    const url = await uploadFile(comp, "vendor-portfolio");
+                    if (url) { setPortfolioImages(prev => prev.map((u, i2) => i2 === idx ? url : u)); setMessage("✅ Image updated — remember to Save Profile."); }
+                  }}
+                />
+              </div>
+            )}
+            {pfEditSrc && (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Editing image {pfIndex + 1} of {pfQueue.length}</p>
+                <ImageEditor
+                  src={pfEditSrc}
+                  aspect={null}
+                  onCancel={() => { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }}
+                  onDone={(file) => {
+                    setPortfolioFiles(prev => [...prev, file]);
+                    const next = pfIndex + 1;
+                    if (next < pfQueue.length) { setPfIndex(next); setPfEditSrc(URL.createObjectURL(pfQueue[next])); }
+                    else { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }
+                  }}
+                />
+              </div>
+            )}
             {portfolioImages.length < photoLimit && (
-              /* ── FIXED: accept="image/*" ── */
               <input type="file" accept="image/*" multiple onChange={e => {
                 const remaining = photoLimit - portfolioImages.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
                 if (Array.from(e.target.files).length > remaining) alert(`You can only add ${remaining} more image(s).`);
-                setPortfolioFiles(files);
+                e.target.value = "";
+                if (files.length === 0) return;
+                setPfQueue(files); setPfIndex(0); setPfEditSrc(URL.createObjectURL(files[0]));
               }} />
             )}
           </div>
@@ -652,7 +426,6 @@ export default function VendorProfile() {
                 </div>
               )}
               {newProductImages.length < productImageLimit && (
-                /* ── FIXED: accept="image/*" ── */
                 <input key={newProductImageKey} type="file" accept="image/*" multiple onChange={e => { const remaining = productImageLimit - newProductImages.length; const files = Array.from(e.target.files).slice(0, remaining); setNewProductImages(prev => [...prev, ...files].slice(0, productImageLimit)); }} style={{ display: "block", marginBottom: 12 }} />
               )}
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
@@ -686,7 +459,6 @@ export default function VendorProfile() {
                           {editProductImages.length < productImageLimit && (
                             <div style={{ marginBottom: 8 }}>
                               <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more ({editProductImages.length}/{productImageLimit})</label>
-                              {/* ── FIXED: accept="image/*" ── */}
                               <input key={editProductFileKey} type="file" accept="image/*" multiple onChange={e => { const remaining = productImageLimit - editProductImages.length; setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining)); }} style={{ display: "block" }} />
                             </div>
                           )}
