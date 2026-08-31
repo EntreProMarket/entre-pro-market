@@ -1,254 +1,9 @@
 // pages/organizer-profile.js
-import Cropper from "react-easy-crop";
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import useInactivityLogout from "../hooks/useInactivityLogout";
-
-// ── IMAGE POSITIONING: position+zoom stored as a #pos=X,Y,Z fragment on the URL itself, no DB changes needed ──
-function withPosition(url, pos, zoom = 1) {
-  if (!url) return url;
-  const base = url.split("#")[0];
-  if (!pos) return base;
-  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
-}
-function parsePosition(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
-  const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
-  const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
-}
-
-// ── Logos display as a square everywhere in the app (organizer card, public profile, admin panel),
-// so the editor crop box below MUST also be square — otherwise what you drag/zoom into position
-// while editing won't match what actually gets shown after saving. ──
-const LOGO_ASPECT_RATIO = "1 / 1";
-
-// ── Logo editor: exports the actual cropped square pixels directly (via canvas), instead
-// of storing crop instructions that every display page has to replay with matching math.
-// Whatever square comes out of here is exactly and permanently what gets uploaded. ──
-function LogoEditor({ src, onDone, onCancel }) {
-  const wrapRef = useRef(null);
-  const canvasRef = useRef(null);
-  const imgRef = useRef(null);
-  const dragStart = useRef(null);
-  const pinchStart = useRef(null);
-  const stateRef = useRef({});
-
-  const [natural, setNatural] = useState(null);
-  const [availW, setAvailW] = useState(320);
-  const [imgCenter, setImgCenter] = useState(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const measure = () => { if (wrapRef.current) setAvailW(wrapRef.current.clientWidth || 320); };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  const maxCanvasH = 520;
-  const hugScale = natural ? Math.min(availW / natural.w, maxCanvasH / natural.h) : 1;
-  const canvasW = natural ? natural.w * hugScale : availW;
-  const canvasH = natural ? natural.h * hugScale : maxCanvasH;
-  const guideSize = Math.min(canvasW, canvasH);
-  const guideLeft = (canvasW - guideSize) / 2;
-  const guideTop = (canvasH - guideSize) / 2;
-  const imgW = natural ? natural.w * hugScale * scale : canvasW;
-  const imgH = natural ? natural.h * hugScale * scale : canvasH;
-
-  // ── Keep a live snapshot of everything the touch handlers need to read, updated every
-  // render via plain assignment (not an effect). The listeners themselves attach ONCE below
-  // and read from this ref — this is what makes two-finger pinch actually reliable: the
-  // browser's touch sequence is never interrupted by listeners being torn down and
-  // re-attached mid-gesture, which is what a changing effect-dependency array would do. ──
-  stateRef.current = { natural, hugScale, canvasW, canvasH, guideSize, guideLeft, guideTop, imgW, imgH, imgCenter, scale };
-
-  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const clampCenter = (cx, cy, iw, ih, cw, ch) => ({
-    x: Math.min(iw / 2, Math.max(cw - iw / 2, cx)),
-    y: Math.min(ih / 2, Math.max(ch - ih / 2, cy)),
-  });
-
-  const handleImageLoad = (e) => {
-    const img = e.target;
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    setScale(1);
-    setImgCenter(null);
-  };
-
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return;
-
-    const onStart = (e) => {
-      const t = e.touches;
-      const s = stateRef.current;
-      if (t.length === 2) {
-        pinchStart.current = { startDist: dist({ x: t[0].clientX, y: t[0].clientY }, { x: t[1].clientX, y: t[1].clientY }), startScale: s.scale };
-        dragStart.current = null;
-      } else if (t.length === 1 && s.imgCenter) {
-        dragStart.current = { x: t[0].clientX, y: t[0].clientY, cx: s.imgCenter.x, cy: s.imgCenter.y };
-        pinchStart.current = null;
-      }
-    };
-    const onMove = (e) => {
-      const s = stateRef.current;
-      if (!s.natural) return;
-      const t = e.touches;
-      if (t.length === 2 && pinchStart.current) {
-        e.preventDefault();
-        const p1 = { x: t[0].clientX, y: t[0].clientY }, p2 = { x: t[1].clientX, y: t[1].clientY };
-        const nextScale = Math.min(3, Math.max(1, pinchStart.current.startScale * (dist(p1, p2) / pinchStart.current.startDist)));
-        const nextIw = s.natural.w * s.hugScale * nextScale, nextIh = s.natural.h * s.hugScale * nextScale;
-        const center = s.imgCenter || { x: s.canvasW / 2, y: s.canvasH / 2 };
-        setScale(nextScale);
-        setImgCenter(clampCenter(center.x, center.y, nextIw, nextIh, s.canvasW, s.canvasH));
-        return;
-      }
-      if (t.length === 1 && dragStart.current) {
-        e.preventDefault();
-        setImgCenter(clampCenter(dragStart.current.cx + (t[0].clientX - dragStart.current.x), dragStart.current.cy + (t[0].clientY - dragStart.current.y), s.imgW, s.imgH, s.canvasW, s.canvasH));
-      }
-    };
-    const onEnd = (e) => {
-      if (e.touches.length < 2) pinchStart.current = null;
-      if (e.touches.length === 0) dragStart.current = null;
-    };
-
-    el.addEventListener("touchstart", onStart, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: false });
-    el.addEventListener("touchend", onEnd, { passive: true });
-    el.addEventListener("touchcancel", onEnd, { passive: true });
-    return () => {
-      el.removeEventListener("touchstart", onStart);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", onEnd);
-      el.removeEventListener("touchcancel", onEnd);
-    };
-  }, []); // eslint-disable-line — intentionally empty: handlers read live values via stateRef
-
-  const handleMouseDown = (e) => {
-    const s = stateRef.current;
-    if (!s.imgCenter) return;
-    dragStart.current = { x: e.clientX, y: e.clientY, cx: s.imgCenter.x, cy: s.imgCenter.y };
-    const onMove = (ev) => {
-      const s2 = stateRef.current;
-      setImgCenter(clampCenter(dragStart.current.cx + (ev.clientX - dragStart.current.x), dragStart.current.cy + (ev.clientY - dragStart.current.y), s2.imgW, s2.imgH, s2.canvasW, s2.canvasH));
-    };
-    const onUp = () => { dragStart.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-
-  const handleUseCrop = () => {
-    if (!natural || !imgRef.current) return;
-    const center = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
-    const sourceScale = hugScale * scale;
-    const iw = natural.w * sourceScale, ih = natural.h * sourceScale;
-    const imgLeft = center.x - iw / 2, imgTop = center.y - ih / 2;
-    const srcX = (guideLeft - imgLeft) / sourceScale;
-    const srcY = (guideTop - imgTop) / sourceScale;
-    const srcSize = guideSize / sourceScale;
-
-    const outSize = 800;
-    const off = document.createElement("canvas");
-    off.width = outSize; off.height = outSize;
-    const ctx = off.getContext("2d");
-    ctx.drawImage(imgRef.current, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
-    off.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], "logo.jpg", { type: "image/jpeg" });
-      onDone(file, URL.createObjectURL(blob));
-    }, "image/jpeg", 0.9);
-  };
-
-  const effCenter = imgCenter || { x: canvasW / 2, y: canvasH / 2 };
-
-  return (
-    <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-      <div ref={wrapRef}>
-        <div
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          style={{ width: canvasW, height: canvasH, maxWidth: "100%", margin: "0 auto", position: "relative", overflow: "hidden", borderRadius: 8, border: "2px solid #701890", backgroundColor: "#111", touchAction: "none", cursor: "grab" }}
-        >
-          <img
-            ref={imgRef}
-            src={src}
-            crossOrigin="anonymous"
-            onLoad={handleImageLoad}
-            draggable={false}
-            style={{ position: "absolute", left: effCenter.x, top: effCenter.y, width: imgW, height: imgH, transform: "translate(-50%, -50%)", display: "block", pointerEvents: "none" }}
-          />
-          <div style={{ position: "absolute", left: guideLeft, top: guideTop, width: guideSize, height: guideSize, border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 0 0 2000px rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-        </div>
-      </div>
-      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Pinch or drag with two fingers to zoom, drag with one finger to reposition.</p>
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
-        <button type="button" onClick={handleUseCrop} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
-      </div>
-    </div>
-  );
-}
-
-function clampNum(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
-
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, height = 320 }) {
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [localZoom, setLocalZoom] = useState(zoom || 1);
-  const naturalRef = useRef(null);
-  const loadedFor = useRef(null);
-
-  // ── Resync when a genuinely different image loads — useState's initial value only applies
-  // on first mount, so without this, picking a new photo kept using the OLD internal zoom/crop
-  // even after the parent correctly reset its own state to defaults. ──
-  useEffect(() => {
-    if (loadedFor.current === src) return;
-    loadedFor.current = src;
-    naturalRef.current = null;
-    setCrop({ x: 0, y: 0 });
-    setLocalZoom(1);
-  }, [src]); // eslint-disable-line
-
-  const handleMediaLoaded = (mediaSize) => {
-    naturalRef.current = { w: mediaSize.naturalWidth, h: mediaSize.naturalHeight };
-  };
-
-  const handleCropComplete = (_area, pixels) => {
-    const nat = naturalRef.current;
-    if (!nat || !pixels.width) return;
-    const cropSize = pixels.width;
-    const maxOffX = nat.w - cropSize, maxOffY = nat.h - cropSize;
-    const xPct = maxOffX > 0 ? clampNum((pixels.x / maxOffX) * 100, 0, 100) : 50;
-    const yPct = maxOffY > 0 ? clampNum((pixels.y / maxOffY) * 100, 0, 100) : 50;
-    onChange({ x: xPct, y: yPct });
-    if (onZoomChange) onZoomChange(Math.min(nat.w, nat.h) / cropSize);
-  };
-
-  return (
-    <div style={{ position: "relative", width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", background: "#111" }}>
-      <Cropper
-        image={src}
-        crop={crop}
-        zoom={localZoom}
-        aspect={1}
-        minZoom={0.2}
-        maxZoom={3}
-        objectFit="auto-cover"
-        restrictPosition={true}
-        onCropChange={setCrop}
-        onZoomChange={setLocalZoom}
-        onCropComplete={handleCropComplete}
-        onMediaLoaded={handleMediaLoaded}
-        showGrid={false}
-      />
-    </div>
-  );
-}
+import ImageEditor from "../components/ImageEditor";
 
 function cleanHandle(v) { return v.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -334,13 +89,15 @@ export default function OrganizerProfile() {
   const [savingEvent, setSavingEvent] = useState(false);
   const [flyerFile, setFlyerFile] = useState(null);
   const [flyerFilePreview, setFlyerFilePreview] = useState(null);
+  const [flyerEditSrc, setFlyerEditSrc] = useState(null);
   const [showFlyerPicker, setShowFlyerPicker] = useState(false);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [editingLogo, setEditingLogo] = useState(false);
   const [logoEditSrc, setLogoEditSrc] = useState(null);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
-  const [flyerPosition, setFlyerPosition] = useState({ x: 50, y: 50 });
-  const [flyerZoom, setFlyerZoom] = useState(1);
+  const [pfQueue, setPfQueue] = useState([]);
+  const [pfIndex, setPfIndex] = useState(0);
+  const [pfEditSrc, setPfEditSrc] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -429,8 +186,6 @@ export default function OrganizerProfile() {
     if (!user) return;
     setSaving(true); setMessage("");
     try {
-      // ── Logo is now saved as an already-cropped square image (via LogoEditor's canvas
-      // export), so no position/zoom instructions need to be stored or replayed anywhere. ──
       let uploadedLogoUrl = logoUrl;
       if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = up; }
       let updatedPortfolio = [...portfolioImages];
@@ -441,7 +196,6 @@ export default function OrganizerProfile() {
           if (url) updatedPortfolio.push(url);
         }
       }
-      // ── Upload any picked video/GIF files, replacing their blob preview URL with the real one ──
       let finalVideoUrls = [...videoUrls];
       for (let i = 0; i < videoFiles.length; i++) {
         if (videoFiles[i]) {
@@ -476,8 +230,8 @@ export default function OrganizerProfile() {
     let flyerUrl = eventForm.flyer_url || "";
     if (flyerFile) {
       const up = await uploadFile(flyerFile, "organizer-portfolio");
-      if (!up) { setSavingEvent(false); return; } // uploadFile already set an error message
-      flyerUrl = withPosition(up, flyerPosition, flyerZoom);
+      if (!up) { setSavingEvent(false); return; }
+      flyerUrl = up;
     }
     const eventData = {
       event_name: eventForm.event_name, event_date: eventForm.event_date || null,
@@ -496,13 +250,12 @@ export default function OrganizerProfile() {
         if (error) throw error;
         if (data) setEvents([...events, data]);
       }
-      setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerPosition({ x: 50, y: 50 }); setShowFlyerPicker(false);
+      setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false);
       setMessage("✅ Event saved!");
     } catch (err) {
       setMessage("❌ Error saving event: " + err.message);
     }
     setSavingEvent(false);
-    setMessage("✅ Event saved!");
   };
 
   const deleteEvent = async (id) => {
@@ -512,7 +265,7 @@ export default function OrganizerProfile() {
   };
 
   const removePortfolioImage = async (url) => {
-    await supabase.storage.from("organizer-portfolio").remove([url.split("#")[0].split("/").pop()]);
+    await supabase.storage.from("organizer-portfolio").remove([url.split("/").pop()]);
     const updated = portfolioImages.filter(img => img !== url);
     setPortfolioImages(updated);
     if (user) await supabase.from("profiles").update({ portfolio_images: updated }).eq("id", user.id);
@@ -572,8 +325,9 @@ export default function OrganizerProfile() {
       <div style={{ marginTop: 16, marginBottom: 16 }}>
         <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
         {editingLogo ? (
-          <LogoEditor
+          <ImageEditor
             src={logoEditSrc}
+            aspect={1}
             onCancel={() => setEditingLogo(false)}
             onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
           />
@@ -591,8 +345,7 @@ export default function OrganizerProfile() {
         )}
         {!editingLogo && (
           <>
-            {/* ── FIXED: accept="image/*" opens native Android gallery ── */}
-            <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); }} style={{ display: "block", marginBottom: 10 }} />
+            <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); e.target.value = ""; }} style={{ display: "block", marginBottom: 10 }} />
             <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
             {showLogoPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
@@ -615,33 +368,64 @@ export default function OrganizerProfile() {
         <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC.</div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-            {portfolioImages.map((img, i) => {
-              const { src, position } = parsePosition(img);
-              return (
-                <div key={i} style={{ position: "relative" }}>
-                  <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-                    <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block" }} />
-                  </div>
-                  <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                  <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Position</button>
+            {portfolioImages.map((img, i) => (
+              <div key={i} style={{ position: "relative" }}>
+                <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+                  <img src={img} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
-              );
-            })}
+                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
+                <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Crop</button>
+              </div>
+            ))}
           </div>
         )}
-        {repositioningIndex !== null && portfolioImages[repositioningIndex] && (() => {
-          const { src, position } = parsePosition(portfolioImages[repositioningIndex]);
-          return (
-            <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-              <PositionableImage src={src} position={position} onChange={pos => {
-                setPortfolioImages(prev => prev.map((u, idx) => idx === repositioningIndex ? withPosition(u, pos) : u));
-              }} height={180} />
-              <button onClick={() => setRepositioningIndex(null)} style={{ marginTop: 8, padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Done</button>
-            </div>
-          );
-        })()}
-        {/* ── FIXED: accept="image/*" ── */}
-        {!atLimit && <input type="file" accept="image/*" multiple onChange={e => { const rem = imageLimit - portfolioImages.length; const files = Array.from(e.target.files).slice(0, rem); if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`); setPortfolioFiles(files); }} style={{ display: "block" }} />}
+        {repositioningIndex !== null && portfolioImages[repositioningIndex] && (
+          <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+            <ImageEditor
+              src={portfolioImages[repositioningIndex]}
+              aspect={null}
+              onCancel={() => setRepositioningIndex(null)}
+              onDone={async (file) => {
+                const idx = repositioningIndex;
+                setRepositioningIndex(null);
+                setMessage("⏳ Updating image...");
+                const url = await uploadFile(file, "organizer-portfolio");
+                if (url && user) {
+                  const updated = portfolioImages.map((u, i2) => i2 === idx ? url : u);
+                  setPortfolioImages(updated);
+                  await supabase.from("profiles").update({ portfolio_images: updated }).eq("id", user.id);
+                  setMessage("✅ Image updated!");
+                }
+              }}
+            />
+          </div>
+        )}
+        {pfEditSrc && (
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Editing image {pfIndex + 1} of {pfQueue.length}</p>
+            <ImageEditor
+              src={pfEditSrc}
+              aspect={null}
+              onCancel={() => { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }}
+              onDone={(file) => {
+                setPortfolioFiles(prev => [...prev, file]);
+                const next = pfIndex + 1;
+                if (next < pfQueue.length) { setPfIndex(next); setPfEditSrc(URL.createObjectURL(pfQueue[next])); }
+                else { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }
+              }}
+            />
+          </div>
+        )}
+        {!atLimit && (
+          <input type="file" accept="image/*" multiple onChange={e => {
+            const rem = imageLimit - portfolioImages.length;
+            const files = Array.from(e.target.files).slice(0, rem);
+            if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`);
+            e.target.value = "";
+            if (files.length === 0) return;
+            setPfQueue(files); setPfIndex(0); setPfEditSrc(URL.createObjectURL(files[0]));
+          }} style={{ display: "block" }} />
+        )}
       </div>
 
       {/* ELITE: VIDEOS & GIFS */}
@@ -731,29 +515,36 @@ export default function OrganizerProfile() {
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
             <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span></label>
-            {flyerPreviewSrc ? (
+            {flyerEditSrc ? (
+              <div style={{ marginBottom: 10 }}>
+                <ImageEditor
+                  src={flyerEditSrc}
+                  aspect={null}
+                  onCancel={() => setFlyerEditSrc(null)}
+                  onDone={(file, previewUrl) => { setFlyerFile(file); setFlyerFilePreview(previewUrl); setFlyerEditSrc(null); }}
+                />
+              </div>
+            ) : flyerPreviewSrc ? (
               <div style={{ marginBottom: 10, maxWidth: 300 }}>
-                <PositionableImage src={flyerFile ? flyerPreviewSrc : parsePosition(flyerPreviewSrc).src} position={flyerFile ? flyerPosition : parsePosition(flyerPreviewSrc).position} onChange={pos => {
-                  setFlyerPosition(pos);
-                  if (!flyerFile) setEventForm(prev => ({ ...prev, flyer_url: withPosition(parsePosition(prev.flyer_url).src, pos, flyerZoom) }));
-                }} zoom={flyerFile ? flyerZoom : parsePosition(flyerPreviewSrc).zoom} onZoomChange={z => {
-                  setFlyerZoom(z);
-                  if (!flyerFile) setEventForm(prev => ({ ...prev, flyer_url: withPosition(parsePosition(prev.flyer_url).src, flyerPosition, z) }));
-                }} height={200} />
-                <button onClick={() => { setFlyerFile(null); setEventForm({ ...eventForm, flyer_url: "" }); setFlyerPosition({ x: 50, y: 50 }); setFlyerZoom(1); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
+                <div style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #eee", position: "relative" }}>
+                  <img src={flyerPreviewSrc} style={{ width: "100%", display: "block", cursor: "zoom-in" }} onClick={() => setFlyerFullscreen(true)} />
+                  <button type="button" onClick={() => setFlyerEditSrc(flyerPreviewSrc)} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Re-crop</button>
+                </div>
+                <button onClick={() => { setFlyerFile(null); setFlyerFilePreview(null); setEventForm({ ...eventForm, flyer_url: "" }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
               </div>
             ) : (
               <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
                 <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A flyer image is required.</p>
               </div>
             )}
-            {/* ── FIXED: accept="image/*" ── */}
-            <input type="file" accept="image/*" onChange={e => { setFlyerFile(e.target.files[0]); setFlyerPosition({ x: 50, y: 50 }); setShowFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
+            {!flyerEditSrc && (
+              <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setFlyerEditSrc(URL.createObjectURL(f)); setShowFlyerPicker(false); e.target.value = ""; }} style={{ display: "block", marginBottom: 10 }} />
+            )}
             <button onClick={() => setShowFlyerPicker(!showFlyerPicker)} style={{ padding: "4px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, marginBottom: 8 }}>{showFlyerPicker ? "Hide" : "Browse Placeholders"}</button>
             {showFlyerPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
                 {FLYER_PLACEHOLDERS.map((src, i) => (
-                  <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setFlyerPosition({ x: 50, y: 50 }); setShowFlyerPicker(false); }}
+                  <div key={i} onClick={() => { setEventForm({ ...eventForm, flyer_url: src }); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false); }}
                     style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: eventForm.flyer_url === src ? "3px solid #AABB23" : "2px solid transparent" }}>
                     <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
@@ -761,7 +552,7 @@ export default function OrganizerProfile() {
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setShowFlyerPicker(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+              {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
               <button onClick={saveEvent} disabled={savingEvent} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEvent ? "Saving..." : editingEvent ? "Update Event" : "Add Event"}</button>
             </div>
           </div>
@@ -779,7 +570,7 @@ export default function OrganizerProfile() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setFlyerFile(null); setFlyerPosition({ x: 50, y: 50 }); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                     <button onClick={() => deleteEvent(ev.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                   </div>
                 </div>
