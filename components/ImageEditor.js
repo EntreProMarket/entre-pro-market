@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const MIN_FRAME = 60;
-const MIN_SCALE = 1;
+const MIN_SCALE = 0.25;
 const MAX_SCALE = 6;
 
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
@@ -101,6 +101,16 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     };
     gesture.current = { mode: "handle", corner, anchor };
   };
+  const startEdge = (edge) => {
+    const s = liveRef.current;
+    const f = s.frame;
+    const anchor = {};
+    if (edge === "w") anchor.x = f.x + f.w;
+    if (edge === "e") anchor.x = f.x;
+    if (edge === "n") anchor.y = f.y + f.h;
+    if (edge === "s") anchor.y = f.y;
+    gesture.current = { mode: "edge", edge, anchor };
+  };
 
   const applyFramePan = (pt) => {
     const g = gesture.current, s = liveRef.current;
@@ -144,6 +154,34 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     const x = signX > 0 ? anchor.x : anchor.x - w;
     const y = signY > 0 ? anchor.y : anchor.y - h;
     setFrame({ x, y, w, h });
+  };
+
+  const applyEdge = (pt) => {
+    const g = gesture.current, s = liveRef.current;
+    const { edge, anchor } = g;
+    const next = { ...s.frame };
+    if (edge === "w") {
+      const minX = s.imgLeft, maxX = anchor.x - MIN_FRAME;
+      const newX = clamp(pt.x, minX, Math.max(minX, maxX));
+      next.x = newX;
+      next.w = anchor.x - newX;
+    } else if (edge === "e") {
+      const minRight = anchor.x + MIN_FRAME, maxRight = s.imgLeft + s.imgW;
+      const newRight = clamp(pt.x, Math.min(minRight, maxRight), maxRight);
+      next.x = anchor.x;
+      next.w = newRight - anchor.x;
+    } else if (edge === "n") {
+      const minY = s.imgTop, maxY = anchor.y - MIN_FRAME;
+      const newY = clamp(pt.y, minY, Math.max(minY, maxY));
+      next.y = newY;
+      next.h = anchor.y - newY;
+    } else if (edge === "s") {
+      const minBottom = anchor.y + MIN_FRAME, maxBottom = s.imgTop + s.imgH;
+      const newBottom = clamp(pt.y, Math.min(minBottom, maxBottom), maxBottom);
+      next.y = anchor.y;
+      next.h = newBottom - anchor.y;
+    }
+    setFrame(next);
   };
 
   useEffect(() => {
@@ -193,15 +231,15 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     setFrame(clampFrameToImage(s.frame, left2, top2, iw2, ih2, aspect));
   };
 
-  const handleGrab = (corner) => (e) => {
+  const attachDrag = (e, startFn, applyFn) => {
     e.stopPropagation();
-    startHandle(corner);
+    startFn();
     const isTouch = e.type === "touchstart";
     const move = (ev) => {
       if (isTouch && (!ev.touches || !ev.touches[0])) return;
       const pt = isTouch ? toStagePoint(ev.touches[0].clientX, ev.touches[0].clientY) : toStagePoint(ev.clientX, ev.clientY);
       if (isTouch) ev.preventDefault();
-      applyHandle(pt);
+      applyFn(pt);
     };
     const end = () => {
       gesture.current = null;
@@ -211,6 +249,8 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     if (isTouch) { window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", end); }
     else { window.addEventListener("mousemove", move); window.addEventListener("mouseup", end); }
   };
+  const handleGrabCorner = (corner) => (e) => attachDrag(e, () => startHandle(corner), applyHandle);
+  const handleGrabEdge = (edge) => (e) => attachDrag(e, () => startEdge(edge), applyEdge);
 
   const handleUse = () => {
     const s = liveRef.current;
@@ -232,6 +272,13 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
       onDone(file, URL.createObjectURL(blob));
     }, "image/jpeg", 0.9);
   };
+
+  const edgeHandles = frame ? [
+    { id: "n", left: frame.x + frame.w / 2 - 16, top: frame.y - 10, w: 32, h: 20, cursor: "ns-resize", barW: 20, barH: 4 },
+    { id: "s", left: frame.x + frame.w / 2 - 16, top: frame.y + frame.h - 10, w: 32, h: 20, cursor: "ns-resize", barW: 20, barH: 4 },
+    { id: "w", left: frame.x - 10, top: frame.y + frame.h / 2 - 16, w: 20, h: 32, cursor: "ew-resize", barW: 4, barH: 20 },
+    { id: "e", left: frame.x + frame.w - 10, top: frame.y + frame.h / 2 - 16, w: 20, h: 32, cursor: "ew-resize", barW: 4, barH: 20 },
+  ] : [];
 
   return (
     <div style={{ padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
@@ -264,19 +311,34 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
                   <div
                     key={c}
                     data-handle={c}
-                    onMouseDown={handleGrab(c)}
-                    onTouchStart={handleGrab(c)}
+                    onMouseDown={handleGrabCorner(c)}
+                    onTouchStart={handleGrabCorner(c)}
                     style={{ position: "absolute", left: hx - 14, top: hy - 14, width: 28, height: 28, cursor: "nwse-resize", touchAction: "none" }}
                   >
                     <div style={{ width: 16, height: 16, margin: 6, border: "3px solid #fff", background: "rgba(255,255,255,0.25)", borderRadius: 2 }} />
                   </div>
                 );
               })}
+              {!aspect && edgeHandles.map((h) => (
+                <div
+                  key={h.id}
+                  data-handle={h.id}
+                  onMouseDown={handleGrabEdge(h.id)}
+                  onTouchStart={handleGrabEdge(h.id)}
+                  style={{ position: "absolute", left: h.left, top: h.top, width: h.w, height: h.h, cursor: h.cursor, touchAction: "none", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <div style={{ width: h.barW, height: h.barH, background: "#fff", borderRadius: 2, boxShadow: "0 0 0 1px rgba(0,0,0,0.4)" }} />
+                </div>
+              ))}
             </>
           )}
         </div>
       </div>
-      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Drag a corner to resize the crop box. Drag inside it to move it. Pinch to zoom the photo. The box can never go past the photo's edges, so the save always comes out completely filled — never any white space.</p>
+      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>
+        {aspect
+          ? "Drag a corner to resize the crop box, or pinch/scroll to zoom the photo — including smaller, to fit more of it in. The box can never go past the photo's edges, so the save always comes out fully filled."
+          : "Drag a corner to resize both sides at once, or a side handle to pull in just that edge. Pinch/scroll to zoom the photo, drag inside to move the box. It can never go past the photo's edges, so the save always comes out fully filled."}
+      </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
         <button type="button" onClick={handleUse} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
