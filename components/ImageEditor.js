@@ -2,34 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 
 const MIN_FRAME = 60;
-const MAX_SCALE_ABS = 6;
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 4;
 
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
-
-// Minimum zoom multiplier (on top of fitScale) at which the image still
-// fully covers the given frame — i.e. the largest "zoom out" allowed
-// before white/empty space would appear in the crop.
-function coverMinScale(frame, natural, fitScale) {
-  if (!frame || !natural || !fitScale) return 1;
-  const sx = frame.w / (natural.w * fitScale);
-  const sy = frame.h / (natural.h * fitScale);
-  return Math.max(sx, sy, 0.05);
-}
-
-// Clamp the image's center so the image rectangle always fully contains
-// the frame rectangle (no gaps on any side).
-function clampCenterForCover(center, imgW, imgH, frame) {
-  if (!frame) return center;
-  const minX = frame.x + frame.w - imgW / 2;
-  const maxX = frame.x + imgW / 2;
-  const minY = frame.y + frame.h - imgH / 2;
-  const maxY = frame.y + imgH / 2;
-  return {
-    x: clamp(center.x, Math.min(minX, maxX), Math.max(minX, maxX)),
-    y: clamp(center.y, Math.min(minY, maxY), Math.max(minY, maxY)),
-  };
-}
 
 export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, onDone, onCancel }) {
   const wrapRef = useRef(null);
@@ -104,23 +81,14 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
   };
 
   const applyPan = (pt) => {
-    const g = gesture.current, s = liveRef.current;
-    const raw = { x: g.cx + (pt.x - g.startX), y: g.cy + (pt.y - g.startY) };
-    setImgCenter(clampCenterForCover(raw, s.imgW, s.imgH, s.frame));
+    const g = gesture.current;
+    setImgCenter({ x: g.cx + (pt.x - g.startX), y: g.cy + (pt.y - g.startY) });
   };
-
   const applyPinch = (t0, t1) => {
-    const g = gesture.current, s = liveRef.current;
+    const g = gesture.current;
     const d = dist(t0, t1);
-    const raw = g.startScale * (d / g.startDist);
-    const minS = coverMinScale(s.frame, s.natural, s.fitScale);
-    const next = clamp(raw, minS, Math.max(minS, MAX_SCALE_ABS));
-    const newImgW = s.natural.w * s.fitScale * next;
-    const newImgH = s.natural.h * s.fitScale * next;
-    setScale(next);
-    setImgCenter(clampCenterForCover(s.imgCenter, newImgW, newImgH, s.frame));
+    setScale(clamp(g.startScale * (d / g.startDist), MIN_SCALE, MAX_SCALE));
   };
-
   const applyHandle = (pt) => {
     const g = gesture.current, s = liveRef.current;
     const px = clamp(pt.x, 0, s.stageW), py = clamp(pt.y, 0, s.stageH);
@@ -142,19 +110,7 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     }
     const x = signX > 0 ? anchor.x : anchor.x - w;
     const y = signY > 0 ? anchor.y : anchor.y - h;
-    const newFrame = { x, y, w, h };
-
-    // After resizing the box, make sure the image still fully covers it —
-    // zoom in automatically if the box just grew past the current coverage.
-    const minS = coverMinScale(newFrame, s.natural, s.fitScale);
-    const nextScale = Math.max(s.scale, minS);
-    const newImgW = s.natural.w * s.fitScale * nextScale;
-    const newImgH = s.natural.h * s.fitScale * nextScale;
-    const newCenter = clampCenterForCover(s.imgCenter, newImgW, newImgH, newFrame);
-
-    setFrame(newFrame);
-    if (nextScale !== s.scale) setScale(nextScale);
-    setImgCenter(newCenter);
+    setFrame({ x, y, w, h });
   };
 
   useEffect(() => {
@@ -192,16 +148,9 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     const onUp = () => { gesture.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
     window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
   };
-
   const onWheel = (e) => {
     e.preventDefault();
-    const s = liveRef.current;
-    const minS = coverMinScale(s.frame, s.natural, s.fitScale);
-    const next = clamp(scale * (e.deltaY < 0 ? 1.05 : 0.95), minS, Math.max(minS, MAX_SCALE_ABS));
-    const newImgW = s.natural.w * s.fitScale * next;
-    const newImgH = s.natural.h * s.fitScale * next;
-    setScale(next);
-    setImgCenter(clampCenterForCover(s.imgCenter, newImgW, newImgH, s.frame));
+    setScale(clamp(scale * (e.deltaY < 0 ? 1.05 : 0.95), MIN_SCALE, MAX_SCALE));
   };
 
   const handleGrab = (corner) => (e) => {
@@ -237,9 +186,6 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, outW); canvas.height = Math.max(1, outH);
     const ctx = canvas.getContext("2d");
-    // No fill needed — coverage is enforced during editing, so the source
-    // rect always lies fully inside the source image. This just guards
-    // against any sub-pixel rounding at the very edge.
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(imgRef.current, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
@@ -295,11 +241,11 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
           )}
         </div>
       </div>
-      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Drag a corner to resize the crop. Pinch or drag inside to zoom and reposition — the photo always fills the box completely, and you're always in control of what gets cropped.</p>
+      <p style={{ fontSize: 11, color: "#888", margin: "8px 0" }}>Drag a corner to resize the crop. Pinch or drag inside to zoom/move the photo — nothing outside the box gets cut, and zooming out never forces a crop.</p>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <button type="button" onClick={onCancel} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Cancel</button>
         <button type="button" onClick={handleUse} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>✅ Use This Crop</button>
       </div>
     </div>
   );
-    }
+            }
