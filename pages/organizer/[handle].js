@@ -6,14 +6,8 @@ import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
 
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
-const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
-function parsePos(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
-  const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
-  const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
-}
+const thumbImg = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
+const logoThumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block", backgroundColor: "#f5f5f5" });
 
 function formatTime(t) {
   if (!t) return "";
@@ -141,11 +135,11 @@ export default function OrganizerPublicProfile() {
       <h1 style={{ marginBottom: 4 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
 
-      {organizer.logo_url && (() => { const p = parsePos(organizer.logo_url); return (
-        <div onClick={() => setSelectedImage(p.src)} style={thumbStyle(160, 160, 12)}>
-          <img src={p.src} alt="logo" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+      {organizer.logo_url && (
+        <div onClick={() => setSelectedImage(organizer.logo_url)} style={logoThumbStyle(160, 160, 12)}>
+          <img src={organizer.logo_url} alt="logo" style={thumbImg} />
         </div>
-      ); })()}
+      )}
 
       <div style={{ marginTop: 16 }}>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
@@ -164,12 +158,12 @@ export default function OrganizerPublicProfile() {
       <div style={{ marginTop: 28 }}>
         <h3>Portfolio</h3>
         {organizer.portfolio_images?.length > 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => { const p = parsePos(img); return (
-              <div key={i} onClick={() => setSelectedImage(p.src)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}>
-                <img src={p.src} alt="portfolio" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+          <div style={{ columnWidth: 150, columnGap: 10 }}>
+            {organizer.portfolio_images.map((img, i) => (
+              <div key={i} onClick={() => setSelectedImage(img)} style={{ breakInside: "avoid", marginBottom: 10, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" }}>
+                <img src={img} alt="portfolio" style={{ width: "100%", height: "auto", display: "block" }} />
               </div>
-            ); })}
+            ))}
           </div>
         ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
@@ -202,8 +196,8 @@ export default function OrganizerPublicProfile() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
             {events.map(event => (
               <div key={event.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
-                <div style={{ height: 130, overflow: "hidden" }}>
-                  {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
+                <div style={{ overflow: "hidden" }}>
+                  {event.flyer_url ? <img src={event.flyer_url} alt={event.event_name} style={{ width: "100%", height: "auto", display: "block" }} /> : <div style={{ width: "100%", height: 130, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                 </div>
                 <div style={{ padding: 12 }}>
                   <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h4>
@@ -247,15 +241,15 @@ export default function OrganizerPublicProfile() {
         <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
           {flyerFullscreen ? (
-            <img src={parsePos(selectedEvent.flyer_url).src} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", objectFit: "contain", borderRadius: 8 }} />
+            <img src={selectedEvent.flyer_url} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", objectFit: "contain", borderRadius: 8 }} />
           ) : (
             <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
-              {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
+              {selectedEvent.flyer_url && (
                 <div style={{ position: "relative", overflow: "hidden", borderRadius: "16px 16px 0 0" }}>
-                  <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", maxHeight: 260, height: 260, objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", cursor: "zoom-in", display: "block" }} />
+                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }} />
                   <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
                 </div>
-              ); })()}
+              )}
               <div style={{ padding: 24 }}>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
                   <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
