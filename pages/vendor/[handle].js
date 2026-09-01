@@ -8,14 +8,6 @@ import { SocialLinks } from "../../components/SocialIcons";
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const thumbImg = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 
-function parsePos(url) {
-  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
-  const [base, frag] = url.split("#pos=");
-  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
-  const [x, y, z] = frag.split(",").map(Number);
-  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z <= 0 ? 1 : z };
-}
-
 export default function VendorPublicProfile() {
   useInactivityLogout();
   const router = useRouter();
@@ -141,11 +133,11 @@ export default function VendorPublicProfile() {
 
       {activeTab === "profile" && (
         <>
-          {vendor.logo_url && (() => { const p = parsePos(vendor.logo_url); return (
-            <div onClick={() => setSelectedImage(p.src)} style={thumbStyle(160, 160, 12)}>
-              <img src={p.src} alt="logo" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+          {vendor.logo_url && (
+            <div onClick={() => setSelectedImage(vendor.logo_url)} style={thumbStyle(160, 160, 12)}>
+              <img src={vendor.logo_url} alt="logo" style={thumbImg} />
             </div>
-          ); })()}
+          )}
           <div style={{ marginTop: 16 }}>
             <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
             <p><strong>Location:</strong> {vendor.city}{vendor.state ? `, ${vendor.state}` : ""}</p>
@@ -164,11 +156,11 @@ export default function VendorPublicProfile() {
             <h3>Portfolio</h3>
             {vendor.portfolio_images?.length > 0 ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-                {vendor.portfolio_images.map((img, i) => { const p = parsePos(img); return (
-                  <div key={i} onClick={() => setSelectedImage(p.src)} style={{ ...thumbStyle("100%", 150, 8), width: "100%" }}>
-                    <img src={p.src} alt="portfolio" style={{ ...thumbImg, objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center" }} />
+                {vendor.portfolio_images.map((img, i) => (
+                  <div key={i} onClick={() => setSelectedImage(img)} style={{ borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" }}>
+                    <img src={img} alt="portfolio" style={{ width: "100%", height: "auto", display: "block" }} />
                   </div>
-                ); })}
+                ))}
               </div>
             ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
           </div>
