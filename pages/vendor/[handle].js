@@ -155,9 +155,9 @@ export default function VendorPublicProfile() {
           <div style={{ marginTop: 28 }}>
             <h3>Portfolio</h3>
             {vendor.portfolio_images?.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+              <div style={{ columnWidth: 150, columnGap: 10 }}>
                 {vendor.portfolio_images.map((img, i) => (
-                  <div key={i} onClick={() => setSelectedImage(img)} style={{ borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" }}>
+                  <div key={i} onClick={() => setSelectedImage(img)} style={{ breakInside: "avoid", marginBottom: 10, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" }}>
                     <img src={img} alt="portfolio" style={{ width: "100%", height: "auto", display: "block" }} />
                   </div>
                 ))}
