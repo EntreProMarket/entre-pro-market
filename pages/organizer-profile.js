@@ -327,14 +327,14 @@ export default function OrganizerProfile() {
         {editingLogo ? (
           <ImageEditor
             src={logoEditSrc}
-            aspect={1}
+            aspect={null}
             onCancel={() => setEditingLogo(false)}
             onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
           />
         ) : (logoFilePreview || logoUrl) ? (
           <div style={{ maxWidth: 220, marginBottom: 8, position: "relative" }}>
-            <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#eee" }}>
-              <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#f5f5f5" }}>
+              <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
             </div>
             <button type="button" onClick={() => { setLogoEditSrc(logoFilePreview || logoUrl); setEditingLogo(true); }} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Reposition</button>
           </div>
@@ -414,6 +414,23 @@ export default function OrganizerProfile() {
                 else { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }
               }}
             />
+          </div>
+        )}
+        {portfolioFiles.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
+              📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
+              {portfolioFiles.map((file, i) => (
+                <div key={i} style={{ position: "relative" }}>
+                  <div style={{ height: 80, borderRadius: 6, overflow: "hidden", border: "1px solid #f0c040" }}>
+                    <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  </div>
+                  <button onClick={() => setPortfolioFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {!atLimit && (
