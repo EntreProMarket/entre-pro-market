@@ -283,6 +283,7 @@ export default function VendorProfile() {
               <ImageEditor
                 src={logoEditSrc}
                 aspect={null}
+                outputAspect={1}
                 onCancel={() => setEditingLogo(false)}
                 onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
               />
