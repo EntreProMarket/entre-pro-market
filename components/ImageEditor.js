@@ -29,7 +29,7 @@ function clampFrameToImage(frame, imgLeft, imgTop, imgW, imgH, aspect) {
   return { x, y, w, h };
 }
 
-export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, onDone, onCancel }) {
+export default function ImageEditor({ src, aspect = null, outputAspect = null, outputMaxSize = 1600, onDone, onCancel }) {
   const wrapRef = useRef(null);
   const stageRef = useRef(null);
   const imgRef = useRef(null);
@@ -260,7 +260,12 @@ export default function ImageEditor({ src, aspect = null, outputMaxSize = 1600, 
     const srcW = f.w / es, srcH = f.h / es;
     const longSide = Math.min(outputMaxSize, Math.round(Math.max(srcW, srcH)));
     let outW, outH;
-    if (f.w >= f.h) { outW = longSide; outH = Math.round(longSide * f.h / f.w); }
+    if (outputAspect) {
+      // Fixed target shape (e.g. a square logo slot): stretch the chosen
+      // crop to exactly fill it, however the crop itself is shaped.
+      if (outputAspect >= 1) { outW = longSide; outH = Math.round(longSide / outputAspect); }
+      else { outH = longSide; outW = Math.round(longSide * outputAspect); }
+    } else if (f.w >= f.h) { outW = longSide; outH = Math.round(longSide * f.h / f.w); }
     else { outH = longSide; outW = Math.round(longSide * f.w / f.h); }
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, outW); canvas.height = Math.max(1, outH);
