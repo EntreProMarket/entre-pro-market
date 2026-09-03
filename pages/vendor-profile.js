@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import useInactivityLogout from "../hooks/useInactivityLogout";
 import ImageEditor from "../components/ImageEditor";
+import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -29,17 +30,23 @@ function formatSocialLink(platform, value) {
   }
 }
 
-function compressImage(file, maxWidth = 1200, quality = 0.8) {
+function compressImage(file, maxWidth = 1200, quality = 0.9) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
+        const width = img.width, height = img.height;
+        // Already small enough — skip re-encoding entirely. Every extra
+        // JPEG encode/decode cycle loses a little quality for nothing.
+        if (width <= maxWidth) { resolve(file); return; }
+        const newWidth = maxWidth, newHeight = Math.round((height * maxWidth) / width);
         const canvas = document.createElement("canvas");
-        let width = img.width, height = img.height;
-        if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
-        canvas.width = width; canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        canvas.width = newWidth; canvas.height = newHeight;
+        const ctx = canvas.getContext("2d");
+        useHighQualitySmoothing(ctx);
+        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+        sharpenCanvas(ctx, newWidth, newHeight, 0.25);
         canvas.toBlob((blob) => resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" })), "image/jpeg", quality);
       };
       img.src = e.target.result;
@@ -161,7 +168,7 @@ export default function VendorProfile() {
       let finalLogoUrl = logoUrl || null;
       if (logoFile) {
         setMessage("⏳ Compressing logo...");
-        const comp = await compressImage(logoFile, 800, 0.85);
+        const comp = await compressImage(logoFile, 800, 0.92);
         setMessage("⏳ Uploading logo...");
         const up = await uploadFile(comp, "vendor-logos");
         if (up) finalLogoUrl = up;
@@ -170,7 +177,7 @@ export default function VendorProfile() {
       if (portfolioFiles.length > 0) {
         for (let i = 0; i < portfolioFiles.length; i++) {
           setMessage(`⏳ Uploading ${i + 1} of ${portfolioFiles.length} images...`);
-          const comp = await compressImage(portfolioFiles[i], 1200, 0.8);
+          const comp = await compressImage(portfolioFiles[i], 1200, 0.9);
           const url = await uploadFile(comp, "vendor-portfolio");
           if (url) portfolio.push(url);
         }
@@ -209,7 +216,7 @@ export default function VendorProfile() {
     setMessage("⏳ Uploading product images...");
     const uploadedUrls = [];
     for (const file of newProductImages) {
-      const comp = await compressImage(file, 1200, 0.8);
+      const comp = await compressImage(file, 1200, 0.9);
       const url = await uploadFile(comp, "vendor-portfolio");
       if (url) uploadedUrls.push(url);
     }
@@ -229,7 +236,7 @@ export default function VendorProfile() {
       setMessage("⏳ Uploading new images...");
       const remaining = productImageLimit - updatedImages.length;
       for (const file of editProductNewFiles.slice(0, remaining)) {
-        const comp = await compressImage(file, 1200, 0.8);
+        const comp = await compressImage(file, 1200, 0.9);
         const url = await uploadFile(comp, "vendor-portfolio");
         if (url) updatedImages.push(url);
       }
@@ -340,7 +347,7 @@ export default function VendorProfile() {
                     const idx = repositioningIndex;
                     setRepositioningIndex(null);
                     setMessage("⏳ Updating image...");
-                    const comp = await compressImage(file, 1200, 0.8);
+                    const comp = await compressImage(file, 1200, 0.9);
                     const url = await uploadFile(comp, "vendor-portfolio");
                     if (url) { setPortfolioImages(prev => prev.map((u, i2) => i2 === idx ? url : u)); setMessage("✅ Image updated — remember to Save Profile."); }
                   }}
