@@ -334,8 +334,8 @@ export default function OrganizerProfile() {
           />
         ) : (logoFilePreview || logoUrl) ? (
           <div style={{ maxWidth: 220, marginBottom: 8, position: "relative" }}>
-            <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#f5f5f5" }}>
-              <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+            <div style={{ borderRadius: 8, overflow: "hidden", border: "2px solid #701890" }}>
+              <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "auto", display: "block" }} />
             </div>
             <button type="button" onClick={() => { setLogoEditSrc(logoOriginalSrc || logoFilePreview || logoUrl); setEditingLogo(true); }} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Reposition</button>
           </div>
