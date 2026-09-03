@@ -33,6 +33,7 @@ export default function ImageEditor({ src, aspect = null, outputAspect = null, o
   const wrapRef = useRef(null);
   const stageRef = useRef(null);
   const imgRef = useRef(null);
+  const frameBorderRef = useRef(null);
   const liveRef = useRef({});
   const gesture = useRef(null);
 
@@ -254,19 +255,49 @@ export default function ImageEditor({ src, aspect = null, outputAspect = null, o
 
   const handleUse = () => {
     const s = liveRef.current;
-    if (!s.natural || !imgRef.current || !s.frame) return;
-    const { effScale: es, imgLeft: il, imgTop: it, frame: f } = s;
-    const srcX = (f.x - il) / es, srcY = (f.y - it) / es;
-    const srcW = f.w / es, srcH = f.h / es;
-    const longSide = Math.min(outputMaxSize, Math.round(Math.max(srcW, srcH)));
+    if (!s.natural || !imgRef.current || !frameBorderRef.current) return;
+    // Measure the actual rendered pixels of the photo and the crop box
+    // directly from the browser, instead of trusting our own tracked
+    // scale/position numbers — this guarantees the export always matches
+    // exactly what's visible on screen.
+    const imgRect = imgRef.current.getBoundingClientRect();
+    const frameRect = frameBorderRef.current.getBoundingClientRect();
+    if (imgRect.width < 1 || imgRect.height < 1) return;
+    const scaleX = s.natural.w / imgRect.width;
+    const scaleY = s.natural.h / imgRect.height;
+    let srcX = (frameRect.left - imgRect.left) * scaleX;
+    let srcY = (frameRect.top - imgRect.top) * scaleY;
+    let srcW = frameRect.width * scaleX;
+    let srcH = frameRect.height * scaleY;
+    // Defensive clamp in case of any sub-pixel rounding at the edges.
+    srcX = Math.max(0, Math.min(srcX, s.natural.w));
+    srcY = Math.max(0, Math.min(srcY, s.natural.h));
+    srcW = Math.max(1, Math.min(srcW, s.natural.w - srcX));
+    srcH = Math.max(1, Math.min(srcH, s.natural.h - srcY));
+
     let outW, outH;
     if (outputAspect) {
-      // Fixed target shape (e.g. a square logo slot): stretch the chosen
-      // crop to exactly fill it, however the crop itself is shaped.
+      const longSide = outputMaxSize;
       if (outputAspect >= 1) { outW = longSide; outH = Math.round(longSide / outputAspect); }
       else { outH = longSide; outW = Math.round(longSide * outputAspect); }
-    } else if (f.w >= f.h) { outW = longSide; outH = Math.round(longSide * f.h / f.w); }
-    else { outH = longSide; outW = Math.round(longSide * f.w / f.h); }
+      // Match the target shape by trimming a centered sliver off the
+      // longer side first — never by stretching — then scale evenly.
+      const targetRatio = outW / outH;
+      const srcRatio = srcW / srcH;
+      if (srcRatio > targetRatio) {
+        const cropW = srcH * targetRatio;
+        srcX = srcX + (srcW - cropW) / 2;
+        srcW = cropW;
+      } else if (srcRatio < targetRatio) {
+        const cropH = srcW / targetRatio;
+        srcY = srcY + (srcH - cropH) / 2;
+        srcH = cropH;
+      }
+    } else {
+      const longSide = Math.min(outputMaxSize, Math.round(Math.max(srcW, srcH)));
+      if (srcW >= srcH) { outW = longSide; outH = Math.round(longSide * srcH / srcW); }
+      else { outH = longSide; outW = Math.round(longSide * srcW / srcH); }
+    }
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, outW); canvas.height = Math.max(1, outH);
     const ctx = canvas.getContext("2d");
@@ -308,7 +339,7 @@ export default function ImageEditor({ src, aspect = null, outputAspect = null, o
               <div style={{ position: "absolute", left: 0, top: frame.y + frame.h, right: 0, bottom: 0, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
               <div style={{ position: "absolute", left: 0, top: frame.y, width: frame.x, height: frame.h, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
               <div style={{ position: "absolute", left: frame.x + frame.w, top: frame.y, right: 0, height: frame.h, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-              <div style={{ position: "absolute", left: frame.x, top: frame.y, width: frame.w, height: frame.h, border: "2px solid #fff", boxSizing: "border-box", pointerEvents: "none" }} />
+              <div ref={frameBorderRef} style={{ position: "absolute", left: frame.x, top: frame.y, width: frame.w, height: frame.h, border: "2px solid #fff", boxSizing: "border-box", pointerEvents: "none" }} />
               {["nw", "ne", "sw", "se"].map((c) => {
                 const hx = c.includes("w") ? frame.x : frame.x + frame.w;
                 const hy = c.includes("n") ? frame.y : frame.y + frame.h;
