@@ -1,4 +1,5 @@
 // components/ImageEditor.js
+import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 import { useEffect, useRef, useState } from "react";
 
 const MIN_FRAME = 60;
@@ -301,12 +302,14 @@ export default function ImageEditor({ src, aspect = null, outputAspect = null, o
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, outW); canvas.height = Math.max(1, outH);
     const ctx = canvas.getContext("2d");
+    useHighQualitySmoothing(ctx);
     ctx.drawImage(imgRef.current, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
+    sharpenCanvas(ctx, canvas.width, canvas.height, 0.25);
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], "image.jpg", { type: "image/jpeg" });
       onDone(file, URL.createObjectURL(blob));
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.94);
   };
 
   const edgeHandles = frame ? [
