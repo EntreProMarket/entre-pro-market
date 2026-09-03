@@ -94,6 +94,7 @@ export default function OrganizerProfile() {
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [editingLogo, setEditingLogo] = useState(false);
   const [logoEditSrc, setLogoEditSrc] = useState(null);
+  const [logoOriginalSrc, setLogoOriginalSrc] = useState(null);
   const [repositioningIndex, setRepositioningIndex] = useState(null);
   const [pfQueue, setPfQueue] = useState([]);
   const [pfIndex, setPfIndex] = useState(0);
@@ -328,7 +329,6 @@ export default function OrganizerProfile() {
           <ImageEditor
             src={logoEditSrc}
             aspect={null}
-            outputAspect={1}
             onCancel={() => setEditingLogo(false)}
             onDone={(file, previewUrl) => { setLogoFile(file); setLogoFilePreview(previewUrl); setEditingLogo(false); }}
           />
@@ -337,7 +337,7 @@ export default function OrganizerProfile() {
             <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden", border: "2px solid #701890", backgroundColor: "#f5f5f5" }}>
               <img src={logoFilePreview || logoUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
             </div>
-            <button type="button" onClick={() => { setLogoEditSrc(logoFilePreview || logoUrl); setEditingLogo(true); }} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Reposition</button>
+            <button type="button" onClick={() => { setLogoEditSrc(logoOriginalSrc || logoFilePreview || logoUrl); setEditingLogo(true); }} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>🎯 Reposition</button>
           </div>
         ) : (
           <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 12 }}>
@@ -346,12 +346,12 @@ export default function OrganizerProfile() {
         )}
         {!editingLogo && (
           <>
-            <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; setLogoEditSrc(URL.createObjectURL(f)); setEditingLogo(true); e.target.value = ""; }} style={{ display: "block", marginBottom: 10 }} />
+            <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; if (!f) return; const url = URL.createObjectURL(f); setLogoOriginalSrc(url); setLogoEditSrc(url); setEditingLogo(true); e.target.value = ""; }} style={{ display: "block", marginBottom: 10 }} />
             <button onClick={() => setShowLogoPicker(!showLogoPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12 }}>{showLogoPicker ? "Hide" : "Browse Placeholders"}</button>
             {showLogoPicker && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 10, marginTop: 10, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
                 {DEFAULT_LOGOS.map((src, i) => (
-                  <div key={i} onClick={() => { setLogoEditSrc(src); setShowLogoPicker(false); setEditingLogo(true); }}
+                  <div key={i} onClick={() => { setLogoOriginalSrc(src); setLogoEditSrc(src); setShowLogoPicker(false); setEditingLogo(true); }}
                     style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: "2px solid transparent" }}>
                     <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
