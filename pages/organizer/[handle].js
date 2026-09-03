@@ -6,8 +6,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
 
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
-const thumbImg = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
-const logoThumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block", backgroundColor: "#f5f5f5" });
+const logoBoxStyle = { maxWidth: 220, borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" };
 
 function formatTime(t) {
   if (!t) return "";
@@ -136,8 +135,8 @@ export default function OrganizerPublicProfile() {
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
 
       {organizer.logo_url && (
-        <div onClick={() => setSelectedImage(organizer.logo_url)} style={logoThumbStyle(160, 160, 12)}>
-          <img src={organizer.logo_url} alt="logo" style={thumbImg} />
+        <div onClick={() => setSelectedImage(organizer.logo_url)} style={logoBoxStyle}>
+          <img src={organizer.logo_url} alt="logo" style={{ width: "100%", height: "auto", display: "block" }} />
         </div>
       )}
 
