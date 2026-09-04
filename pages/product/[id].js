@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
+import ZoomableLightbox from "../../components/ZoomableLightbox";
 
 export default function ProductPage() {
   const router = useRouter();
@@ -193,19 +194,20 @@ export default function ProductPage() {
 
       <p style={{ marginTop: 16, fontSize: 12, color: "#aaa", textAlign: "center" }}>Secure checkout. Card payments processed by Stripe.</p>
 
-      {/* FULLSCREEN */}
+      {/* FULLSCREEN — pinch/double-tap to zoom, thumbnail strip to switch images */}
       {fullscreen && (
-        <div onClick={() => setFullscreen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" }}>
-          <img src={images[currentImg]} alt={product.title} style={{ maxWidth: "95%", maxHeight: "85vh", borderRadius: 8, objectFit: "contain" }} />
-          {images.length > 1 && (
-            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+        <ZoomableLightbox
+          src={images[currentImg]}
+          onClose={() => setFullscreen(false)}
+          footer={images.length > 1 ? (
+            <div style={{ display: "flex", gap: 10 }}>
               {images.map((img, i) => (
-                <img key={i} src={img} onClick={e => { e.stopPropagation(); setCurrentImg(i); }}
+                <img key={i} src={img} onClick={() => setCurrentImg(i)}
                   style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 6, cursor: "pointer", border: i === currentImg ? "2px solid white" : "2px solid transparent" }} />
               ))}
             </div>
-          )}
-        </div>
+          ) : null}
+        />
       )}
     </div>
   );
