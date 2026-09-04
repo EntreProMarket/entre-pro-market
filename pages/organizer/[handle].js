@@ -4,6 +4,7 @@ import useInactivityLogout from "../../hooks/useInactivityLogout";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
+import ZoomableLightbox from "../../components/ZoomableLightbox";
 
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const logoBoxStyle = { maxWidth: 220, borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" };
@@ -231,40 +232,38 @@ export default function OrganizerPublicProfile() {
       </div>
 
       {selectedImage && (
-        <div onClick={() => setSelectedImage(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.9)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
-          <img src={selectedImage} alt="enlarged" style={{ maxWidth: "95%", maxHeight: "90vh", borderRadius: 10, objectFit: "contain" }} />
-        </div>
+        <ZoomableLightbox src={selectedImage} onClose={() => setSelectedImage(null)} />
       )}
 
-      {selectedEvent && (
-        <div onClick={() => { if (flyerFullscreen) setFlyerFullscreen(false); else setSelectedEvent(null); }}
-          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: flyerFullscreen ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: flyerFullscreen ? 0 : 16 }}>
-          {flyerFullscreen ? (
-            <img src={selectedEvent.flyer_url} alt="flyer" style={{ maxWidth: "95%", maxHeight: "95vh", objectFit: "contain", borderRadius: 8 }} />
-          ) : (
-            <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
-              {selectedEvent.flyer_url && (
-                <div style={{ position: "relative", overflow: "hidden", borderRadius: "16px 16px 0 0" }}>
-                  <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }} />
-                  <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
-                </div>
-              )}
-              <div style={{ padding: 24 }}>
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                  <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
-                </div>
-                <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>{selectedEvent.event_name}</h2>
-                {selectedEvent.category && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#AABB23", fontWeight: "bold" }}>{selectedEvent.category}</p>}
-                <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
-                {(selectedEvent.event_start_time || selectedEvent.event_end_time) && <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>}
-                {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444", whiteSpace: "pre-line" }}>📍 {selectedEvent.venue}{selectedEvent.venue_address ? `\n${selectedEvent.venue_address}` : ""}</p>}
-                {selectedEvent.price && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>💵 {selectedEvent.price}</p>}
-                {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
-                {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
-                <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span></p>
+      {selectedEvent && flyerFullscreen && (
+        <ZoomableLightbox src={selectedEvent.flyer_url} onClose={() => setFlyerFullscreen(false)} />
+      )}
+
+      {selectedEvent && !flyerFullscreen && (
+        <div onClick={() => setSelectedEvent(null)}
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto" }}>
+            {selectedEvent.flyer_url && (
+              <div style={{ position: "relative", overflow: "hidden", borderRadius: "16px 16px 0 0" }}>
+                <img src={selectedEvent.flyer_url} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }} />
+                <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
               </div>
+            )}
+            <div style={{ padding: 24 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button onClick={() => setSelectedEvent(null)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#888" }}>✕</button>
+              </div>
+              <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>{selectedEvent.event_name}</h2>
+              {selectedEvent.category && <p style={{ margin: "0 0 10px", fontSize: 12, color: "#AABB23", fontWeight: "bold" }}>{selectedEvent.category}</p>}
+              <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
+              {(selectedEvent.event_start_time || selectedEvent.event_end_time) && <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>}
+              {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444", whiteSpace: "pre-line" }}>📍 {selectedEvent.venue}{selectedEvent.venue_address ? `\n${selectedEvent.venue_address}` : ""}</p>}
+              {selectedEvent.price && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>💵 {selectedEvent.price}</p>}
+              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
+              {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
+              <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span></p>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
