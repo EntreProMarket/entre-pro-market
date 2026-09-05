@@ -239,7 +239,7 @@ export default function HomePage() {
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
               <div style={{ position: "relative", width: "100%", height: 320, backgroundColor: "#000", borderRadius: "16px 16px 0 0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ width: "100%", height: "100%", objectFit: "contain", cursor: "zoom-in", display: "block" }} />
+                <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", cursor: "zoom-in", display: "block" }} />
                 <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
               </div>
             ); })()}
