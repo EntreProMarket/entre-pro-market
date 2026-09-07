@@ -275,7 +275,7 @@ export default function HomePage() {
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
               <div style={{ position: "relative", width: "100%", backgroundColor: "#f0f0f0", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "center" }}>
-                <img src={cover.src} alt={selectedArticle.title} onClick={() => setArticleZoomSrc(cover.src)} style={{ width: "100%", height: "auto", display: "block", cursor: "zoom-in" }} />
+                <img src={cover.src} alt={selectedArticle.title} onClick={() => setArticleZoomSrc(cover.src)} style={{ maxWidth: "100%", width: "auto", height: "auto", display: "block", margin: "0 auto", cursor: "zoom-in" }} />
                 <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
               </div>
             ); })()}
