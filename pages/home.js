@@ -272,9 +272,9 @@ export default function HomePage() {
       {/* Community & News article modal */}
       {selectedArticle && (
         <div onClick={() => setSelectedArticle(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", overflowX: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
-              <div style={{ position: "relative", width: "100%", backgroundColor: "#f0f0f0", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "center" }}>
+              <div style={{ position: "relative", width: "100%", minWidth: 0, overflow: "hidden", backgroundColor: "#f0f0f0", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "center" }}>
                 <img src={cover.src} alt={selectedArticle.title} onClick={() => setArticleZoomSrc(cover.src)} style={{ maxWidth: "100%", width: "auto", height: "auto", display: "block", margin: "0 auto", cursor: "zoom-in" }} />
                 <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
               </div>
