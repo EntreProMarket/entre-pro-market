@@ -239,7 +239,7 @@ export default function HomePage() {
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
               <div style={{ position: "relative", width: "100%", height: 320, backgroundColor: "#000", borderRadius: "16px 16px 0 0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", cursor: "zoom-in", display: "block" }} />
+                <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", minWidth: 0, minHeight: 0, cursor: "zoom-in", display: "block" }} />
                 <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
               </div>
             ); })()}
@@ -275,7 +275,7 @@ export default function HomePage() {
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", overflowX: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
             {selectedArticle.cover_image_url && (() => { const cover = parsePos(selectedArticle.cover_image_url); return (
               <div style={{ position: "relative", width: "100%", minWidth: 0, overflow: "hidden", backgroundColor: "#f0f0f0", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "center" }}>
-                <img src={cover.src} alt={selectedArticle.title} onClick={() => setArticleZoomSrc(cover.src)} style={{ maxWidth: "100%", width: "auto", height: "auto", display: "block", margin: "0 auto", cursor: "zoom-in" }} />
+                <img src={cover.src} alt={selectedArticle.title} onClick={() => setArticleZoomSrc(cover.src)} style={{ maxWidth: "100%", width: "auto", height: "auto", minWidth: 0, display: "block", margin: "0 auto", cursor: "zoom-in" }} />
                 <div style={{ position: "absolute", bottom: 8, right: 10, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>Tap to enlarge</div>
               </div>
             ); })()}
