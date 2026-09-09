@@ -6,31 +6,16 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* Global reset — browsers apply a default 8px margin to <body> unless
-            this is zeroed out. Without it, any full-width element (like the
-            purple footer) shows a small gap from the true screen edges.
-
-            touch-action: pan-x pan-y — this is the real lock against native
-            browser pinch-zoom/double-tap-zoom. The old `user-scalable=no` /
-            `maximum-scale=1` viewport meta directives below are IGNORED by
-            modern Chrome on Android for accessibility reasons, so without this
-            CSS a stray pinch gesture anywhere on the page (e.g. near an image)
-            zooms/pans the whole browser viewport — including fixed elements
-            like the header logo — and it doesn't reset until the user manually
-            zooms back out. touch-action blocks that at the browser level while
-            still allowing normal scroll/pan, and does not interfere with the
-            ZoomableLightbox's own JS-driven pinch-zoom (that runs inside a
-            fixed full-screen overlay with its own touch handling). */}
         <style>{`
           html, body {
             margin: 0;
             padding: 0;
+            max-width: 100vw;
+            overflow-x: hidden;
             touch-action: pan-x pan-y;
             -ms-touch-action: pan-x pan-y;
           }
         `}</style>
-        {/* Viewport — kept as a first line of defense / hint for browsers that do
-            still honor it, but touch-action above is what actually enforces this. */}
         <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
 
         {/* PWA Manifest */}
