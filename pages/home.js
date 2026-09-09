@@ -43,6 +43,7 @@ export default function HomePage() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [articleZoomSrc, setArticleZoomSrc] = useState(null);
+  const [debugInfo, setDebugInfo] = useState("Loading debug info...");
 
   useEffect(() => {
     const load = async () => {
@@ -77,21 +78,46 @@ export default function HomePage() {
     load();
   }, []);
 
+  // ── TEMPORARY DIAGNOSTIC — scans the page for any element wider than the
+  // screen and reports it in the yellow bar at the top. Remove once the
+  // overflow culprit is found and fixed. ──
+  useEffect(() => {
+    if (loading) return;
+    const timer = setTimeout(() => {
+      try {
+        const w = document.documentElement.clientWidth;
+        const all = document.querySelectorAll("*");
+        const offenders = [];
+        all.forEach(el => {
+          const rect = el.getBoundingClientRect();
+          if (rect.right > w + 3) {
+            const cls = (el.className && typeof el.className === "string") ? el.className.slice(0, 40) : "";
+            offenders.push(`${el.tagName}.${cls} R:${Math.round(rect.right)}/${w}`);
+          }
+        });
+        setDebugInfo(offenders.length ? offenders.slice(0, 6).join(" || ") : "NO OVERFLOW FOUND");
+      } catch (err) {
+        setDebugInfo("debug error: " + err.message);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
 
   const visibleEvents = upcomingEvents.slice(0, 6);
 
   return (
     <div style={{ fontFamily: "sans-serif" }}>
+      {/* ── TEMPORARY DEBUG BAR — remove after diagnosing ── */}
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, backgroundColor: "yellow", color: "black", fontSize: 10, padding: 4, zIndex: 999999, wordBreak: "break-all" }}>{debugInfo}</div>
+
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      {/* HEADER — flexWrap + minWidth:0 added so this row wraps onto a second
-          line on narrow phones instead of overflowing the viewport width.
-          marketplace.js's header already has flexWrap:"wrap" for the same
-          reason; this brings home.js in line with that pattern. */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10, flexWrap: "wrap", rowGap: 10 }}>
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
-        <div style={{ display: "flex", flex: "1 1 auto", minWidth: 0, marginLeft: 24, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex", flex: 1, marginLeft: 24, alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
             {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
@@ -137,7 +163,6 @@ export default function HomePage() {
           <button onClick={() => router.push("/contact")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>Learn More</button>
         </div>
 
-        {/* a. FEATURED VENDORS */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>🔥 Featured Vendors</h2>
@@ -164,7 +189,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* b. UPCOMING EVENTS */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>👑 Upcoming Events</h2>
@@ -195,7 +219,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* c. COMMUNITY & NEWS */}
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           {newsArticles.length > 0 ? (
