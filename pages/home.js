@@ -1,5 +1,5 @@
 // pages/home.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import AnnouncementBanner from "../components/AnnouncementBanner";
@@ -43,7 +43,8 @@ export default function HomePage() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [articleZoomSrc, setArticleZoomSrc] = useState(null);
-  const [debugInfo, setDebugInfo] = useState("Loading debug info...");
+  const [modalDebug, setModalDebug] = useState("");
+  const modalRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -78,25 +79,20 @@ export default function HomePage() {
     load();
   }, []);
 
-  // ── TEMPORARY DIAGNOSTIC — checks visualViewport (pinch-zoom/pan state that
-  // does NOT show up as DOM overflow) since the previous check ruled out
-  // actual overflow. Remove once resolved. ──
+  // ── TEMPORARY DIAGNOSTIC — measures the popup box's own position vs the
+  // screen, directly, instead of measuring the page. Remove once resolved. ──
   useEffect(() => {
-    if (loading) return;
+    if (!selectedEvent) return;
     const timer = setTimeout(() => {
-      try {
-        const vv = window.visualViewport;
-        if (vv) {
-          setDebugInfo(`VV scale:${vv.scale.toFixed(2)} offsetLeft:${Math.round(vv.offsetLeft)} width:${Math.round(vv.width)} vs clientWidth:${document.documentElement.clientWidth} pageXOffset:${Math.round(window.pageXOffset)} scrollX:${Math.round(window.scrollX)}`);
-        } else {
-          setDebugInfo("no visualViewport support");
-        }
-      } catch (err) {
-        setDebugInfo("debug error: " + err.message);
-      }
-    }, 600);
+      if (!modalRef.current) { setModalDebug("modal ref not found"); return; }
+      const r = modalRef.current.getBoundingClientRect();
+      const screenW = window.innerWidth;
+      const leftGap = r.left;
+      const rightGap = screenW - r.right;
+      setModalDebug(`modal left:${Math.round(r.left)} right:${Math.round(r.right)} width:${Math.round(r.width)} | screenW:${screenW} | leftGap:${Math.round(leftGap)} rightGap:${Math.round(rightGap)}`);
+    }, 300);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [selectedEvent]);
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
 
@@ -104,9 +100,6 @@ export default function HomePage() {
 
   return (
     <div style={{ fontFamily: "sans-serif" }}>
-      {/* ── TEMPORARY DEBUG BAR — remove after diagnosing ── */}
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, backgroundColor: "yellow", color: "black", fontSize: 10, padding: 4, zIndex: 999999, wordBreak: "break-all" }}>{debugInfo}</div>
-
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
@@ -249,7 +242,9 @@ export default function HomePage() {
       {selectedEvent && !flyerFullscreen && (
         <div onClick={() => setSelectedEvent(null)}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+          <div ref={modalRef} onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 480, width: "100%", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
+            {/* ── TEMPORARY DEBUG LINE ── */}
+            <div style={{ backgroundColor: "yellow", color: "black", fontSize: 10, padding: 4, wordBreak: "break-all" }}>{modalDebug}</div>
             {selectedEvent.flyer_url && (() => { const p = parsePos(selectedEvent.flyer_url); return (
               <div style={{ position: "relative", width: "100%", height: 320, backgroundColor: "#000", borderRadius: "16px 16px 0 0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <img src={p.src} alt={selectedEvent.event_name} onClick={e => { e.stopPropagation(); setFlyerFullscreen(true); }} style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", minWidth: 0, minHeight: 0, cursor: "zoom-in", display: "block" }} />
