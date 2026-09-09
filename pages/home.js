@@ -12,7 +12,6 @@ function formatTime(t) {
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
-// ── Turns plain URLs typed in article text into real clickable links ──
 function linkify(text) {
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
   const parts = text.split(urlRegex);
@@ -31,8 +30,6 @@ function parsePos(url) {
   const [x, y, z] = frag.split(",").map(Number);
   return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
 }
-// ── Must match the same constant in admin.js exactly, so the crop you set in the
-// editor is guaranteed to look identical here. ──
 const COVER_ASPECT_RATIO = "8 / 5";
 
 export default function HomePage() {
@@ -60,15 +57,12 @@ export default function HomePage() {
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
 
-      // ── Elite Organizer events ──
       const { data: eliteData } = await supabase.from("organizer_events").select("*, organizer:organizer_id(organizer_name, handle, logo_url, account_type)").gte("event_date", todayStr).order("event_date", { ascending: true }).limit(20);
       const eliteOnly = (eliteData || []).filter(e => e.organizer?.account_type === "elite").map(e => ({ ...e, _source: "elite" }));
 
-      // ── Admin-created EPM events ──
       const { data: epmData } = await supabase.from("epm_events").select("*").gte("event_date", todayStr).order("event_date", { ascending: true }).limit(20);
       const epmOnly = (epmData || []).map(e => ({ ...e, _source: "epm" }));
 
-      // ── Merge & sort together by date so they mix, not two separate lists ──
       const combined = [...eliteOnly, ...epmOnly].sort((a, b) => {
         if (!a.event_date) return 1;
         if (!b.event_date) return -1;
@@ -76,7 +70,6 @@ export default function HomePage() {
       });
       setUpcomingEvents(combined);
 
-      // ── Community & News ──
       const { data: newsData } = await supabase.from("community_news").select("*").eq("published", true).order("created_at", { ascending: false }).limit(12);
       setNewsArticles(newsData || []);
       setLoading(false);
@@ -91,11 +84,14 @@ export default function HomePage() {
   return (
     <div style={{ fontFamily: "sans-serif" }}>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
+      {/* HEADER — flexWrap + minWidth:0 added so this row wraps onto a second
+          line on narrow phones instead of overflowing the viewport width.
+          marketplace.js's header already has flexWrap:"wrap" for the same
+          reason; this brings home.js in line with that pattern. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10, flexWrap: "wrap", rowGap: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
-        <div style={{ display: "flex", flex: 1, marginLeft: 24, alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flex: "1 1 auto", minWidth: 0, marginLeft: 24, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
             <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
             {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
@@ -168,7 +164,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* b. UPCOMING EVENTS — Elite Organizer + Admin EPM Events, mixed together by date */}
+        {/* b. UPCOMING EVENTS */}
         <div style={{ marginBottom: 32 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>👑 Upcoming Events</h2>
@@ -232,7 +228,6 @@ export default function HomePage() {
     <PageFooter />
     <FooterBar />
 
-      {/* Event flyer — non-fullscreen modal */}
       {selectedEvent && !flyerFullscreen && (
         <div onClick={() => setSelectedEvent(null)}
           style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -264,12 +259,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Event flyer — pinch/double-tap zoomable fullscreen */}
       {selectedEvent && flyerFullscreen && (
         <ZoomableLightbox src={parsePos(selectedEvent.flyer_url).src} onClose={() => setFlyerFullscreen(false)} />
       )}
 
-      {/* Community & News article modal */}
       {selectedArticle && (
         <div onClick={() => setSelectedArticle(null)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "88vh", overflowY: "auto", overflowX: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" }}>
@@ -301,7 +294,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Community & News image — pinch/double-tap zoomable fullscreen */}
       {articleZoomSrc && (
         <ZoomableLightbox src={articleZoomSrc} onClose={() => setArticleZoomSrc(null)} />
       )}
