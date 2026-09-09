@@ -78,24 +78,19 @@ export default function HomePage() {
     load();
   }, []);
 
-  // ── TEMPORARY DIAGNOSTIC — scans the page for any element wider than the
-  // screen and reports it in the yellow bar at the top. Remove once the
-  // overflow culprit is found and fixed. ──
+  // ── TEMPORARY DIAGNOSTIC — checks visualViewport (pinch-zoom/pan state that
+  // does NOT show up as DOM overflow) since the previous check ruled out
+  // actual overflow. Remove once resolved. ──
   useEffect(() => {
     if (loading) return;
     const timer = setTimeout(() => {
       try {
-        const w = document.documentElement.clientWidth;
-        const all = document.querySelectorAll("*");
-        const offenders = [];
-        all.forEach(el => {
-          const rect = el.getBoundingClientRect();
-          if (rect.right > w + 3) {
-            const cls = (el.className && typeof el.className === "string") ? el.className.slice(0, 40) : "";
-            offenders.push(`${el.tagName}.${cls} R:${Math.round(rect.right)}/${w}`);
-          }
-        });
-        setDebugInfo(offenders.length ? offenders.slice(0, 6).join(" || ") : "NO OVERFLOW FOUND");
+        const vv = window.visualViewport;
+        if (vv) {
+          setDebugInfo(`VV scale:${vv.scale.toFixed(2)} offsetLeft:${Math.round(vv.offsetLeft)} width:${Math.round(vv.width)} vs clientWidth:${document.documentElement.clientWidth} pageXOffset:${Math.round(window.pageXOffset)} scrollX:${Math.round(window.scrollX)}`);
+        } else {
+          setDebugInfo("no visualViewport support");
+        }
       } catch (err) {
         setDebugInfo("debug error: " + err.message);
       }
