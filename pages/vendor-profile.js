@@ -115,6 +115,7 @@ export default function VendorProfile() {
   const [markSaleProductId, setMarkSaleProductId] = useState(null);
   const [markSaleEmail, setMarkSaleEmail] = useState("");
   const [markSaleMethod, setMarkSaleMethod] = useState("cashapp");
+  const [markSaleProof, setMarkSaleProof] = useState("");
   const [markingSale, setMarkingSale] = useState(false);
   const [markSaleMessage, setMarkSaleMessage] = useState("");
 
@@ -259,16 +260,17 @@ const handleSave = async () => {
 
   const submitMarkSale = async () => {
     if (!markSaleEmail.trim() || !markSaleEmail.includes("@")) { setMarkSaleMessage("⚠️ Enter a valid buyer email."); return; }
+    if (!markSaleProof.trim()) { setMarkSaleMessage("⚠️ Enter a transaction ID or screenshot reference."); return; }
     setMarkingSale(true); setMarkSaleMessage("");
     try {
       const res = await fetch("/api/mark-manual-sale", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendorId: userId, productId: markSaleProductId, buyerEmail: markSaleEmail.trim(), paymentMethod: markSaleMethod }),
+        body: JSON.stringify({ vendorId: userId, productId: markSaleProductId, buyerEmail: markSaleEmail.trim(), paymentMethod: markSaleMethod, proofReference: markSaleProof.trim() }),
       });
       const data = await res.json();
       if (data.success) {
         setMarkSaleMessage("✅ Sale recorded! The buyer can now leave a review.");
-        setTimeout(() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleMessage(""); }, 2000);
+        setTimeout(() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleProof(""); setMarkSaleMessage(""); }, 2000);
       } else {
         setMarkSaleMessage("❌ " + data.error);
       }
@@ -456,6 +458,12 @@ const handleSave = async () => {
           </div>
           <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.</p>
 
+          {accountType !== "free" && (
+            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#701890" }}>
+              ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales to unlock that buyer's ability to review.
+            </div>
+          )}
+
           {shopProducts.length >= productLimit && <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>⚠️ You've reached your {productLimit}-product limit. Upgrade to add more.</div>}
 
           {shopProducts.length < productLimit && (
@@ -533,11 +541,12 @@ const handleSave = async () => {
                                 <button onClick={() => setMarkSaleMethod("venmo")} style={{ flex: 1, padding: "6px 10px", backgroundColor: markSaleMethod === "venmo" ? "#008CFF" : "#eee", color: markSaleMethod === "venmo" ? "white" : "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Venmo</button>
                               </div>
                               <input placeholder="Buyer's email (their EPM account email)" value={markSaleEmail} onChange={e => setMarkSaleEmail(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
-                              <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>The buyer must have an EntreProMarket account with this email. This unlocks their ability to leave a review.</p>
+                              <input placeholder="Transaction ID or screenshot reference *" value={markSaleProof} onChange={e => setMarkSaleProof(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
+                              <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>The buyer must have an EntreProMarket account with this email. Proof reference is required and kept on record for disputes.</p>
                               {markSaleMessage && <p style={{ fontSize: 12, margin: "0 0 8px", color: markSaleMessage.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold" }}>{markSaleMessage}</p>}
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={submitMarkSale} disabled={markingSale} style={{ padding: "6px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>{markingSale ? "Saving..." : "Confirm Sale"}</button>
-                                <button onClick={() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleMessage(""); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
+                                <button onClick={() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleProof(""); setMarkSaleMessage(""); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
                               </div>
                             </div>
                           ) : (
@@ -545,7 +554,7 @@ const handleSave = async () => {
                               <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                               <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                               <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
-                              <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
+                              <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleProof(""); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
                             </div>
                           )}
                         </>
