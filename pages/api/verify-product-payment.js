@@ -24,14 +24,12 @@ export default async function handler(req, res) {
 
     const { productId, buyerId, vendorId } = session.metadata;
 
-    // ── Get product details ──
     const { data: product } = await supabaseAdmin
       .from("vendor_products")
       .select("title, price, image_url")
       .eq("id", productId)
       .single();
 
-    // ── Get profile display names ──
     const { data: buyerProfile } = await supabaseAdmin
       .from("profiles")
       .select("business_name, handle")
@@ -44,7 +42,6 @@ export default async function handler(req, res) {
       .eq("id", vendorId)
       .single();
 
-    // ── Get emails from Supabase Auth (profiles.email column does not exist) ──
     let buyerEmail = session.customer_details?.email || null;
     let vendorEmail = null;
 
@@ -58,16 +55,22 @@ export default async function handler(req, res) {
       if (vendorAuth?.user?.email) vendorEmail = vendorAuth.user.email;
     } catch (_) {}
 
-    // ── Record the order ──
+    // ── Record the order — upsert on stripe_session_id so a repeat call
+    // (e.g. the person re-triggers this page, or the effect re-fires)
+    // updates the existing row instead of failing on the unique constraint
+    // or creating a duplicate. ──
     try {
-      await supabaseAdmin.from("orders").insert({
-        product_id: productId,
-        buyer_id: buyerId,
-        vendor_id: vendorId,
-        amount: session.amount_total,
-        stripe_session_id: sessionId,
-        status: "paid",
-      });
+      await supabaseAdmin.from("orders").upsert(
+        {
+          product_id: productId,
+          buyer_id: buyerId,
+          vendor_id: vendorId,
+          amount: session.amount_total,
+          stripe_session_id: sessionId,
+          status: "paid",
+        },
+        { onConflict: "stripe_session_id" }
+      );
     } catch (_) {
       // orders table may not exist yet — safe to ignore
     }
