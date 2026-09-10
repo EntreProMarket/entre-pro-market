@@ -30,21 +30,30 @@ export default function ProductPage() {
       const { data: prod } = await supabase.from("vendor_products").select("*").eq("id", id).single();
       if (!prod) { setLoading(false); return; }
       setProduct(prod);
-      const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle").eq("id", prod.vendor_id).single();
+      const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle, account_type").eq("id", prod.vendor_id).single();
       setVendor(v);
+
+      // ── Free vendors: reviews are open to any logged-in user.
+      // Premium/Featured vendors: reviews require a verified purchase (Stripe order
+      // or manually-marked CashApp/Venmo sale with proof reference). ──
+      const isFreeVendor = !v?.account_type || v.account_type === "free";
 
       if (currentUser) {
         const { data: myProfile } = await supabase.from("profiles").select("is_admin").eq("id", currentUser.id).single();
         setIsAdmin(myProfile?.is_admin === true);
 
-        const { data: order } = await supabase.from("orders").select("id").eq("product_id", id).eq("buyer_id", currentUser.id).eq("status", "paid").limit(1).maybeSingle();
-        if (order) {
+        if (isFreeVendor) {
           setEligibility({ checking: false, allowed: true, reason: "" });
         } else {
-          setEligibility({ checking: false, allowed: false, reason: "Only customers who purchased this product can leave a review." });
+          const { data: order } = await supabase.from("orders").select("id").eq("product_id", id).eq("buyer_id", currentUser.id).eq("status", "paid").limit(1).maybeSingle();
+          if (order) {
+            setEligibility({ checking: false, allowed: true, reason: "" });
+          } else {
+            setEligibility({ checking: false, allowed: false, reason: "Only customers who purchased this product can leave a review." });
+          }
         }
       } else {
-        setEligibility({ checking: false, allowed: false, reason: "Log in and purchase this product to leave a review." });
+        setEligibility({ checking: false, allowed: false, reason: isFreeVendor ? "Log in to leave a review." : "Log in and purchase this product to leave a review." });
       }
 
       setLoading(false);
@@ -232,4 +241,4 @@ export default function ProductPage() {
       )}
     </div>
   );
-}
+                                                                                                                                                   }
