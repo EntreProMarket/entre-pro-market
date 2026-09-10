@@ -1,8 +1,8 @@
 // pages/api/mark-manual-sale.js
 // Lets a vendor manually record a CashApp/Venmo sale as paid, creating an
-// `orders` row so the buyer becomes eligible to leave a review. Buyer is
-// identified by email (looked up via the service role key, since vendors
-// don't have access to auth.admin from the client).
+// `orders` row so the buyer becomes eligible to leave a review (for
+// Premium/Featured vendors, where reviews are purchase-gated). Requires a
+// proof reference (transaction ID or screenshot note) for accountability.
 
 const { createClient } = require("@supabase/supabase-js");
 
@@ -14,13 +14,15 @@ const supabaseAdmin = createClient(
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { vendorId, productId, buyerEmail, paymentMethod } = req.body;
+  const { vendorId, productId, buyerEmail, paymentMethod, proofReference } = req.body;
   if (!vendorId || !productId || !buyerEmail) {
     return res.status(400).json({ error: "Missing required fields" });
   }
+  if (!proofReference || !proofReference.trim()) {
+    return res.status(400).json({ error: "A transaction ID or screenshot reference is required." });
+  }
 
   try {
-    // Confirm the product belongs to this vendor (prevents marking sales on someone else's product)
     const { data: product, error: productError } = await supabaseAdmin
       .from("vendor_products")
       .select("id, vendor_id, price")
@@ -29,7 +31,6 @@ export default async function handler(req, res) {
     if (productError || !product) return res.status(404).json({ error: "Product not found" });
     if (product.vendor_id !== vendorId) return res.status(403).json({ error: "This product does not belong to you" });
 
-    // Look up the buyer by email across all auth users
     let buyerId = null;
     let page = 1;
     const perPage = 200;
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
       if (listError) throw listError;
       const match = usersPage.users.find(u => u.email?.toLowerCase() === buyerEmail.toLowerCase());
       if (match) { buyerId = match.id; break; }
-      if (usersPage.users.length < perPage) break; // no more pages
+      if (usersPage.users.length < perPage) break;
       page++;
     }
 
@@ -54,6 +55,7 @@ export default async function handler(req, res) {
       stripe_session_id: null,
       status: "paid",
       payment_method: paymentMethod || "manual",
+      proof_reference: proofReference.trim(),
     });
     if (insertError) throw insertError;
 
