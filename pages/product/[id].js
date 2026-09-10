@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
+import ReviewsSection from "../../components/ReviewsSection";
 
 export default function ProductPage() {
   const router = useRouter();
@@ -14,19 +15,38 @@ export default function ProductPage() {
   const [buying, setBuying] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [manualPay, setManualPay] = useState(null);
   const [currentImg, setCurrentImg] = useState(0);
+  const [eligibility, setEligibility] = useState({ checking: true, allowed: false, reason: "" });
 
   useEffect(() => {
     if (!id) return;
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
-      setUser(userData?.user || null);
+      const currentUser = userData?.user || null;
+      setUser(currentUser);
+
       const { data: prod } = await supabase.from("vendor_products").select("*").eq("id", id).single();
       if (!prod) { setLoading(false); return; }
       setProduct(prod);
       const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle").eq("id", prod.vendor_id).single();
       setVendor(v);
+
+      if (currentUser) {
+        const { data: myProfile } = await supabase.from("profiles").select("is_admin").eq("id", currentUser.id).single();
+        setIsAdmin(myProfile?.is_admin === true);
+
+        const { data: order } = await supabase.from("orders").select("id").eq("product_id", id).eq("buyer_id", currentUser.id).eq("status", "paid").limit(1).maybeSingle();
+        if (order) {
+          setEligibility({ checking: false, allowed: true, reason: "" });
+        } else {
+          setEligibility({ checking: false, allowed: false, reason: "Only customers who purchased this product can leave a review." });
+        }
+      } else {
+        setEligibility({ checking: false, allowed: false, reason: "Log in and purchase this product to leave a review." });
+      }
+
       setLoading(false);
     };
     load();
@@ -59,10 +79,8 @@ export default function ProductPage() {
   const cashappUrl = `https://cash.app/$${cashappHandle}/${price}`;
   const venmoUrl = `https://venmo.com/${venmoHandle}?txn=pay&amount=${price}&note=${productNote}`;
 
-  // Back destination — vendor shop tab
   const backUrl = vendor?.handle ? `/vendor/${vendor.handle}?tab=shop` : null;
 
-  // MANUAL PAYMENT SCREEN
   if (manualPay) {
     const isCashApp = manualPay === "cashapp";
     const payHandle = isCashApp ? `$${cashappHandle}` : `@${venmoHandle}`;
@@ -99,32 +117,27 @@ export default function ProductPage() {
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: 20, fontFamily: "sans-serif" }}>
 
-      {/* BACK — goes to shop tab */}
       <button onClick={() => backUrl ? router.push(backUrl) : router.back()}
         style={{ marginBottom: 20, padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>
         ← Back to Shop
       </button>
 
-      {/* IMAGE GALLERY */}
       {images.length > 0 && (
         <div style={{ position: "relative", marginBottom: 24 }}>
           <img src={images[currentImg]} alt={product.title}
             onClick={() => setFullscreen(true)}
             style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12, cursor: "zoom-in", display: "block" }} />
 
-          {/* Enlarge hint */}
           <div style={{ position: "absolute", bottom: 10, right: 12, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>
             Tap to enlarge
           </div>
 
-          {/* Image counter */}
           {images.length > 1 && (
             <div style={{ position: "absolute", bottom: 10, left: 12, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>
               {currentImg + 1} / {images.length}
             </div>
           )}
 
-          {/* Prev / Next arrows */}
           {images.length > 1 && (
             <>
               <button onClick={() => setCurrentImg(i => (i - 1 + images.length) % images.length)}
@@ -134,7 +147,6 @@ export default function ProductPage() {
             </>
           )}
 
-          {/* Dot indicators */}
           {images.length > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
               {images.map((_, i) => (
@@ -144,7 +156,6 @@ export default function ProductPage() {
             </div>
           )}
 
-          {/* Thumbnail strip */}
           {images.length > 1 && (
             <div style={{ display: "flex", gap: 8, marginTop: 10, overflowX: "auto" }}>
               {images.map((img, i) => (
@@ -156,7 +167,6 @@ export default function ProductPage() {
         </div>
       )}
 
-      {/* VENDOR LINK */}
       {vendor && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}
           onClick={() => router.push(`/vendor/${vendor.handle}`)}>
@@ -169,7 +179,6 @@ export default function ProductPage() {
       <p style={{ margin: "0 0 20px", fontSize: 28, fontWeight: "bold", color: "#701890" }}>${price}</p>
       {product.description && <p style={{ margin: "0 0 28px", fontSize: 15, color: "#444", lineHeight: 1.6 }}>{product.description}</p>}
 
-      {/* BUY BUTTONS */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <button onClick={handleBuyWithStripe} disabled={buying}
           style={{ padding: "15px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>
@@ -194,7 +203,19 @@ export default function ProductPage() {
 
       <p style={{ marginTop: 16, fontSize: 12, color: "#aaa", textAlign: "center" }}>Secure checkout. Card payments processed by Stripe.</p>
 
-      {/* FULLSCREEN — pinch/double-tap to zoom, thumbnail strip to switch images */}
+      <ReviewsSection
+        tableName="product_reviews"
+        idField="product_id"
+        idValue={id}
+        extraMatch={{}}
+        replyField="vendor_reply"
+        replyAtField="vendor_reply_at"
+        ownerUserId={product.vendor_id}
+        currentUser={user}
+        isAdmin={isAdmin}
+        eligibility={eligibility}
+      />
+
       {fullscreen && (
         <ZoomableLightbox
           src={images[currentImg]}
