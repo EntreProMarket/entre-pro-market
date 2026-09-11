@@ -55,10 +55,10 @@ export default async function handler(req, res) {
       if (vendorAuth?.user?.email) vendorEmail = vendorAuth.user.email;
     } catch (_) {}
 
-    // ── Record the order — upsert on stripe_session_id so a repeat call
-    // (e.g. the person re-triggers this page, or the effect re-fires)
-    // updates the existing row instead of failing on the unique constraint
-    // or creating a duplicate. ──
+    // ── Stripe orders are pre-verified by Stripe itself — proof_status is
+    // set to "approved" automatically, no manual admin review needed.
+    // Manual CashApp/Venmo sales (see mark-manual-sale.js) start "pending"
+    // instead, since those require admin proof review. ──
     try {
       await supabaseAdmin.from("orders").upsert(
         {
@@ -68,12 +68,12 @@ export default async function handler(req, res) {
           amount: session.amount_total,
           stripe_session_id: sessionId,
           status: "paid",
+          payment_method: "stripe",
+          proof_status: "approved",
         },
         { onConflict: "stripe_session_id" }
       );
-    } catch (_) {
-      // orders table may not exist yet — safe to ignore
-    }
+    } catch (_) {}
 
     return res.status(200).json({
       success: true,
