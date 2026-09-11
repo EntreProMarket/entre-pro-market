@@ -33,9 +33,6 @@ export default function ProductPage() {
       const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle, account_type").eq("id", prod.vendor_id).single();
       setVendor(v);
 
-      // ── Free vendors: reviews are open to any logged-in user.
-      // Premium/Featured vendors: reviews require a verified purchase (Stripe order
-      // or manually-marked CashApp/Venmo sale with proof reference). ──
       const isFreeVendor = !v?.account_type || v.account_type === "free";
 
       if (currentUser) {
@@ -45,7 +42,18 @@ export default function ProductPage() {
         if (isFreeVendor) {
           setEligibility({ checking: false, allowed: true, reason: "" });
         } else {
-          const { data: order } = await supabase.from("orders").select("id").eq("product_id", id).eq("buyer_id", currentUser.id).eq("status", "paid").limit(1).maybeSingle();
+          // ── proof_status.neq.rejected — a manually-marked sale that's been
+          // rejected no longer counts, even though it was momentarily "paid".
+          // Stripe orders have proof_status "approved" so they're unaffected. ──
+          const { data: order } = await supabase
+            .from("orders")
+            .select("id, proof_status")
+            .eq("product_id", id)
+            .eq("buyer_id", currentUser.id)
+            .eq("status", "paid")
+            .neq("proof_status", "rejected")
+            .limit(1)
+            .maybeSingle();
           if (order) {
             setEligibility({ checking: false, allowed: true, reason: "" });
           } else {
@@ -241,4 +249,4 @@ export default function ProductPage() {
       )}
     </div>
   );
-                                                                                                                                                   }
+}
