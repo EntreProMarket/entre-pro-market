@@ -111,11 +111,14 @@ export default function VendorProfile() {
   const [editProductFileKey, setEditProductFileKey] = useState(0);
   const [userId, setUserId] = useState(null);
 
-  // ── Manual sale marking (CashApp/Venmo) ──
+  // ── Manual sale marking (CashApp/Venmo) — now requires a proof screenshot
+  // upload instead of a self-reported text note. Order is created instantly
+  // (buyer gets review access right away) but starts proof_status:"pending"
+  // until the admin approves/rejects it from the Orders tab. ──
   const [markSaleProductId, setMarkSaleProductId] = useState(null);
   const [markSaleEmail, setMarkSaleEmail] = useState("");
   const [markSaleMethod, setMarkSaleMethod] = useState("cashapp");
-  const [markSaleProof, setMarkSaleProof] = useState("");
+  const [markSaleProofFile, setMarkSaleProofFile] = useState(null);
   const [markingSale, setMarkingSale] = useState(false);
   const [markSaleMessage, setMarkSaleMessage] = useState("");
 
@@ -260,17 +263,22 @@ const handleSave = async () => {
 
   const submitMarkSale = async () => {
     if (!markSaleEmail.trim() || !markSaleEmail.includes("@")) { setMarkSaleMessage("⚠️ Enter a valid buyer email."); return; }
-    if (!markSaleProof.trim()) { setMarkSaleMessage("⚠️ Enter a transaction ID or screenshot reference."); return; }
-    setMarkingSale(true); setMarkSaleMessage("");
+    if (!markSaleProofFile) { setMarkSaleMessage("⚠️ Upload a screenshot of the payment as proof."); return; }
+    setMarkingSale(true); setMarkSaleMessage("⏳ Uploading proof...");
     try {
+      const comp = await compressImage(markSaleProofFile, 1200, 0.9);
+      const proofUrl = await uploadFile(comp, "payment-proofs");
+      if (!proofUrl) { setMarkSaleMessage("❌ Failed to upload proof image."); setMarkingSale(false); return; }
+
+      setMarkSaleMessage("⏳ Recording sale...");
       const res = await fetch("/api/mark-manual-sale", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendorId: userId, productId: markSaleProductId, buyerEmail: markSaleEmail.trim(), paymentMethod: markSaleMethod, proofReference: markSaleProof.trim() }),
+        body: JSON.stringify({ vendorId: userId, productId: markSaleProductId, buyerEmail: markSaleEmail.trim(), paymentMethod: markSaleMethod, proofImageUrl: proofUrl }),
       });
       const data = await res.json();
       if (data.success) {
-        setMarkSaleMessage("✅ Sale recorded! The buyer can now leave a review.");
-        setTimeout(() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleProof(""); setMarkSaleMessage(""); }, 2000);
+        setMarkSaleMessage("✅ Sale recorded! Buyer can review now — subject to admin review within 3 business days.");
+        setTimeout(() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleProofFile(null); setMarkSaleMessage(""); }, 3000);
       } else {
         setMarkSaleMessage("❌ " + data.error);
       }
@@ -440,7 +448,7 @@ const handleSave = async () => {
             <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>{saving ? "Saving..." : "Save Profile"}</button>
           </div>
         </>
-      )}
+      )}    
 
 {activeTab === "shop" && (
         <div>
@@ -460,7 +468,7 @@ const handleSave = async () => {
 
           {accountType !== "free" && (
             <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#701890" }}>
-              ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales to unlock that buyer's ability to review.
+              ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales — the buyer gets review access right away, subject to a proof review by Entre PRO Market within 3 business days.
             </div>
           )}
 
@@ -541,12 +549,22 @@ const handleSave = async () => {
                                 <button onClick={() => setMarkSaleMethod("venmo")} style={{ flex: 1, padding: "6px 10px", backgroundColor: markSaleMethod === "venmo" ? "#008CFF" : "#eee", color: markSaleMethod === "venmo" ? "white" : "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Venmo</button>
                               </div>
                               <input placeholder="Buyer's email (their EPM account email)" value={markSaleEmail} onChange={e => setMarkSaleEmail(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
-                              <input placeholder="Transaction ID or screenshot reference *" value={markSaleProof} onChange={e => setMarkSaleProof(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
-                              <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>The buyer must have an EntreProMarket account with this email. Proof reference is required and kept on record for disputes.</p>
+                              <label style={{ fontSize: 12, fontWeight: "bold", color: "#555", display: "block", marginBottom: 4 }}>Screenshot proof of payment *</label>
+                              {markSaleProofFile ? (
+                                <div style={{ marginBottom: 8, position: "relative", maxWidth: 200 }}>
+                                  <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #AABB23" }}>
+                                    <img src={URL.createObjectURL(markSaleProofFile)} alt="proof" style={{ width: "100%", height: "auto", display: "block" }} />
+                                  </div>
+                                  <button onClick={() => setMarkSaleProofFile(null)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12 }}>×</button>
+                                </div>
+                              ) : (
+                                <input type="file" accept="image/*" onChange={e => setMarkSaleProofFile(e.target.files[0] || null)} style={{ display: "block", marginBottom: 8 }} />
+                              )}
+                              <p style={{ fontSize: 11, color: "#888", margin: "0 0 8px" }}>The buyer must have an EntreProMarket account with this email. Buyer gets review access immediately — this proof will be reviewed by Entre PRO Market within 3 business days; a rejected proof removes the review.</p>
                               {markSaleMessage && <p style={{ fontSize: 12, margin: "0 0 8px", color: markSaleMessage.startsWith("✅") ? "#166534" : "#991b1b", fontWeight: "bold" }}>{markSaleMessage}</p>}
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={submitMarkSale} disabled={markingSale} style={{ padding: "6px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>{markingSale ? "Saving..." : "Confirm Sale"}</button>
-                                <button onClick={() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleProof(""); setMarkSaleMessage(""); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
+                                <button onClick={() => { setMarkSaleProductId(null); setMarkSaleEmail(""); setMarkSaleProofFile(null); setMarkSaleMessage(""); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
                               </div>
                             </div>
                           ) : (
@@ -554,7 +572,7 @@ const handleSave = async () => {
                               <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                               <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                               <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
-                              <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleProof(""); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
+                              <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleProofFile(null); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
                             </div>
                           )}
                         </>
