@@ -1,8 +1,8 @@
 // pages/api/mark-manual-sale.js
-// Lets a vendor manually record a CashApp/Venmo sale as paid, creating an
-// `orders` row so the buyer becomes eligible to leave a review (for
-// Premium/Featured vendors, where reviews are purchase-gated). Requires a
-// proof reference (transaction ID or screenshot note) for accountability.
+// Vendor marks a CashApp/Venmo sale as paid with a required screenshot proof.
+// The buyer gets INSTANT review access (order created as status: paid), but
+// proof_status starts as "pending" until the admin approves/rejects it. If
+// rejected later, review access is revoked and the review itself is deleted.
 
 const { createClient } = require("@supabase/supabase-js");
 
@@ -14,18 +14,18 @@ const supabaseAdmin = createClient(
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { vendorId, productId, buyerEmail, paymentMethod, proofReference } = req.body;
+  const { vendorId, productId, buyerEmail, paymentMethod, proofImageUrl } = req.body;
   if (!vendorId || !productId || !buyerEmail) {
     return res.status(400).json({ error: "Missing required fields" });
   }
-  if (!proofReference || !proofReference.trim()) {
-    return res.status(400).json({ error: "A transaction ID or screenshot reference is required." });
+  if (!proofImageUrl) {
+    return res.status(400).json({ error: "A screenshot of the payment is required." });
   }
 
   try {
     const { data: product, error: productError } = await supabaseAdmin
       .from("vendor_products")
-      .select("id, vendor_id, price")
+      .select("id, vendor_id, price, title")
       .eq("id", productId)
       .single();
     if (productError || !product) return res.status(404).json({ error: "Product not found" });
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "No EntreProMarket account found with that email. The buyer must have an account to be marked as a verified purchase." });
     }
 
-    const { error: insertError } = await supabaseAdmin.from("orders").insert({
+    const { data: newOrder, error: insertError } = await supabaseAdmin.from("orders").insert({
       product_id: productId,
       buyer_id: buyerId,
       vendor_id: vendorId,
@@ -55,9 +55,27 @@ export default async function handler(req, res) {
       stripe_session_id: null,
       status: "paid",
       payment_method: paymentMethod || "manual",
-      proof_reference: proofReference.trim(),
-    });
+      proof_image_url: proofImageUrl,
+      proof_status: "pending",
+    }).select().single();
     if (insertError) throw insertError;
+
+    const { data: vendorProfile } = await supabaseAdmin.from("profiles").select("business_name, handle").eq("id", vendorId).single();
+
+    // Alert admin — non-blocking, don't fail the request if the email fails
+    fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "https://app.entrepromarket.com"}/api/send-manual-sale-alert`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId: newOrder.id,
+        productTitle: product.title,
+        vendorName: vendorProfile?.business_name || "Unknown Vendor",
+        vendorHandle: vendorProfile?.handle || "",
+        buyerEmail,
+        amount: product.price,
+        paymentMethod: paymentMethod || "manual",
+        proofImageUrl,
+      }),
+    }).catch(() => {});
 
     return res.status(200).json({ success: true });
   } catch (err) {
