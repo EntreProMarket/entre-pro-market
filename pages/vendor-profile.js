@@ -466,11 +466,21 @@ const handleSave = async () => {
           </div>
           <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.</p>
 
-          {accountType !== "free" && (
-            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#701890" }}>
-              ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales — the buyer gets review access right away, subject to a proof review by Entre PRO Market within 3 business days.
-            </div>
-          )}
+  {activeTab === "shop" && (
+        <div>
+          <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
+            <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Your Payment Handles</label>
+            <p style={{ fontSize: 12, color: "#888", marginBottom: 10, marginTop: -4 }}>Buyers send payments directly to these accounts.</p>
+            <input placeholder="CashApp (e.g. $YourHandle)" value={cashappHandle} onChange={e => setCashappHandle(e.target.value)} style={iS} />
+            <input placeholder="Venmo (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
+            <button onClick={async () => { setSaving(true); await supabase.from("profiles").update({ cashapp_handle: cashappHandle.replace(/^\$/, "").trim(), venmo_handle: venmoHandle.replace(/^@/, "").trim() }).eq("id", userId); setSaving(false); setMessage("✅ Payment handles saved!"); }} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>{saving ? "Saving..." : "Save Handles"}</button>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <h2 style={{ margin: 0 }}>Your Products</h2>
+            <span style={{ fontSize: 13, color: shopProducts.length >= productLimit ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {productLimit}</span>
+          </div>
+          <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.</p>
 
           {shopProducts.length >= productLimit && <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>⚠️ You've reached your {productLimit}-product limit. Upgrade to add more.</div>}
 
@@ -496,6 +506,12 @@ const handleSave = async () => {
                 <input key={newProductImageKey} type="file" accept="image/*" multiple onChange={e => { const remaining = productImageLimit - newProductImages.length; const files = Array.from(e.target.files).slice(0, remaining); setNewProductImages(prev => [...prev, ...files].slice(0, productImageLimit)); }} style={{ display: "block", marginBottom: 12 }} />
               )}
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
+            </div>
+          )}
+
+          {accountType !== "free" && (
+            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#701890" }}>
+              ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales — the buyer gets review access right away, subject to a proof review by Entre PRO Market within 3 business days.
             </div>
           )}
 
