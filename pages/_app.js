@@ -1,36 +1,67 @@
 import "cropperjs/dist/cropper.css";
 // pages/_app.js
-// Global 30-minute auto-logout for ALL pages and account types
-import { useEffect, useState, useRef } from "react";
+// Global 30-minute auto-logout for ALL pages and account types.
+// Uses a stored timestamp + visibility checks instead of relying purely on
+// setTimeout, since mobile OSes suspend JS timers when a tab is backgrounded
+// (phone locked, app switched) — a plain setTimeout can fire late or not at
+// all, letting a session outlive 30 minutes. Checking real elapsed time
+// whenever the tab becomes active again closes that gap.
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 const INACTIVITY_MS = 30 * 60 * 1000;
+const LAST_ACTIVITY_KEY = "epm_last_activity";
+const CHECK_INTERVAL_MS = 30 * 1000; // periodic safety check while tab is open
 
 function AutoLogout() {
   const router = useRouter();
-  const timerRef = useRef(null);
 
   useEffect(() => {
-    const resetTimer = () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(async () => {
+    const recordActivity = () => {
+      localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+    };
+
+    const checkAndLogoutIfExpired = async () => {
+      const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
+      const now = Date.now();
+      if (last && now - last >= INACTIVITY_MS) {
         const { data } = await supabase.auth.getUser();
         if (data?.user) {
           await supabase.auth.signOut();
-          router.replace("/");
+          router.replace("/?timeout=1");
         }
-      }, INACTIVITY_MS);
+      } else {
+        recordActivity();
+      }
     };
 
+    // Mark activity now, on load
+    recordActivity();
+
+    // Any user interaction resets the clock
     const events = ["mousemove", "keydown", "touchstart", "click", "scroll"];
-    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
-    resetTimer();
-    return () => {
-      events.forEach(e => window.removeEventListener(e, resetTimer));
-      if (timerRef.current) clearTimeout(timerRef.current);
+    events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }));
+
+    // The critical check: whenever the tab becomes visible again (phone
+    // unlocked, app switched back to), verify real elapsed time immediately —
+    // this is what catches a background suspension a setTimeout would miss.
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") checkAndLogoutIfExpired();
     };
-  }, []);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", checkAndLogoutIfExpired);
+
+    // Periodic safety net while the tab stays open and active
+    const interval = setInterval(checkAndLogoutIfExpired, CHECK_INTERVAL_MS);
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, recordActivity));
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", checkAndLogoutIfExpired);
+      clearInterval(interval);
+    };
+  }, [router]);
 
   return null;
 }
@@ -82,8 +113,6 @@ function InstallBanner() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // iOS/iPadOS Safari: no beforeinstallprompt event ever fires, so check
-    // directly and show instructions instead, once per session.
     if (isIosSafari()) {
       const dismissedThisSession = sessionStorage.getItem("epm_ios_install_dismissed");
       if (!dismissedThisSession) {
