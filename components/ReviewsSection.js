@@ -29,6 +29,7 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
   const [editing, setEditing] = useState(false);
   const [formRating, setFormRating] = useState(5);
   const [formText, setFormText] = useState("");
+  const [formName, setFormName] = useState("");
   const [saving, setSaving] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [savingReply, setSavingReply] = useState(null);
@@ -55,7 +56,7 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
     if (currentUser) {
       const mine = list.find(r => r.user_id === currentUser.id);
       setMyReview(mine || null);
-      if (mine) { setFormRating(mine.rating); setFormText(mine.review_text || ""); }
+      if (mine) { setFormRating(mine.rating); setFormText(mine.review_text || ""); setFormName(mine.reviewer_name || ""); }
     }
     setLoading(false);
   };
@@ -64,9 +65,10 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
 
   const submitReview = async () => {
     if (!currentUser) return;
+    if (!formName.trim()) { setMessage("⚠️ Please enter your name."); return; }
     setSaving(true); setMessage("");
     try {
-      const row = { [idField]: idValue, ...extraMatch, user_id: currentUser.id, rating: formRating, review_text: formText.trim() || null, updated_at: new Date().toISOString() };
+      const row = { [idField]: idValue, ...extraMatch, user_id: currentUser.id, rating: formRating, review_text: formText.trim() || null, reviewer_name: formName.trim(), updated_at: new Date().toISOString() };
       if (myReview) {
         const { error } = await supabase.from(tableName).update(row).eq("id", myReview.id);
         if (error) throw error;
@@ -86,7 +88,7 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
     if (!myReview) return;
     if (!confirm("Delete your review?")) return;
     await supabase.from(tableName).delete().eq("id", myReview.id);
-    setMyReview(null); setEditing(false); setFormRating(5); setFormText("");
+    setMyReview(null); setEditing(false); setFormRating(5); setFormText(""); setFormName("");
     await load();
   };
 
@@ -105,6 +107,12 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
   };
 
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+
+  const displayName = (r) => {
+    if (r.reviewer_name && r.reviewer_name.trim()) return r.reviewer_name.trim();
+    const p = profiles[r.user_id];
+    return p?.business_name || p?.organizer_name || (p?.handle ? `@${p.handle}` : "Anonymous");
+  };
 
   return (
     <div style={{ marginTop: 28 }}>
@@ -133,6 +141,9 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
           (editing || !myReview) ? (
             <div style={{ backgroundColor: "#faf5ff", border: "1px solid #e5d5f5", borderRadius: 10, padding: 16, marginBottom: 20 }}>
               <p style={{ margin: "0 0 8px", fontWeight: "bold", fontSize: 14 }}>{myReview ? "Edit your review" : "Write a review"}</p>
+              <label style={{ fontSize: 12, fontWeight: "bold", color: "#555", display: "block", marginBottom: 4 }}>Your name *</label>
+              <input value={formName} onChange={e => setFormName(e.target.value)} placeholder="How should we display your name?"
+                style={{ display: "block", width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box", marginBottom: 10 }} />
               <div style={{ marginBottom: 10 }}>
                 <StarRatingInput value={formRating} onChange={setFormRating} />
               </div>
@@ -140,7 +151,7 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
                 style={{ display: "block", width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #ddd", fontSize: 14, boxSizing: "border-box", marginBottom: 10, resize: "vertical" }} />
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={submitReview} disabled={saving} style={{ padding: "9px 18px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>{saving ? "Saving..." : myReview ? "Update Review" : "Submit Review"}</button>
-                {myReview && <button onClick={() => { setEditing(false); setFormRating(myReview.rating); setFormText(myReview.review_text || ""); }} style={{ padding: "9px 18px", backgroundColor: "#eee", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>}
+                {myReview && <button onClick={() => { setEditing(false); setFormRating(myReview.rating); setFormText(myReview.review_text || ""); setFormName(myReview.reviewer_name || ""); }} style={{ padding: "9px 18px", backgroundColor: "#eee", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>Cancel</button>}
               </div>
             </div>
           ) : (
@@ -164,7 +175,7 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {reviews.map(r => {
             const p = profiles[r.user_id];
-            const name = p?.business_name || p?.organizer_name || (p?.handle ? `@${p.handle}` : "User");
+            const name = displayName(r);
             return (
               <div key={r.id} style={{ borderBottom: "1px solid #f0f0f0", paddingBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -196,4 +207,4 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
       )}
     </div>
   );
-}
+                  }
