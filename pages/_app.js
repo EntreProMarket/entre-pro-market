@@ -50,11 +50,29 @@ function ServiceWorkerRegister() {
   return null;
 }
 
+// ── Detects iOS/iPadOS Safari — these browsers NEVER fire the
+// `beforeinstallprompt` event (Apple has never implemented it), so the
+// Android-style InstallBanner below silently never appears there. This
+// detects that environment specifically so we can show manual instructions
+// instead. Also excludes an already-installed PWA (running in standalone
+// mode) so the banner doesn't show to someone who already installed it. ──
+function isIosSafari() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const ua = window.navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
+  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  const isStandalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+  return isIOS && isSafari && !isStandalone;
+}
+
 // ── Custom purple "Install App" banner — captures Chrome's install prompt
-// and shows our own UI instead of relying on Chrome's default top-right icon ──
+// and shows our own UI instead of relying on Chrome's default top-right icon.
+// On iOS/iPadOS Safari, shows manual "Add to Home Screen" instructions instead,
+// since the native install prompt event never fires there. ──
 function InstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [visible, setVisible] = useState(false);
+  const [showIosInstructions, setShowIosInstructions] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -63,6 +81,16 @@ function InstallBanner() {
       setVisible(true);
     };
     window.addEventListener("beforeinstallprompt", handler);
+
+    // iOS/iPadOS Safari: no beforeinstallprompt event ever fires, so check
+    // directly and show instructions instead, once per session.
+    if (isIosSafari()) {
+      const dismissedThisSession = sessionStorage.getItem("epm_ios_install_dismissed");
+      if (!dismissedThisSession) {
+        setShowIosInstructions(true);
+      }
+    }
+
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
@@ -75,6 +103,22 @@ function InstallBanner() {
   };
 
   const handleDismiss = () => setVisible(false);
+
+  const handleIosDismiss = () => {
+    setShowIosInstructions(false);
+    sessionStorage.setItem("epm_ios_install_dismissed", "true");
+  };
+
+  if (showIosInstructions) {
+    return (
+      <div style={{ position: "fixed", bottom: 0, left: 0, width: "100%", backgroundColor: "#701890", color: "white", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, zIndex: 99999, boxShadow: "0 -2px 12px rgba(0,0,0,0.2)", fontFamily: "sans-serif", boxSizing: "border-box" }}>
+        <span style={{ fontSize: 13, fontWeight: "bold", lineHeight: 1.4 }}>
+          📲 Install this app: tap <strong>Share</strong> <span style={{ fontSize: 15 }}>⬆️</span>, then <strong>"Add to Home Screen"</strong>
+        </span>
+        <button onClick={handleIosDismiss} style={{ padding: "8px 14px", backgroundColor: "transparent", color: "white", border: "1px solid rgba(255,255,255,0.5)", borderRadius: 20, cursor: "pointer", fontSize: 13, flexShrink: 0 }}>Got it</button>
+      </div>
+    );
+  }
 
   if (!visible) return null;
 
