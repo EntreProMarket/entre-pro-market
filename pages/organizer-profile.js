@@ -99,9 +99,6 @@ export default function OrganizerProfile() {
   const [pfQueue, setPfQueue] = useState([]);
   const [pfIndex, setPfIndex] = useState(0);
   const [pfEditSrc, setPfEditSrc] = useState(null);
-  // ── Tracks the standalone portfolio re-crop upload (outside the main Save
-  // Profile flow) so it also triggers the full-screen uploading overlay
-  // below instead of only a small text message that's easy to miss. ──
   const [repoUploading, setRepoUploading] = useState(false);
 
   useEffect(() => {
@@ -326,7 +323,7 @@ export default function OrganizerProfile() {
       <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
       <input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} style={iS} />
 
-      {/* LOGO */}
+          {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
         <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
         {editingLogo ? (
@@ -577,3 +574,50 @@ export default function OrganizerProfile() {
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+              <button onClick={saveEvent} disabled={savingEvent} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEvent ? "Saving..." : editingEvent ? "Update Event" : "Add Event"}</button>
+            </div>
+          </div>
+
+{events.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {events.map(ev => (
+                <div key={ev.id} style={{ backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    {ev.flyer_url && <div style={{ width: 56, height: 56, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={ev.flyer_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                    <div>
+                      <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
+                      {ev.category && <p style={{ margin: "1px 0 0", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{ev.category}</p>}
+                      <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>{ev.event_date ? new Date(ev.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date TBD"}{ev.event_start_time && ` · ${formatTime(ev.event_start_time)}`}</p>
+                      {ev.venue && <p style={{ margin: "2px 0 0", fontSize: 12, color: "#aaa" }}>{ev.venue}</p>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                    <button onClick={() => deleteEvent(ev.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {events.length === 0 && <p style={{ fontSize: 13, color: "#888", margin: 0 }}>No events yet. Add your first event above!</p>}
+        </div>
+      )}
+
+      {message && <p style={{ padding: "12px 16px", backgroundColor: message.startsWith("✅") ? "#f0fdf4" : message.startsWith("⚠️") ? "#fff8e1" : "#fef2f2", border: `1px solid ${message.startsWith("✅") ? "#86efac" : message.startsWith("⚠️") ? "#f0c040" : "#fca5a5"}`, borderRadius: 6, color: message.startsWith("✅") ? "#166534" : message.startsWith("⚠️") ? "#856404" : "#991b1b", fontWeight: "bold", marginTop: 16 }}>{message}</p>}
+
+      <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end", gap: 12 }}>
+        <button onClick={() => router.replace("/organizer-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
+        <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>{saving ? "Saving..." : "Save Profile"}</button>
+      </div>
+
+      {flyerFullscreen && flyerPreviewSrc && (
+        <div onClick={() => setFlyerFullscreen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" }}>
+          <img src={flyerPreviewSrc} style={{ maxWidth: "95%", maxHeight: "95vh", borderRadius: 8, objectFit: "contain" }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const iS = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
+const lS = { display: "block", fontWeight: "bold", marginBottom: 6, fontSize: 14, color: "#333" };
