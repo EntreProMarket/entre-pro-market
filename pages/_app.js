@@ -1,18 +1,13 @@
 import "cropperjs/dist/cropper.css";
 // pages/_app.js
 // Global 30-minute auto-logout for ALL pages and account types.
-// Uses a stored timestamp + visibility checks instead of relying purely on
-// setTimeout, since mobile OSes suspend JS timers when a tab is backgrounded
-// (phone locked, app switched) — a plain setTimeout can fire late or not at
-// all, letting a session outlive 30 minutes. Checking real elapsed time
-// whenever the tab becomes active again closes that gap.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 const INACTIVITY_MS = 30 * 60 * 1000;
 const LAST_ACTIVITY_KEY = "epm_last_activity";
-const CHECK_INTERVAL_MS = 30 * 1000; // periodic safety check while tab is open
+const CHECK_INTERVAL_MS = 30 * 1000;
 
 function AutoLogout() {
   const router = useRouter();
@@ -22,6 +17,11 @@ function AutoLogout() {
       localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
     };
 
+    // ── Checks real elapsed time against the stored timestamp and signs
+    // out if expired. Critically, this must run BEFORE recordActivity()
+    // gets a chance to reset the clock — otherwise every page load/refresh
+    // silently renews a session that should have expired, which is exactly
+    // what let a page stay open all night without ever logging out. ──
     const checkAndLogoutIfExpired = async () => {
       const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
       const now = Date.now();
@@ -31,28 +31,25 @@ function AutoLogout() {
           await supabase.auth.signOut();
           router.replace("/?timeout=1");
         }
+        recordActivity(); // reset the clock either way, so we don't loop
       } else {
         recordActivity();
       }
     };
 
-    // Mark activity now, on load
-    recordActivity();
+    // On mount (including refresh): check expiry FIRST, don't blindly
+    // stamp a fresh "active now" timestamp before that check runs.
+    checkAndLogoutIfExpired();
 
-    // Any user interaction resets the clock
     const events = ["mousemove", "keydown", "touchstart", "click", "scroll"];
     events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }));
 
-    // The critical check: whenever the tab becomes visible again (phone
-    // unlocked, app switched back to), verify real elapsed time immediately —
-    // this is what catches a background suspension a setTimeout would miss.
     const handleVisibility = () => {
       if (document.visibilityState === "visible") checkAndLogoutIfExpired();
     };
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("focus", checkAndLogoutIfExpired);
 
-    // Periodic safety net while the tab stays open and active
     const interval = setInterval(checkAndLogoutIfExpired, CHECK_INTERVAL_MS);
 
     return () => {
@@ -66,9 +63,6 @@ function AutoLogout() {
   return null;
 }
 
-// ── Registers public/sw.js so Chrome/Android will recognize the app as
-// installable. Without this, the service worker file exists but never
-// runs, and Chrome has no basis to offer the "Add to Home Screen" prompt. ──
 function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
@@ -81,12 +75,6 @@ function ServiceWorkerRegister() {
   return null;
 }
 
-// ── Detects iOS/iPadOS Safari — these browsers NEVER fire the
-// `beforeinstallprompt` event (Apple has never implemented it), so the
-// Android-style InstallBanner below silently never appears there. This
-// detects that environment specifically so we can show manual instructions
-// instead. Also excludes an already-installed PWA (running in standalone
-// mode) so the banner doesn't show to someone who already installed it. ──
 function isIosSafari() {
   if (typeof window === "undefined" || typeof navigator === "undefined") return false;
   const ua = window.navigator.userAgent;
@@ -96,10 +84,6 @@ function isIosSafari() {
   return isIOS && isSafari && !isStandalone;
 }
 
-// ── Custom purple "Install App" banner — captures Chrome's install prompt
-// and shows our own UI instead of relying on Chrome's default top-right icon.
-// On iOS/iPadOS Safari, shows manual "Add to Home Screen" instructions instead,
-// since the native install prompt event never fires there. ──
 function InstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [visible, setVisible] = useState(false);
