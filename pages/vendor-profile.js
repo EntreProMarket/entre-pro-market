@@ -118,6 +118,11 @@ export default function VendorProfile() {
   const [markingSale, setMarkingSale] = useState(false);
   const [markSaleMessage, setMarkSaleMessage] = useState("");
 
+  // ── Tracks the standalone portfolio re-crop upload (outside the main Save
+  // Profile flow) so it also triggers the full-screen uploading overlay
+  // instead of only a small text message that's easy to miss. ──
+  const [repoUploading, setRepoUploading] = useState(false);
+
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase.auth.getUser();
@@ -288,6 +293,16 @@ const handleSave = async () => {
 
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
+      {/* ── UPLOADING OVERLAY — now also covers the portfolio re-crop upload ── */}
+      {(saving || repoUploading) && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, textAlign: "center" }}>
+          <style>{`@keyframes epm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontSize: 56, animation: "epm-spin 1.6s linear infinite", marginBottom: 20 }}>⏳</div>
+          <p style={{ color: "white", fontWeight: "bold", fontSize: 17, margin: "0 0 8px" }}>Uploading your files...</p>
+          <p style={{ color: "#ddd", fontSize: 14, maxWidth: 320, lineHeight: 1.6, margin: 0 }}>Photos can take a moment, especially on mobile data. Please stay on this page and be patient.</p>
+        </div>
+      )}
+
       <h1 style={{ marginBottom: 20 }}>Edit Vendor Profile</h1>
       <div style={{ display: "flex", marginBottom: 24, borderBottom: "2px solid #ddd" }}>
         <button onClick={() => setActiveTab("profile")} style={{ flex: 1, padding: 12, fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "none", background: "none", border: "none", cursor: "pointer" }}>📋 Profile</button>
@@ -317,7 +332,7 @@ const handleSave = async () => {
           <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
           <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
 
-<div style={{ marginTop: 16, marginBottom: 8 }}>
+              <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
             {editingLogo ? (
               <ImageEditor
@@ -378,10 +393,12 @@ const handleSave = async () => {
                   onDone={async (file) => {
                     const idx = repositioningIndex;
                     setRepositioningIndex(null);
-                    setMessage("⏳ Updating image...");
+                    setRepoUploading(true);
+                    setMessage("");
                     const comp = await compressImage(file, 1200, 0.9);
                     const url = await uploadFile(comp, "vendor-portfolio");
                     if (url) { setPortfolioImages(prev => prev.map((u, i2) => i2 === idx ? url : u)); setMessage("✅ Image updated — remember to Save Profile."); }
+                    setRepoUploading(false);
                   }}
                 />
               </div>
