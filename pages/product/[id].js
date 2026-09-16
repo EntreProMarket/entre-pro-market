@@ -5,6 +5,8 @@ import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
 import ReviewsSection from "../../components/ReviewsSection";
+import useLoadingTimeout from "../../hooks/useLoadingTimeout";
+import LoadTimeoutFallback from "../../components/LoadTimeoutFallback";
 
 export default function ProductPage() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export default function ProductPage() {
   const [manualPay, setManualPay] = useState(null);
   const [currentImg, setCurrentImg] = useState(0);
   const [eligibility, setEligibility] = useState({ checking: true, allowed: false, reason: "" });
+  const timedOut = useLoadingTimeout(loading);
 
   useEffect(() => {
     if (!id) return;
@@ -42,9 +45,6 @@ export default function ProductPage() {
         if (isFreeVendor) {
           setEligibility({ checking: false, allowed: true, reason: "" });
         } else {
-          // ── proof_status.neq.rejected — a manually-marked sale that's been
-          // rejected no longer counts, even though it was momentarily "paid".
-          // Stripe orders have proof_status "approved" so they're unaffected. ──
           const { data: order } = await supabase
             .from("orders")
             .select("id, proof_status")
@@ -85,6 +85,7 @@ export default function ProductPage() {
     setBuying(false);
   };
 
+  if (loading && timedOut) return <LoadTimeoutFallback label="this product" />;
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
   if (!product) return <div style={{ padding: 40, textAlign: "center" }}>Product not found.</div>;
 
