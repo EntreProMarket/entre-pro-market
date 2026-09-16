@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import { getOfflineSafeUser } from "../lib/getOfflineSafeUser";
 import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
@@ -26,8 +27,7 @@ export default function Marketplace() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUser = userData?.user || null;
+      const currentUser = await getOfflineSafeUser();
       setUser(currentUser);
       if (currentUser) {
         const { data: profileData } = await supabase.from("profiles").select("role, is_admin").eq("id", currentUser.id).single();
@@ -78,7 +78,6 @@ export default function Marketplace() {
     <div style={{ fontFamily: "sans-serif" }}>
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
 
-      {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -156,7 +155,6 @@ export default function Marketplace() {
     <PageFooter />
     <FooterBar />
 
-      {/* EMAIL GATE */}
       {emailGateOpen && (
         <div onClick={() => setEmailGateOpen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999, padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ backgroundColor: "white", borderRadius: 16, padding: "32px 28px", maxWidth: 380, width: "100%", textAlign: "center" }}>
@@ -180,4 +178,4 @@ export default function Marketplace() {
       )}
     </div>
   );
-}
+    }
