@@ -4,6 +4,8 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import DashboardLayout from "../components/DashboardLayout";
 import AnnouncementBanner from "../components/AnnouncementBanner";
+import useLoadingTimeout from "../hooks/useLoadingTimeout";
+import LoadTimeoutFallback from "../components/LoadTimeoutFallback";
 
 export default function VendorDashboard() {
   const router = useRouter();
@@ -11,6 +13,7 @@ export default function VendorDashboard() {
   const [loading, setLoading] = useState(true);
   const [messageCount, setMessageCount] = useState(0);
   const [profileViews, setProfileViews] = useState(0);
+  const timedOut = useLoadingTimeout(loading);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -34,6 +37,7 @@ export default function VendorDashboard() {
     loadUser();
   }, [router]);
 
+  if (loading && timedOut) return <LoadTimeoutFallback label="your dashboard" />;
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   const tier = profile?.account_type || "free";
@@ -94,7 +98,6 @@ export default function VendorDashboard() {
           </div>
         </div>
 
-        {/* ── Profile Insights — Featured Vendors only ── */}
         {tier === "featured" && (
           <button onClick={() => router.push("/profile-insights")}
             style={{ width: "100%", padding: "14px", backgroundColor: "#111", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", cursor: "pointer", fontSize: 15, marginTop: 4 }}>
