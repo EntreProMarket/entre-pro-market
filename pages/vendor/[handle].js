@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import useInactivityLogout from "../../hooks/useInactivityLogout";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { getOfflineSafeUser } from "../../lib/getOfflineSafeUser";
 import { SocialLinks } from "../../components/SocialIcons";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
 
@@ -35,8 +36,7 @@ export default function VendorPublicProfile() {
   useEffect(() => {
     if (!handle) return;
     const fetchVendor = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
+      const user = await getOfflineSafeUser();
 
       if (!handle || handle === "undefined" || handle === "null") {
         if (user) {
@@ -233,5 +233,4 @@ export default function VendorPublicProfile() {
       )}
     </div>
   );
-}
-
+                                                                        }
