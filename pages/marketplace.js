@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
-import { getOfflineSafeUser } from "../lib/getOfflineSafeUser";
 import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
@@ -27,7 +26,8 @@ export default function Marketplace() {
 
   useEffect(() => {
     const load = async () => {
-      const currentUser = await getOfflineSafeUser();
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user || null;
       setUser(currentUser);
       if (currentUser) {
         const { data: profileData } = await supabase.from("profiles").select("role, is_admin").eq("id", currentUser.id).single();
@@ -178,4 +178,4 @@ export default function Marketplace() {
       )}
     </div>
   );
-    }
+}
