@@ -1,4 +1,4 @@
-// pages/_document.js
+        // pages/_document.js
 
 import { Html, Head, Main, NextScript } from "next/document";
 
@@ -15,7 +15,6 @@ export default function Document() {
             padding: 0;
             max-width: 100vw;
             overflow-x: hidden;
-            overscroll-behavior-y: none;
             touch-action: pan-x pan-y;
             -ms-touch-action: pan-x pan-y;
           }
