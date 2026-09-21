@@ -56,18 +56,13 @@ function AutoLogout() {
   return null;
 }
 
-// ── KILL SWITCH: registers the self-destructing service worker once so it
-// can unregister itself and wipe stale caches on devices that still have the
-// old caching service worker installed. Safe to leave in place. ──
-function ServiceWorkerRegister() {
-  useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
-  }, []);
-
-  return null;
-}
+// ── Service worker registration REMOVED. It was causing a reload loop:
+// the kill-switch sw.js unregisters itself, but this component was
+// re-registering it on every single page load, which re-triggered the
+// unregister-and-reload cycle endlessly — that was the freeze. Any
+// service worker already installed on a device will still get cleaned
+// up next time it runs (browsers check for updates periodically), but
+// nothing here will ever re-register one again. ──
 
 function isIosSafari() {
   if (typeof window === "undefined" || typeof navigator === "undefined") return false;
@@ -154,10 +149,9 @@ function BfcacheGuard() {
 export default function App({ Component, pageProps }) {
   return (
     <>
-      <ServiceWorkerRegister />
       <AutoLogout />
       <Component {...pageProps} />
       <InstallBanner />
     </>
   );
-      }
+}
