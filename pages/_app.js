@@ -17,11 +17,6 @@ function AutoLogout() {
       localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
     };
 
-    // ── Checks real elapsed time against the stored timestamp and signs
-    // out if expired. Critically, this must run BEFORE recordActivity()
-    // gets a chance to reset the clock — otherwise every page load/refresh
-    // silently renews a session that should have expired, which is exactly
-    // what let a page stay open all night without ever logging out. ──
     const checkAndLogoutIfExpired = async () => {
       const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
       const now = Date.now();
@@ -31,14 +26,12 @@ function AutoLogout() {
           await supabase.auth.signOut();
           router.replace("/?timeout=1");
         }
-        recordActivity(); // reset the clock either way, so we don't loop
+        recordActivity();
       } else {
         recordActivity();
       }
     };
 
-    // On mount (including refresh): check expiry FIRST, don't blindly
-    // stamp a fresh "active now" timestamp before that check runs.
     checkAndLogoutIfExpired();
 
     const events = ["mousemove", "keydown", "touchstart", "click", "scroll"];
@@ -63,12 +56,13 @@ function AutoLogout() {
   return null;
 }
 
+// ── KILL SWITCH: registers the self-destructing service worker once so it
+// can unregister itself and wipe stale caches on devices that still have the
+// old caching service worker installed. Safe to leave in place. ──
 function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.error("Service worker registration failed:", err);
-      });
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
 
@@ -166,4 +160,4 @@ export default function App({ Component, pageProps }) {
       <InstallBanner />
     </>
   );
-}
+      }
