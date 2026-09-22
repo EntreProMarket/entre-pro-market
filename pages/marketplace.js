@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import useForceLogoutIfExpired from "../hooks/useForceLogoutIfExpired";
 import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
@@ -10,6 +11,7 @@ const CATEGORIES = ["All","DJ","Photographer","Videographer","Caterer","Decorato
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
 export default function Marketplace() {
+  useForceLogoutIfExpired();
   const router = useRouter();
   const [vendors, setVendors] = useState([]);
   const [filtered, setFiltered] = useState([]);
