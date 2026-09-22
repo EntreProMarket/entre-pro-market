@@ -1,6 +1,7 @@
 // pages/vendor/[handle].js
 import { useRouter } from "next/router";
 import useInactivityLogout from "../../hooks/useInactivityLogout";
+import useForceLogoutIfExpired from "../../hooks/useForceLogoutIfExpired";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
@@ -11,6 +12,7 @@ const logoBoxStyle = { maxWidth: 220, borderRadius: 12, border: "1px solid #e5e7
 
 export default function VendorPublicProfile() {
   useInactivityLogout();
+  useForceLogoutIfExpired();
   const router = useRouter();
   const { handle, tab, from: fromParam } = router.query;
   const [vendor, setVendor] = useState(null);
