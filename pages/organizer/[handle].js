@@ -1,6 +1,7 @@
 // pages/organizer/[handle].js
 import { useRouter } from "next/router";
 import useInactivityLogout from "../../hooks/useInactivityLogout";
+import useForceLogoutIfExpired from "../../hooks/useForceLogoutIfExpired";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
@@ -23,6 +24,7 @@ function isUploadedGifUrl(url) { if (!url) return false; const clean = url.split
 
 export default function OrganizerPublicProfile() {
   useInactivityLogout();
+  useForceLogoutIfExpired();
   const router = useRouter();
   const { handle, from: fromParam } = router.query;
   const [organizer, setOrganizer] = useState(null);
