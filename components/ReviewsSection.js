@@ -6,6 +6,9 @@ import { StarRating, StarRatingInput, RatingBreakdown } from "./StarRating";
 function formatDate(d) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
+function formatDateTime(d) {
+  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
 
 /**
  * Reusable reviews block for both products and events.
@@ -16,12 +19,13 @@ function formatDate(d) {
  * - idValue: the product/event id
  * - extraMatch: {} — additional eq filters (e.g. { event_source: "elite" })
  * - replyField / replyAtField: "vendor_reply"/"vendor_reply_at" or "organizer_reply"/"organizer_reply_at"
+ * - replyEditedAtField / replyHistoryField: "vendor_reply_edited_at"/"vendor_reply_history" or organizer equivalents
  * - ownerUserId: the vendor's or organizer's user id who may reply (null if none, e.g. admin-only EPM events)
  * - currentUser: the logged-in user object (or null)
  * - isAdmin: boolean — admin override, can always reply
  * - eligibility: { checking: bool, allowed: bool, reason: string }
  */
-export default function ReviewsSection({ tableName, idField, idValue, extraMatch = {}, replyField, replyAtField, ownerUserId, currentUser, isAdmin, eligibility }) {
+export default function ReviewsSection({ tableName, idField, idValue, extraMatch = {}, replyField, replyAtField, replyEditedAtField, replyHistoryField, ownerUserId, currentUser, isAdmin, eligibility }) {
   const [reviews, setReviews] = useState([]);
   const [profiles, setProfiles] = useState({});
   const [loading, setLoading] = useState(true);
@@ -33,6 +37,8 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
   const [saving, setSaving] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [savingReply, setSavingReply] = useState(null);
+  const [editingReplyId, setEditingReplyId] = useState(null);
+  const [historyOpenId, setHistoryOpenId] = useState(null);
   const [message, setMessage] = useState("");
 
   const canReply = (r) => isAdmin || (ownerUserId && currentUser && currentUser.id === ownerUserId);
@@ -92,18 +98,40 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
     await load();
   };
 
-  const submitReply = async (reviewId) => {
-    const text = (replyDrafts[reviewId] || "").trim();
+  const submitReply = async (review) => {
+    const text = (replyDrafts[review.id] || "").trim();
     if (!text) return;
-    setSavingReply(reviewId);
+    setSavingReply(review.id);
     try {
-      await supabase.from(tableName).update({ [replyField]: text, [replyAtField]: new Date().toISOString() }).eq("id", reviewId);
+      const now = new Date().toISOString();
+      const existingText = review[replyField];
+      const existingHistory = review[replyHistoryField] || [];
+
+      // If there's an existing reply being edited, push it into history before overwriting.
+      const newHistory = existingText
+        ? [...existingHistory, { text: existingText, replaced_at: now }]
+        : existingHistory;
+
+      const update = {
+        [replyField]: text,
+        [replyAtField]: existingText ? review[replyAtField] : now, // preserve original post time
+        [replyEditedAtField]: existingText ? now : null, // only set edited timestamp if this was an edit
+        [replyHistoryField]: newHistory,
+      };
+
+      await supabase.from(tableName).update(update).eq("id", review.id);
       await load();
-      setReplyDrafts(prev => ({ ...prev, [reviewId]: "" }));
+      setReplyDrafts(prev => ({ ...prev, [review.id]: "" }));
+      setEditingReplyId(null);
     } catch (err) {
       setMessage("❌ " + err.message);
     }
     setSavingReply(null);
+  };
+
+  const startEditReply = (review) => {
+    setEditingReplyId(review.id);
+    setReplyDrafts(prev => ({ ...prev, [review.id]: review[replyField] || "" }));
   };
 
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
@@ -176,6 +204,11 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
           {reviews.map(r => {
             const p = profiles[r.user_id];
             const name = displayName(r);
+            const hasReply = !!r[replyField];
+            const isEditingThisReply = editingReplyId === r.id;
+            const history = r[replyHistoryField] || [];
+            const historyOpen = historyOpenId === r.id;
+
             return (
               <div key={r.id} style={{ borderBottom: "1px solid #f0f0f0", paddingBottom: 14 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -186,18 +219,45 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
                 </div>
                 {r.review_text && <p style={{ margin: "4px 0 0", fontSize: 14, color: "#444", lineHeight: 1.5 }}>{r.review_text}</p>}
 
-                {r[replyField] && (
+                {hasReply && !isEditingThisReply && (
                   <div style={{ marginTop: 8, marginLeft: 16, paddingLeft: 12, borderLeft: "3px solid #AABB23" }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: "bold", color: "#701890" }}>Reply:</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 13, color: "#555" }}>{r[replyField]}</p>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: "bold", color: "#701890" }}>
+                          Reply {r[replyEditedAtField] && <span style={{ fontWeight: "normal", color: "#aaa" }}>(edited {formatDate(r[replyEditedAtField])})</span>}
+                        </p>
+                        <p style={{ margin: "2px 0 0", fontSize: 13, color: "#555" }}>{r[replyField]}</p>
+                      </div>
+                      {canReply(r) && (
+                        <button onClick={() => startEditReply(r)} style={{ padding: "3px 10px", backgroundColor: "#eee", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 11, fontWeight: "bold", color: "#555", flexShrink: 0 }}>Edit</button>
+                      )}
+                    </div>
+                    {history.length > 0 && (
+                      <button onClick={() => setHistoryOpenId(historyOpen ? null : r.id)} style={{ marginTop: 6, background: "none", border: "none", color: "#888", fontSize: 11, cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+                        {historyOpen ? "Hide" : "View"} edit history ({history.length})
+                      </button>
+                    )}
+                    {historyOpen && (
+                      <div style={{ marginTop: 8, backgroundColor: "#f9f9f9", borderRadius: 8, padding: 10 }}>
+                        {history.slice().reverse().map((h, i) => (
+                          <div key={i} style={{ marginBottom: i < history.length - 1 ? 8 : 0, paddingBottom: i < history.length - 1 ? 8 : 0, borderBottom: i < history.length - 1 ? "1px solid #eee" : "none" }}>
+                            <p style={{ margin: 0, fontSize: 11, color: "#aaa" }}>{formatDateTime(h.replaced_at)}</p>
+                            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#777" }}>{h.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {canReply(r) && !r[replyField] && (
+                {canReply(r) && (isEditingThisReply || !hasReply) && (
                   <div style={{ marginTop: 8, marginLeft: 16, display: "flex", gap: 8 }}>
                     <input value={replyDrafts[r.id] || ""} onChange={e => setReplyDrafts(prev => ({ ...prev, [r.id]: e.target.value }))} placeholder="Write a reply..."
                       style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "1px solid #ddd", fontSize: 13 }} />
-                    <button onClick={() => submitReply(r.id)} disabled={savingReply === r.id} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{savingReply === r.id ? "..." : "Reply"}</button>
+                    <button onClick={() => submitReply(r)} disabled={savingReply === r.id} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{savingReply === r.id ? "..." : hasReply ? "Save" : "Reply"}</button>
+                    {isEditingThisReply && (
+                      <button onClick={() => { setEditingReplyId(null); setReplyDrafts(prev => ({ ...prev, [r.id]: "" })); }} style={{ padding: "7px 14px", backgroundColor: "#eee", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>Cancel</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -207,4 +267,4 @@ export default function ReviewsSection({ tableName, idField, idValue, extraMatch
       )}
     </div>
   );
-                  }
+}
