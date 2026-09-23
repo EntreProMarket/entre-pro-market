@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import useForceLogoutIfExpired from "../hooks/useForceLogoutIfExpired";
 import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
@@ -33,6 +34,7 @@ function parsePos(url) {
 const COVER_ASPECT_RATIO = "8 / 5";
 
 export default function HomePage() {
+  useForceLogoutIfExpired();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [featuredVendors, setFeaturedVendors] = useState([]);
