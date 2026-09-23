@@ -104,11 +104,21 @@ export default function VendorProfile() {
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
   const [newProductImages, setNewProductImages] = useState([]);
   const [newProductImageKey, setNewProductImageKey] = useState(0);
+  // ── New-product image crop queue — mirrors the Portfolio pfQueue pattern.
+  // Previously this picker took raw files straight into newProductImages
+  // with no crop step at all, which is why product images displayed wrong. ──
+  const [npQueue, setNpQueue] = useState([]);
+  const [npIndex, setNpIndex] = useState(0);
+  const [npEditSrc, setNpEditSrc] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({ title: "", description: "", price: "" });
   const [editProductImages, setEditProductImages] = useState([]);
   const [editProductNewFiles, setEditProductNewFiles] = useState([]);
   const [editProductFileKey, setEditProductFileKey] = useState(0);
+  // ── Same crop queue for images added while editing an existing product. ──
+  const [epQueue, setEpQueue] = useState([]);
+  const [epIndex, setEpIndex] = useState(0);
+  const [epEditSrc, setEpEditSrc] = useState(null);
   const [userId, setUserId] = useState(null);
 
   const [markSaleProductId, setMarkSaleProductId] = useState(null);
@@ -236,6 +246,7 @@ const handleSave = async () => {
     setMessage("✅ Product added!");
     setNewProduct({ title: "", description: "", price: "" });
     setNewProductImages([]); setNewProductImageKey(k => k + 1);
+    setNpQueue([]); setNpIndex(0); setNpEditSrc(null);
     await loadProducts(userId);
   };
 
@@ -255,6 +266,7 @@ const handleSave = async () => {
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product updated!"); setEditingProduct(null);
     setEditProductNewFiles([]); setEditProductFileKey(k => k + 1);
+    setEpQueue([]); setEpIndex(0); setEpEditSrc(null);
     await loadProducts(userId);
   };
 
@@ -499,8 +511,32 @@ const handleSave = async () => {
                   ))}
                 </div>
               )}
-              {newProductImages.length < productImageLimit && (
-                <input key={newProductImageKey} type="file" accept="image/*" multiple onChange={e => { const remaining = productImageLimit - newProductImages.length; const files = Array.from(e.target.files).slice(0, remaining); setNewProductImages(prev => [...prev, ...files].slice(0, productImageLimit)); }} style={{ display: "block", marginBottom: 12 }} />
+              {/* ── Crop queue: each newly picked image is cropped via ImageEditor
+                   before it's added to newProductImages — same pattern as Portfolio. ── */}
+              {npEditSrc && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {npIndex + 1} of {npQueue.length}</p>
+                  <ImageEditor
+                    src={npEditSrc}
+                    aspect={null}
+                    onCancel={() => { setNpQueue([]); setNpIndex(0); setNpEditSrc(null); }}
+                    onDone={(file) => {
+                      setNewProductImages(prev => [...prev, file].slice(0, productImageLimit));
+                      const next = npIndex + 1;
+                      if (next < npQueue.length) { setNpIndex(next); setNpEditSrc(URL.createObjectURL(npQueue[next])); }
+                      else { setNpQueue([]); setNpIndex(0); setNpEditSrc(null); }
+                    }}
+                  />
+                </div>
+              )}
+              {!npEditSrc && newProductImages.length < productImageLimit && (
+                <input key={newProductImageKey} type="file" accept="image/*" multiple onChange={e => {
+                  const remaining = productImageLimit - newProductImages.length;
+                  const files = Array.from(e.target.files).slice(0, remaining);
+                  e.target.value = "";
+                  if (files.length === 0) return;
+                  setNpQueue(files); setNpIndex(0); setNpEditSrc(URL.createObjectURL(files[0]));
+                }} style={{ display: "block", marginBottom: 12 }} />
               )}
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
             </div>
@@ -536,15 +572,38 @@ const handleSave = async () => {
                               ))}
                             </div>
                           )}
-                          {editProductImages.length < productImageLimit && (
+                          {/* ── Same crop queue applied to images added while editing. ── */}
+                          {epEditSrc && (
+                            <div style={{ marginBottom: 10 }}>
+                              <p style={{ fontSize: 11, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {epIndex + 1} of {epQueue.length}</p>
+                              <ImageEditor
+                                src={epEditSrc}
+                                aspect={null}
+                                onCancel={() => { setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }}
+                                onDone={(file) => {
+                                  setEditProductNewFiles(prev => [...prev, file]);
+                                  const next = epIndex + 1;
+                                  if (next < epQueue.length) { setEpIndex(next); setEpEditSrc(URL.createObjectURL(epQueue[next])); }
+                                  else { setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }
+                                }}
+                              />
+                            </div>
+                          )}
+                          {!epEditSrc && editProductImages.length < productImageLimit && (
                             <div style={{ marginBottom: 8 }}>
                               <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more ({editProductImages.length}/{productImageLimit})</label>
-                              <input key={editProductFileKey} type="file" accept="image/*" multiple onChange={e => { const remaining = productImageLimit - editProductImages.length; setEditProductNewFiles(Array.from(e.target.files).slice(0, remaining)); }} style={{ display: "block" }} />
+                              <input key={editProductFileKey} type="file" accept="image/*" multiple onChange={e => {
+                                const remaining = productImageLimit - editProductImages.length;
+                                const files = Array.from(e.target.files).slice(0, remaining);
+                                e.target.value = "";
+                                if (files.length === 0) return;
+                                setEpQueue(files); setEpIndex(0); setEpEditSrc(URL.createObjectURL(files[0]));
+                              }} style={{ display: "block" }} />
                             </div>
                           )}
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={saveEditProduct} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Save</button>
-                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
+                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
                           </div>
                         </>
                       ) : (
@@ -582,7 +641,7 @@ const handleSave = async () => {
                             </div>
                           ) : (
                             <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                              <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                              <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                               <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                               <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                               <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleProofFile(null); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
