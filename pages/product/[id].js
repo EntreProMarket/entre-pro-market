@@ -226,6 +226,8 @@ export default function ProductPage() {
         extraMatch={{}}
         replyField="vendor_reply"
         replyAtField="vendor_reply_at"
+        replyEditedAtField="vendor_reply_edited_at"
+        replyHistoryField="vendor_reply_history"
         ownerUserId={product.vendor_id}
         currentUser={user}
         isAdmin={isAdmin}
