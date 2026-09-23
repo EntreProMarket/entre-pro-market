@@ -17,6 +17,12 @@ function AutoLogout() {
       localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
     };
 
+    // Only ever READS the timestamp and logs out if expired. It must never
+    // write to LAST_ACTIVITY_KEY itself — previously the "not yet expired"
+    // branch called recordActivity(), which meant every 30-second interval
+    // tick reset the clock even with zero real user interaction, so the
+    // timeout could never actually be reached while the tab stayed open.
+    // Real activity is recorded only by the genuine input listeners below.
     const checkAndLogoutIfExpired = async () => {
       const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
       const now = Date.now();
@@ -26,13 +32,12 @@ function AutoLogout() {
           await supabase.auth.signOut();
           router.replace("/?timeout=1");
         }
-        recordActivity();
-      } else {
-        recordActivity();
       }
     };
 
-    checkAndLogoutIfExpired();
+    // Establish a baseline on mount so a fresh page load starts its own
+    // 30-minute countdown even before any interaction happens.
+    recordActivity();
 
     const events = ["mousemove", "keydown", "touchstart", "click", "scroll"];
     events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }));
