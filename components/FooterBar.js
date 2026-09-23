@@ -1,6 +1,12 @@
 // components/FooterBar.js
 import { useEffect, useState, useRef } from "react";
 
+// Below this, a visualViewport height delta is almost certainly the iOS
+// Safari toolbar animating (typically 40-50px), not a keyboard (200px+).
+// We ignore small deltas so the footer doesn't float above the bottom
+// edge as the toolbar shows/hides during scroll.
+const KEYBOARD_GAP_THRESHOLD = 100;
+
 export default function FooterBar() {
   const [visible, setVisible] = useState(false);
   const [bottomOffset, setBottomOffset] = useState(0);
@@ -20,7 +26,8 @@ export default function FooterBar() {
       const vv = window.visualViewport;
       if (!vv) { setBottomOffset(0); return; }
       const gap = window.innerHeight - (vv.height + vv.offsetTop);
-      setBottomOffset(Math.max(0, gap));
+      const clamped = gap < KEYBOARD_GAP_THRESHOLD ? 0 : gap;
+      setBottomOffset(Math.max(0, clamped));
     };
 
     const handleTouchStart = () => {
