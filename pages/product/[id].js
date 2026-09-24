@@ -32,10 +32,12 @@ export default function ProductPage() {
       const { data: prod } = await supabase.from("vendor_products").select("*").eq("id", id).single();
       if (!prod) { setLoading(false); return; }
       setProduct(prod);
-      const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle, account_type").eq("id", prod.vendor_id).single();
+      const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle, account_type, is_admin").eq("id", prod.vendor_id).single();
       setVendor(v);
 
-      const isFreeVendor = !v?.account_type || v.account_type === "free";
+      // EPM Shop products (sold by an admin account) skip the purchase-verified
+      // review requirement entirely — same as free-tier vendors.
+      const isFreeVendor = !v?.account_type || v.account_type === "free" || v?.is_admin;
 
       if (currentUser) {
         const { data: myProfile } = await supabase.from("profiles").select("is_admin").eq("id", currentUser.id).single();
@@ -95,7 +97,9 @@ export default function ProductPage() {
   const cashappUrl = `https://cash.app/$${cashappHandle}/${price}`;
   const venmoUrl = `https://venmo.com/${venmoHandle}?txn=pay&amount=${price}&note=${productNote}`;
 
-  const backUrl = vendor?.handle ? `/vendor/${vendor.handle}?tab=shop` : null;
+  // EPM Shop products (sold by an admin account) link back to /epm-shop instead
+  // of a vendor profile — admin profiles typically have no business_name/handle set.
+  const backUrl = vendor?.is_admin ? "/epm-shop" : (vendor?.handle ? `/vendor/${vendor.handle}?tab=shop` : null);
 
   if (manualPay) {
     const isCashApp = manualPay === "cashapp";
@@ -183,7 +187,13 @@ export default function ProductPage() {
         </div>
       )}
 
-      {vendor && (
+      {vendor?.is_admin ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}
+          onClick={() => router.push("/epm-shop")}>
+          <img src="/logo-circle.png" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+          <span style={{ fontSize: 13, color: "#701890", fontWeight: "bold" }}>🏢 Entre PRO Market · EPM Shop</span>
+        </div>
+      ) : vendor && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}
           onClick={() => router.push(`/vendor/${vendor.handle}`)}>
           {vendor.logo_url && <img src={vendor.logo_url} style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />}
