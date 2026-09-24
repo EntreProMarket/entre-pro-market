@@ -2,9 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
-import AdminShopTab from "../components/AdminShopTab";
 
-const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Shop", "Community & News", "Messaging", "Business Email", "Reports", "Orders", "Exports", "Settings"];
+const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Community & News", "Messaging", "Business Email", "Reports", "Orders", "Exports", "Settings"];
 const BUSINESS_MAILBOXES = ["noreply", "support", "events", "shop", "services"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
@@ -262,7 +261,7 @@ export default function AdminDashboard() {
     }
   };
 
-// ── EPM EVENTS (Admin-created, shown mixed with Elite Organizer events on the Homepage) ──
+  // ── EPM EVENTS (Admin-created, shown mixed with Elite Organizer events on the Homepage) ──
   const saveEpmEvent = async () => {
     if (!epmEventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
     if (!epmEventForm.flyer_url && !epmFlyerFile) { setMessage("⚠️ A flyer image is required."); return; }
@@ -1154,9 +1153,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── SHOP TAB (logic lives in components/AdminShopTab.js) ── */}
-        {activeTab === "Shop" && <AdminShopTab adminId={adminId} />}
-
         {/* ── MESSAGING TAB ── */}
         {/* ── COMMUNITY & NEWS TAB ── */}
         {activeTab === "Community & News" && (
@@ -1303,4 +1299,200 @@ export default function AdminDashboard() {
                     {sentMessages.map(msg => (
                       <div key={msg.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 8, padding: 14 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
-                          <p style={{ margin: 0, fontWeight
+                          <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>To: {msg.recipient?.business_name || msg.recipient?.organizer_name || msg.recipient?.handle || "Unknown"}</p>
+                          <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{new Date(msg.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                        </div>
+                        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#444" }}>{msg.content}</p>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => replyToRecipient(msg)} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>↩️ Reply</button>
+                          <button onClick={() => resendMessage(msg)} style={{ padding: "5px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>🔁 Resend</button>
+                          <button onClick={() => deleteSentMessage(msg.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>🗑️ Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+{/* ── BUSINESS EMAIL TAB ── */}
+        {activeTab === "Business Email" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>📧 Business Email</h2>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Send and receive email from your @entrepromarket.com addresses — no Gmail involved, so your personal address is never exposed.</p>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+              {BUSINESS_MAILBOXES.map(mb => (
+                <button key={mb} onClick={() => { setActiveMailbox(mb); loadBusinessEmails(mb); }}
+                  style={{ padding: "8px 16px", backgroundColor: activeMailbox === mb ? "#701890" : "white", color: activeMailbox === mb ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>
+                  {mb}@
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <p style={{ margin: 0, fontSize: 13, color: "#888" }}>{activeMailbox}@entrepromarket.com</p>
+              <button onClick={() => openCompose({ to: "", subject: "" })} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>✏️ Compose</button>
+            </div>
+
+            {composeOpen && (
+              <div style={{ backgroundColor: "white", border: "2px solid #701890", borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 14 }}>{composeReplyId ? "↩️ Reply" : "✏️ New Email"} — from {activeMailbox}@entrepromarket.com</p>
+                <input placeholder="To (email address)" value={composeTo} onChange={e => setComposeTo(e.target.value)} style={inputStyle} />
+                <input placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} style={inputStyle} />
+                <textarea placeholder="Message" value={composeBody} onChange={e => setComposeBody(e.target.value)} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button onClick={() => { setComposeOpen(false); setComposeReplyId(null); }} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
+                  <button onClick={sendBusinessEmail} disabled={sendingBusinessEmail} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{sendingBusinessEmail ? "Sending..." : "📨 Send"}</button>
+                </div>
+              </div>
+            )}
+
+            {loadingBusinessEmails ? <p style={{ color: "#888" }}>Loading...</p> : businessEmails.length === 0 ? (
+              <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 32, textAlign: "center", color: "#aaa" }}>
+                <p style={{ fontSize: 36, margin: 0 }}>📧</p>
+                <p style={{ fontSize: 14, marginTop: 12 }}>No emails yet for {activeMailbox}@. Tap "🔍 refresh" by switching tabs, or Compose to send your first one.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {businessEmails.map(em => (
+                  <div key={em.id} style={{ backgroundColor: em.direction === "inbound" && !em.read ? "#faf5ff" : "white", border: `1px solid ${em.direction === "inbound" && !em.read ? "#701890" : "#eee"}`, borderRadius: 10, padding: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
+                      <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>
+                        {em.direction === "inbound" ? "📥 From: " : "📤 To: "}
+                        {em.direction === "inbound" ? em.from_address : em.to_address}
+                        {em.direction === "inbound" && !em.read && <span style={{ marginLeft: 8, fontSize: 10, backgroundColor: "#701890", color: "white", padding: "1px 6px", borderRadius: 8, fontWeight: "bold" }}>NEW</span>}
+                        {em.status === "failed" && <span style={{ marginLeft: 8, fontSize: 10, backgroundColor: "#cc0000", color: "white", padding: "1px 6px", borderRadius: 8, fontWeight: "bold" }}>FAILED</span>}
+                      </p>
+                      <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{new Date(em.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+                    </div>
+                    <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{em.subject}</p>
+                    <p style={{ margin: "0 0 12px", fontSize: 13, color: "#444", whiteSpace: "pre-wrap" }}>{em.body}</p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {em.direction === "inbound" && (
+                        <button onClick={() => openCompose({ to: em.from_address, subject: em.subject?.startsWith("Re:") ? em.subject : `Re: ${em.subject}`, replyId: em.id })} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>↩️ Reply</button>
+                      )}
+                      {em.direction === "inbound" && !em.read && (
+                        <button onClick={() => markEmailRead(em.id)} style={{ padding: "5px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>✓ Mark Read</button>
+                      )}
+                      <button onClick={() => deleteBusinessEmail(em.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>🗑️ Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "Reports" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>🚩 Reports</h2>
+            {reports.length === 0 ? <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 30, textAlign: "center", color: "#888" }}><p>No reports yet. 🎉</p></div> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {reports.map(report => (
+                  <div key={report.id} style={{ backgroundColor: "white", border: `1px solid ${report.status === "pending" ? "#fca5a5" : "#eee"}`, borderRadius: 10, padding: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                      <div><strong style={{ fontSize: 14 }}>{report.reporter?.business_name || report.reporter?.organizer_name || "Unknown"} reported a message</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{new Date(report.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p></div>
+                      <span style={{ padding: "4px 10px", borderRadius: 10, fontSize: 11, fontWeight: "bold", backgroundColor: report.status === "pending" ? "#fef2f2" : report.status === "resolved" ? "#f0fdf4" : "#f9ffe8", color: report.status === "pending" ? "#991b1b" : report.status === "resolved" ? "#166534" : "#888B00" }}>{report.status?.toUpperCase()}</span>
+                    </div>
+                    <div style={{ backgroundColor: "#f9f9f9", borderRadius: 6, padding: "10px 14px", marginBottom: 12 }}>
+                      <p style={{ margin: 0, fontSize: 12, color: "#666" }}><strong>Reason:</strong> {report.reason}</p>
+                      {report.message?.content && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#444", fontStyle: "italic" }}>"{report.message.content}"</p>}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button onClick={async () => { await supabase.from("reports").update({ status: "reviewed" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "reviewed" } : r)); setMessage("✅ Marked as reviewed"); }} style={{ padding: "7px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Mark Reviewed</button>
+                      <button onClick={async () => { await supabase.from("reports").update({ status: "resolved" }).eq("id", report.id); setReports(reports.map(r => r.id === report.id ? { ...r, status: "resolved" } : r)); setMessage("✅ Resolved"); }} style={{ padding: "7px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Resolve</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── EXPORTS TAB ── */}
+        {activeTab === "Exports" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>📥 Export User Data</h2>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 28 }}>Download spreadsheets (.csv) directly to your phone or computer. Opens in Excel, Google Sheets, or any spreadsheet app.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20 }}>
+              {[
+                { type: "vendors", label: "Vendors", icon: "🛒", color: "#701890", bg: "#f3e8ff", desc: "All vendors — name, handle, email, tier, city, state, category, signup date" },
+                { type: "organizers", label: "Organizers", icon: "🎪", color: "#AABB23", bg: "#f9ffe8", desc: "All organizers — name, handle, email, tier, city, state, category, signup date" },
+                { type: "public", label: "Public Users", icon: "👤", color: "#555", bg: "#f5f5f5", desc: "Public accounts with no role — email and signup date" },
+              ].map(({ type, label, icon, color, bg, desc }) => (
+                <div key={type} style={{ backgroundColor: "white", border: `1px solid ${color}30`, borderRadius: 12, padding: 24 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: bg, borderRadius: 20, padding: "5px 14px", marginBottom: 14 }}>
+                    <span>{icon}</span>
+                    <span style={{ color, fontWeight: "bold", fontSize: 14 }}>{label}</span>
+                  </div>
+                  <p style={{ color: "#666", fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>{desc}</p>
+                  <button
+                    onClick={() => downloadCSV(type, `entrepromarket-${type}-${new Date().toISOString().split("T")[0]}.csv`)}
+                    disabled={exportLoading === type}
+                    style={{ width: "100%", padding: "12px", backgroundColor: color, color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14, opacity: exportLoading === type ? 0.7 : 1 }}
+                  >
+                    {exportLoading === type ? "Preparing..." : `⬇️ Download ${label} CSV`}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "14px 20px", marginTop: 24 }}>
+              <p style={{ margin: 0, fontSize: 13, color: "#166534" }}>
+                ✅ Files download directly to your device. On mobile they save to your Downloads folder. On desktop they save to your Downloads folder automatically.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "Settings" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>⚙️ Settings</h2>
+            <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, marginBottom: 20 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 4 }}>📸 Photo & Video Upload Limits</h3>
+              <h4 style={{ color: "#701890", marginBottom: 12, marginTop: 16 }}>💜 Vendor Limits</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
+                {[{ key: "vendor_free_photos", label: "Free Photos" }, { key: "vendor_premium_photos", label: "Premium Photos" }, { key: "vendor_featured_photos", label: "Featured Photos" }, { key: "vendor_free_videos", label: "Free Videos" }, { key: "vendor_premium_videos", label: "Premium Videos" }, { key: "vendor_featured_videos", label: "Featured Videos" }].map(({ key, label }) => (
+                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
+                ))}
+              </div>
+              <h4 style={{ color: "#AABB23", marginBottom: 12, marginTop: 0 }}>🏆 Organizer Limits</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
+                {[{ key: "organizer_basic_photos", label: "Basic Photos" }, { key: "organizer_pro_photos", label: "Pro Photos" }, { key: "organizer_elite_photos", label: "Elite Photos" }].map(({ key, label }) => (
+                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
+                ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={saveLimits} disabled={saving} style={{ padding: "12px 28px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 15 }}>{saving ? "Saving..." : "💾 Save All Limits"}</button>
+              </div>
+            </div>
+            <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ marginTop: 0 }}>App Links</h3>
+              <p style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>Opens in a new tab so the Admin panel stays open.</p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <button onClick={() => window.open('/home', '_blank')} style={smallBtnStyle}>Homepage</button>
+                <button onClick={() => window.open('/marketplace', '_blank')} style={smallBtnStyle}>Marketplace</button>
+                <button onClick={() => window.open('/vendor-info', '_blank')} style={smallBtnStyle}>Vendor Info</button>
+                <button onClick={() => window.open('/organizer-info', '_blank')} style={smallBtnStyle}>Organizer Info</button>
+              </div>
+            </div>
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 10, padding: 20 }}>
+              <h3 style={{ marginTop: 0, color: "#856404" }}>⚠️ Danger Zone</h3>
+              <button onClick={async () => { if (confirm("Delete all NULL profiles? Cannot be undone.")) { await supabase.from("profiles").delete().is("business_name", null).eq("role", "vendor"); setMessage("✅ Null profiles deleted"); await loadAllData(); } }} style={{ padding: "10px 18px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🗑️ Delete Incomplete Profiles</button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
+const labelStyle = { display: "block", fontWeight: "bold", marginBottom: 5, fontSize: 13, color: "#333" };
+const thStyle = { padding: "12px 14px", textAlign: "left", fontWeight: "bold", whiteSpace: "nowrap" };
+const tdStyle = { padding: "12px 14px", borderBottom: "1px solid #eee", verticalAlign: "middle" };
+const smallBtnStyle = { padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 };
+const smallSelectStyle = { padding: "6px 8px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, backgroundColor: "white" };
