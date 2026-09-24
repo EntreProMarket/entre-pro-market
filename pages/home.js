@@ -45,6 +45,8 @@ export default function HomePage() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [flyerFullscreen, setFlyerFullscreen] = useState(false);
   const [articleZoomSrc, setArticleZoomSrc] = useState(null);
+  // ── EPM Shop badge — only shows when at least one admin-added product is active ──
+  const [epmShopHasProducts, setEpmShopHasProducts] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -74,6 +76,14 @@ export default function HomePage() {
 
       const { data: newsData } = await supabase.from("community_news").select("*").eq("published", true).order("created_at", { ascending: false }).limit(12);
       setNewsArticles(newsData || []);
+
+      const { data: adminProfiles } = await supabase.from("profiles").select("id").eq("is_admin", true);
+      const adminIds = (adminProfiles || []).map(a => a.id);
+      if (adminIds.length > 0) {
+        const { count } = await supabase.from("vendor_products").select("*", { count: "exact", head: true }).in("vendor_id", adminIds).eq("is_active", true);
+        setEpmShopHasProducts((count || 0) > 0);
+      }
+
       setLoading(false);
     };
     load();
@@ -161,7 +171,25 @@ export default function HomePage() {
           )}
         </div>
 
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 32, position: "relative" }}>
+          {epmShopHasProducts && (
+            <button
+              onClick={() => router.push("/epm-shop")}
+              title="EPM Shop"
+              style={{
+                position: "absolute", top: -14, right: 0, zIndex: 2,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                width: 64, height: 64, borderRadius: "50%",
+                background: "linear-gradient(135deg, #701890, #AABB23)",
+                color: "white", border: "3px solid white",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+                cursor: "pointer", fontWeight: "bold", lineHeight: 1.1, padding: 0
+              }}
+            >
+              <span style={{ fontSize: 13 }}>EPM</span>
+              <span style={{ fontSize: 9 }}>SHOP</span>
+            </button>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>👑 Upcoming Events</h2>
             {upcomingEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
