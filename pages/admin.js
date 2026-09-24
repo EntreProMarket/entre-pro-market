@@ -2,17 +2,13 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
-import ImageEditor from "../components/ImageEditor";
+import AdminShopTab from "../components/AdminShopTab";
 
 const TABS = ["Overview", "Plans & Pricing", "Public Users", "Free Vendors", "Premium Vendors", "Featured Vendors", "Basic Organizers", "Pro Organizers", "Elite Organizers", "Ads", "EPM Events", "Shop", "Community & News", "Messaging", "Business Email", "Reports", "Orders", "Exports", "Settings"];
 const BUSINESS_MAILBOXES = ["noreply", "support", "events", "shop", "services"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const BLANK_EPM_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
-// ── EPM Shop — admin-managed products, publicly listed at /epm-shop, no schema
-// changes needed: vendor_id just points at whichever admin profile added the item,
-// and the public page queries vendor_id IN (profiles WHERE is_admin = true). ──
-const SHOP_PRODUCT_IMAGE_LIMIT = 10;
 function parsePos(url) {
   if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
   const [base, frag] = url.split("#pos=");
@@ -130,24 +126,6 @@ export default function AdminDashboard() {
   const [reviewingOrderId, setReviewingOrderId] = useState(null);
   const [orderFullscreenImage, setOrderFullscreenImage] = useState(null);
 
-  // ── SHOP TAB (EPM Shop) ──
-  const [shopProducts, setShopProducts] = useState([]);
-  const [loadingShop, setLoadingShop] = useState(false);
-  const [shopNewProduct, setShopNewProduct] = useState({ title: "", description: "", price: "" });
-  const [shopNewProductImages, setShopNewProductImages] = useState([]);
-  const [shopNewProductImageKey, setShopNewProductImageKey] = useState(0);
-  const [shopNpQueue, setShopNpQueue] = useState([]);
-  const [shopNpIndex, setShopNpIndex] = useState(0);
-  const [shopNpEditSrc, setShopNpEditSrc] = useState(null);
-  const [shopEditingProduct, setShopEditingProduct] = useState(null);
-  const [shopEditForm, setShopEditForm] = useState({ title: "", description: "", price: "" });
-  const [shopEditProductImages, setShopEditProductImages] = useState([]);
-  const [shopEditProductNewFiles, setShopEditProductNewFiles] = useState([]);
-  const [shopEditProductFileKey, setShopEditProductFileKey] = useState(0);
-  const [shopEpQueue, setShopEpQueue] = useState([]);
-  const [shopEpIndex, setShopEpIndex] = useState(0);
-  const [shopEpEditSrc, setShopEpEditSrc] = useState(null);
-
   useEffect(() => {
     checkAdmin();
     const freezeBack = () => { window.history.pushState(null, document.title, window.location.href); };
@@ -164,7 +142,6 @@ export default function AdminDashboard() {
     if (activeTab === "Business Email") loadBusinessEmails(activeMailbox);
     if (activeTab === "Community & News") loadNewsArticles();
     if (activeTab === "Orders") loadOrders();
-    if (activeTab === "Shop") loadShopProducts();
   }, [activeTab]);
 
   const checkAdmin = async () => {
@@ -261,7 +238,7 @@ export default function AdminDashboard() {
     } catch (err) { setMessage("❌ Error: " + err.message); }
   };
 
-  // ── FILE UPLOAD (for EPM event flyers, article images, and Shop product images) ──
+  // ── FILE UPLOAD (for EPM event flyers) ──
   const uploadFile = async (file, bucket, attempt = 1) => {
     const fileName = `${Date.now()}-${file.name}`;
     try {
@@ -326,60 +303,6 @@ export default function AdminDashboard() {
     await supabase.from("epm_events").delete().eq("id", id);
     setEpmEvents(epmEvents.filter(e => e.id !== id));
   };
-
-  // ── SHOP (EPM Shop products — reuses vendor_products table; vendor_id is set
-  // to whichever admin added the item, and the public /epm-shop page fetches
-  // every product whose vendor_id belongs to an is_admin profile) ──
-  const loadShopProducts = async () => {
-    setLoadingShop(true);
-    const { data: adminProfiles } = await supabase.from("profiles").select("id").eq("is_admin", true);
-    const adminIds = (adminProfiles || []).map(p => p.id);
-    if (adminIds.length === 0) { setShopProducts([]); setLoadingShop(false); return; }
-    const { data } = await supabase.from("vendor_products").select("*").in("vendor_id", adminIds).order("created_at", { ascending: false });
-    setShopProducts(data || []);
-    setLoadingShop(false);
-  };
-
-  const addShopProduct = async () => {
-    if (!shopNewProduct.title || !shopNewProduct.price) { setMessage("⚠️ Product title and price are required."); return; }
-    if (shopNewProductImages.length === 0) { setMessage("⚠️ At least one product image is required."); return; }
-    setMessage("");
-    const uploadedUrls = [];
-    for (const file of shopNewProductImages) {
-      const url = await uploadFile(file, "vendor-portfolio");
-      if (url) uploadedUrls.push(url);
-    }
-    if (uploadedUrls.length === 0) return;
-    const { error } = await supabase.from("vendor_products").insert({ vendor_id: adminId, title: shopNewProduct.title, description: shopNewProduct.description, price: Math.round(parseFloat(shopNewProduct.price) * 100), image_url: uploadedUrls[0], images: uploadedUrls, is_active: true });
-    if (error) { setMessage("❌ Error: " + error.message); return; }
-    setMessage("✅ Product added to EPM Shop!");
-    setShopNewProduct({ title: "", description: "", price: "" });
-    setShopNewProductImages([]); setShopNewProductImageKey(k => k + 1);
-    setShopNpQueue([]); setShopNpIndex(0); setShopNpEditSrc(null);
-    await loadShopProducts();
-  };
-
-  const saveShopEditProduct = async () => {
-    if (!shopEditForm.title || !shopEditForm.price) { setMessage("⚠️ Title and price are required."); return; }
-    let updatedImages = [...shopEditProductImages];
-    if (shopEditProductNewFiles.length > 0) {
-      const remaining = SHOP_PRODUCT_IMAGE_LIMIT - updatedImages.length;
-      for (const file of shopEditProductNewFiles.slice(0, remaining)) {
-        const url = await uploadFile(file, "vendor-portfolio");
-        if (url) updatedImages.push(url);
-      }
-    }
-    const { error } = await supabase.from("vendor_products").update({ title: shopEditForm.title, description: shopEditForm.description, price: Math.round(parseFloat(shopEditForm.price) * 100), image_url: updatedImages[0] || null, images: updatedImages }).eq("id", shopEditingProduct);
-    if (error) { setMessage("❌ Error: " + error.message); return; }
-    setMessage("✅ Product updated!");
-    setShopEditingProduct(null); setShopEditProductNewFiles([]); setShopEditProductFileKey(k => k + 1);
-    setShopEpQueue([]); setShopEpIndex(0); setShopEpEditSrc(null);
-    await loadShopProducts();
-  };
-
-  const toggleShopProduct = async (id, current) => { await supabase.from("vendor_products").update({ is_active: !current }).eq("id", id); await loadShopProducts(); };
-  const deleteShopProduct = async (id) => { if (!confirm("Delete this product from the EPM Shop?")) return; await supabase.from("vendor_products").delete().eq("id", id); await loadShopProducts(); };
-  const removeShopEditImage = (url) => setShopEditProductImages(shopEditProductImages.filter(u => u !== url));
 
   // ── ADMIN BULK MESSAGING ──
   const broadcastRecipients = users.filter(u => (u.role === "vendor" || u.role === "organizer") && (u.business_name || u.organizer_name || u.handle));
@@ -1231,106 +1154,153 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── SHOP TAB (EPM Shop) ── */}
-        {activeTab === "Shop" && (
-          <div>
-            <h2 style={{ marginBottom: 6 }}>🏢 EPM Shop</h2>
-            <p style={{ color: "#888", fontSize: 14, marginBottom: 8 }}>Products added here appear on the public EPM Shop page, linked from a badge on the Homepage whenever at least one product is active. Share this link anywhere:</p>
-            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "#701890", fontWeight: "bold" }}>app.entrepromarket.com/epm-shop</div>
+        {/* ── SHOP TAB (logic lives in components/AdminShopTab.js) ── */}
+        {activeTab === "Shop" && <AdminShopTab adminId={adminId} />}
 
-            <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 20, marginBottom: 24 }}>
-              <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>➕ Add New Product</p>
-              <input placeholder="Product Title *" value={shopNewProduct.title} onChange={e => setShopNewProduct({ ...shopNewProduct, title: e.target.value })} style={inputStyle} />
-              <textarea placeholder="Description" value={shopNewProduct.description} onChange={e => setShopNewProduct({ ...shopNewProduct, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-              <input type="number" step="0.01" placeholder="Price in USD *" value={shopNewProduct.price} onChange={e => setShopNewProduct({ ...shopNewProduct, price: e.target.value })} style={inputStyle} />
-              <label style={labelStyle}>Product Images * <span style={{ fontWeight: "normal", color: "#888" }}>(up to {SHOP_PRODUCT_IMAGE_LIMIT} — first is main)</span></label>
-              {shopNewProductImages.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
-                  {shopNewProductImages.map((file, i) => (
-                    <div key={i} style={{ position: "relative" }}>
-                      <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
-                      <button onClick={() => setShopNewProductImages(shopNewProductImages.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                      {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+        {/* ── MESSAGING TAB ── */}
+        {/* ── COMMUNITY & NEWS TAB ── */}
+        {activeTab === "Community & News" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>📰 Community & News</h2>
+            <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Articles published here appear on the Homepage's Community & News section.</p>
+
+            {!composingArticle && (
+              <button onClick={startNewArticle} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 14, marginBottom: 20 }}>✏️ Write New Article</button>
+            )}
+
+            {composingArticle && (
+              <div style={{ backgroundColor: "white", border: "2px solid #701890", borderRadius: 10, padding: 20, marginBottom: 24 }}>
+                <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>{editingArticleId ? "✏️ Edit Article" : "📝 New Article"}</p>
+                <input placeholder="Article Title *" value={articleTitle} onChange={e => setArticleTitle(e.target.value)} style={inputStyle} />
+
+                <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>Cover Image</label>
+                {(articleCoverFile || articleCoverUrl) ? (
+                  <div style={{ marginBottom: 10, maxWidth: 320 }}>
+                    <PositionableImage
+                      src={articleCoverFile ? URL.createObjectURL(articleCoverFile) : articleCoverUrl}
+                      position={articleCoverPosition}
+                      onChange={setArticleCoverPosition}
+                      zoom={articleCoverZoom}
+                      onZoomChange={setArticleCoverZoom}
+                      aspectRatio={COVER_ASPECT_RATIO}
+                    />
+                    <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>This exact crop is what shows on the homepage card and article header — drag to reposition, use the slider to zoom in.</p>
+                    <button onClick={() => { setArticleCoverFile(null); setArticleCoverUrl(""); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove cover</button>
+                  </div>
+                ) : (
+                  <input type="file" accept="image/*" onChange={e => { setArticleCoverFile(e.target.files[0]); setArticleCoverPosition({ x: 50, y: 50 }); }} style={{ display: "block", marginBottom: 16 }} />
+                )}
+
+                <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8, display: "block", marginTop: 8 }}>Story Content</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 }}>
+                  {articleBlocks.map((block, i) => (
+                    <div key={i} style={{ border: "1px solid #eee", borderRadius: 8, padding: 12, backgroundColor: "#fafafa" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: "bold", color: "#888", textTransform: "uppercase" }}>{block.type === "paragraph" ? "📝 Paragraph" : "🖼️ Image"} #{i + 1}</span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => moveBlock(i, -1)} disabled={i === 0} style={{ padding: "3px 8px", backgroundColor: "#eee", border: "none", borderRadius: 6, cursor: i === 0 ? "default" : "pointer", fontSize: 11, opacity: i === 0 ? 0.4 : 1 }}>↑</button>
+                          <button onClick={() => moveBlock(i, 1)} disabled={i === articleBlocks.length - 1} style={{ padding: "3px 8px", backgroundColor: "#eee", border: "none", borderRadius: 6, cursor: i === articleBlocks.length - 1 ? "default" : "pointer", fontSize: 11, opacity: i === articleBlocks.length - 1 ? 0.4 : 1 }}>↓</button>
+                          <button onClick={() => removeBlock(i)} style={{ padding: "3px 8px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>✕</button>
+                        </div>
+                      </div>
+                      {block.type === "paragraph" ? (
+                        <textarea value={block.text} onChange={e => updateBlock(i, { text: e.target.value })} placeholder="Write a paragraph..." rows={4} style={{ ...inputStyle, marginBottom: 0, resize: "vertical" }} />
+                      ) : (
+                        <div>
+                          {(block.file || block.url || block._displaySrc) ? (
+                            <div style={{ maxWidth: 400, marginBottom: 8 }}>
+                              <img
+                                src={block.file ? URL.createObjectURL(block.file) : (block._displaySrc || block.url)}
+                                style={{ width: "100%", height: "auto", borderRadius: 8, objectFit: "contain", display: "block", border: "2px solid #701890" }}
+                              />
+                              <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>Shown exactly like this in the article — full image, no cropping.</p>
+                              <button onClick={() => updateBlock(i, { file: null, url: "", _displaySrc: null })} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove image</button>
+                            </div>
+                          ) : (
+                            <input type="file" accept="image/*" onChange={e => updateBlock(i, { file: e.target.files[0], position: { x: 50, y: 50 } })} style={{ display: "block", marginBottom: 8 }} />
+                          )}
+                          <input placeholder="Caption (optional)" value={block.caption || ""} onChange={e => updateBlock(i, { caption: e.target.value })} style={{ ...inputStyle, marginBottom: 0, fontSize: 13 }} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              )}
-              {shopNpEditSrc && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {shopNpIndex + 1} of {shopNpQueue.length}</p>
-                  <ImageEditor
-                    src={shopNpEditSrc}
-                    aspect={null}
-                    onCancel={() => { setShopNpQueue([]); setShopNpIndex(0); setShopNpEditSrc(null); }}
-                    onDone={(file) => {
-                      setShopNewProductImages(prev => [...prev, file].slice(0, SHOP_PRODUCT_IMAGE_LIMIT));
-                      const next = shopNpIndex + 1;
-                      if (next < shopNpQueue.length) { setShopNpIndex(next); setShopNpEditSrc(URL.createObjectURL(shopNpQueue[next])); }
-                      else { setShopNpQueue([]); setShopNpIndex(0); setShopNpEditSrc(null); }
-                    }}
-                  />
+                <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                  <button onClick={addParagraphBlock} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>+ Paragraph</button>
+                  <button onClick={addImageBlock} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>+ Image</button>
                 </div>
-              )}
-              {!shopNpEditSrc && shopNewProductImages.length < SHOP_PRODUCT_IMAGE_LIMIT && (
-                <input key={shopNewProductImageKey} type="file" accept="image/*" multiple onChange={e => {
-                  const remaining = SHOP_PRODUCT_IMAGE_LIMIT - shopNewProductImages.length;
-                  const files = Array.from(e.target.files).slice(0, remaining);
-                  e.target.value = "";
-                  if (files.length === 0) return;
-                  setShopNpQueue(files); setShopNpIndex(0); setShopNpEditSrc(URL.createObjectURL(files[0]));
-                }} style={{ display: "block", marginBottom: 12 }} />
-              )}
-              <button onClick={addShopProduct} style={{ padding: "10px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button onClick={resetArticleForm} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
+                  <button onClick={saveArticle} disabled={savingArticle} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingArticle ? "Saving..." : editingArticleId ? "Update Article" : "Publish Article"}</button>
+                </div>
+              </div>
+            )}
+
+            {loadingNews ? <p style={{ color: "#888" }}>Loading...</p> : newsArticles.length === 0 ? (
+              <p style={{ color: "#888", fontSize: 13 }}>No articles yet. Write your first one above!</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {newsArticles.map(article => {
+                  const cover = parsePos(article.cover_image_url || "");
+                  return (
+                    <div key={article.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 14, display: "flex", gap: 12, alignItems: "center" }}>
+                      {cover.src && <div style={{ width: 60, height: 60, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: "1px solid #e5e7eb" }}><img src={cover.src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%` }} /></div>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{article.title}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 11, color: article.published ? "#166534" : "#991b1b", fontWeight: "bold" }}>{article.published ? "✅ Published" : "⏸️ Hidden"} · {article.content_blocks?.length || 0} blocks</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+                        <button onClick={() => startEditArticle(article)} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Edit</button>
+                        <button onClick={() => togglePublished(article)} style={{ padding: "6px 12px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>{article.published ? "Hide" : "Publish"}</button>
+                        <button onClick={() => deleteArticle(article.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 16, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "Messaging" && (
+          <div>
+            <h2 style={{ marginBottom: 6 }}>✉️ Message Vendors & Organizers</h2>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+              <button onClick={() => setMessagingView("compose")} style={{ padding: "8px 16px", backgroundColor: messagingView === "compose" ? "#701890" : "white", color: messagingView === "compose" ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>✏️ Compose</button>
+              <button onClick={() => { setMessagingView("sent"); loadSentMessages(); }} style={{ padding: "8px 16px", backgroundColor: messagingView === "sent" ? "#701890" : "white", color: messagingView === "sent" ? "white" : "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📤 Sent Messages</button>
             </div>
 
-            {loadingShop ? <p style={{ color: "#888" }}>Loading...</p> : shopProducts.length === 0 ? (
-              <p style={{ color: "#888", fontSize: 13 }}>No EPM Shop products yet. Add your first one above!</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {shopProducts.map(p => {
-                  const productImages = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
-                  return (
-                    <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
-                      {productImages.length > 0 && <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={productImages[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+            {messagingView === "compose" ? (
+              <>
+                <p style={{ color: "#888", fontSize: 14, marginBottom: 16 }}>Select one or more recipients below and send them a message directly from Admin. Users see your messages as coming from "Entre PRO Market" and cannot reply to this inbox — they're auto-redirected to email instead.</p>
+                <input value={broadcastSearch} onChange={e => setBroadcastSearch(e.target.value)} placeholder="🔍 Search recipients by name, handle, city..." style={{ ...inputStyle, marginBottom: 10 }} />
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+                  <button onClick={selectAllFiltered} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Select All Shown ({filteredRecipients.length})</button>
+                  <button onClick={() => setSelectedRecipients([])} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Clear Selection</button>
+                  <span style={{ fontSize: 13, color: "#701890", fontWeight: "bold" }}>{selectedRecipients.length} selected</span>
+                </div>
+                <div style={{ maxHeight: 380, overflowY: "auto", border: "1px solid #eee", borderRadius: 8, marginBottom: 16 }}>
+                  {filteredRecipients.length === 0 ? <p style={{ padding: 16, color: "#888", margin: 0 }}>No matching vendors or organizers.</p> : filteredRecipients.map(u => (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid #f0f0f0" }}>
+                      <input type="checkbox" checked={selectedRecipients.includes(u.id)} onChange={() => toggleRecipient(u.id)} />
+                      {u.logo_url && <div onClick={() => window.open(`/${u.role}/${u.handle}?from=admin`, "_blank")} style={{ width: 34, height: 34, borderRadius: 6, overflow: "hidden", cursor: "pointer", flexShrink: 0, border: "1px solid #e5e7eb" }}><img src={u.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                       <div style={{ flex: 1 }}>
-                        {shopEditingProduct === p.id ? (
-                          <>
-                            <input value={shopEditForm.title} onChange={e => setShopEditForm({ ...shopEditForm, title: e.target.value })} style={{ ...inputStyle, marginBottom: 6 }} />
-                            <textarea value={shopEditForm.description} onChange={e => setShopEditForm({ ...shopEditForm, description: e.target.value })} style={{ ...inputStyle, height: 60, resize: "vertical", marginBottom: 6 }} />
-                            <input type="number" step="0.01" value={shopEditForm.price} onChange={e => setShopEditForm({ ...shopEditForm, price: e.target.value })} style={{ ...inputStyle, marginBottom: 8 }} />
-                            {shopEditProductImages.length > 0 && (
-                              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
-                                {shopEditProductImages.map((url, i) => (
-                                  <div key={i} style={{ position: "relative" }}>
-                                    <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
-                                    <button onClick={() => removeShopEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
-                                    {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {shopEpEditSrc && (
-                              <div style={{ marginBottom: 10 }}>
-                                <p style={{ fontSize: 11, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {shopEpIndex + 1} of {shopEpQueue.length}</p>
-                                <ImageEditor
-                                  src={shopEpEditSrc}
-                                  aspect={null}
-                                  onCancel={() => { setShopEpQueue([]); setShopEpIndex(0); setShopEpEditSrc(null); }}
-                                  onDone={(file) => {
-                                    setShopEditProductNewFiles(prev => [...prev, file]);
-                                    const next = shopEpIndex + 1;
-                                    if (next < shopEpQueue.length) { setShopEpIndex(next); setShopEpEditSrc(URL.createObjectURL(shopEpQueue[next])); }
-                                    else { setShopEpQueue([]); setShopEpIndex(0); setShopEpEditSrc(null); }
-                                  }}
-                                />
-                              </div>
-                            )}
-                            {!shopEpEditSrc && shopEditProductImages.length < SHOP_PRODUCT_IMAGE_LIMIT && (
-                              <div style={{ marginBottom: 8 }}>
-                                <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more ({shopEditProductImages.length}/{SHOP_PRODUCT_IMAGE_LIMIT})</label>
-                                <input key={shopEditProductFileKey} type="file" accept="image/*" multiple onChange={e => {
-                                  const remaining = SHOP_PRODUCT_IMAGE_LIMIT - shopEditProductImages.length;
-                                  const files = Array.from(e.target.files).slice(0, remaining);
-                                  e.target.value = "";
-                                  if (files.length === 0) return;
-                                  setShopEpQueue(files); setShopEpIndex(0); setShopEpEditSrc(URL.createObjectURL(files[0
+                        <p style={{ margin: 0, fontWeight: "bold", fontSize: 13 }}>{u.business_name || u.organizer_name || u.handle}</p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{u.role === "vendor" ? "🛒" : "🎪"} {u.role} · {u.account_type || "—"} · {u.city || ""}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write your message..." rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+                <button onClick={sendBroadcastMessage} disabled={sendingBroadcast} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14 }}>
+                  {sendingBroadcast ? "Sending..." : `📨 Send to ${selectedRecipients.length} Recipient${selectedRecipients.length !== 1 ? "s" : ""}`}
+                </button>
+              </>
+            ) : (
+              <div>
+                {loadingSent ? <p style={{ color: "#888" }}>Loading...</p> : sentMessages.length === 0 ? <p style={{ color: "#888" }}>No sent messages yet.</p> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {sentMessages.map(msg => (
+                      <div key={msg.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 8, padding: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
+                          <p style={{ margin: 0, fontWeight
