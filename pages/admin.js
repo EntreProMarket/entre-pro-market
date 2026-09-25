@@ -203,7 +203,7 @@ export default function AdminDashboard() {
     setDowngrading(false); setDowngradeModal(null); setDowngradeReason("");
   };
 
-  const updateUserTier = async (userId, newAccountType) => {
+const updateUserTier = async (userId, newAccountType) => {
     try {
       const res = await fetch("/api/admin-update-tier", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, newTier: newAccountType }) });
       const data = await res.json();
@@ -416,7 +416,7 @@ export default function AdminDashboard() {
     setLoadingNews(false);
   };
 
-  const resetArticleForm = () => {
+ const resetArticleForm = () => {
     setEditingArticleId(null); setArticleTitle(""); setArticleCoverUrl(""); setArticleCoverFile(null);
     setArticleCoverPosition({ x: 50, y: 50 }); setArticleCoverZoom(1); setArticleBlocks(BLANK_ARTICLE_BLOCKS); setComposingArticle(false);
   };
@@ -890,7 +890,8 @@ export default function AdminDashboard() {
                 <div key={user.id} style={{ backgroundColor: "white", border: "1px solid #AABB23", borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {user.logo_url && <div onClick={() => window.open(`/vendor/${user.handle}?from=admin`, "_blank")} style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", cursor: "pointer" }} title="Open profile"><img src={user.logo_url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Last login: {formatLastLogin(user.last_sign_in_at)}</p></div>
+                    
+<div><strong>{user.business_name}</strong><p style={{ margin: 0, fontSize: 12, color: "#888" }}>{user.category} · {user.city}</p><p style={{ margin: "2px 0 0", fontSize: 11, color: "#aaa" }}>Last login: {formatLastLogin(user.last_sign_in_at)}</p></div>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => viewUserInfo(user.id)} style={{ ...smallBtnStyle, backgroundColor: "#f3e8ff", color: "#701890", border: "1px solid #701890" }}>ℹ️</button>
@@ -1304,3 +1305,10 @@ export default function AdminDashboard() {
                       <div key={msg.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 8, padding: 14 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
                           <p style={{ margin: 0, fontWeight
+
+
+
+
+
+
+
