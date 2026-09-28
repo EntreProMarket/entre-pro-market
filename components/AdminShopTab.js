@@ -109,7 +109,7 @@ export default function AdminShopTab({ adminId }) {
 
   return (
     <div>
-      <h2 style={{ marginBottom: 6 }}>🏢 EPM Shop</h2>
+      <h2 style={{ marginBottom: 6 }}>🛍️ EPM Shop</h2>
       <p style={{ color: "#888", fontSize: 14, marginBottom: 8 }}>Products added here appear on the public EPM Shop page, linked from a badge on the Homepage whenever at least one product is active. Share this link anywhere:</p>
       <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "#701890", fontWeight: "bold" }}>app.entrepromarket.com/epm-shop</div>
 
