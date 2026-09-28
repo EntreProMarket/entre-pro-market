@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import useForceLogoutIfExpired from "../hooks/useForceLogoutIfExpired";
-import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
 
 export default function EpmShop() {
@@ -39,8 +38,8 @@ export default function EpmShop() {
 
         <div style={{ padding: "20px 16px" }}>
           <div style={{ background: "linear-gradient(135deg, #701890, #AABB23)", borderRadius: 16, padding: "24px 20px", marginBottom: 24, textAlign: "center", color: "white" }}>
-            <h1 style={{ margin: "0 0 6px", fontSize: 22 }}>🏢 EPM Shop</h1>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Official merchandise and goods from Entre PRO Market</p>
+            <h1 style={{ margin: "0 0 6px", fontSize: 22 }}>🛍️ EPM Shop</h1>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Official merchandise and goods<br />from Entre PRO Market</p>
           </div>
 
           {products.length === 0 ? (
@@ -71,7 +70,6 @@ export default function EpmShop() {
         </div>
       </div>
       <PageFooter />
-      <FooterBar />
     </div>
   );
 }
