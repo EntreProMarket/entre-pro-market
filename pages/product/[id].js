@@ -35,9 +35,11 @@ export default function ProductPage() {
       const { data: v } = await supabase.from("profiles").select("business_name, handle, logo_url, cashapp_handle, venmo_handle, account_type, is_admin").eq("id", prod.vendor_id).single();
       setVendor(v);
 
-      // EPM Shop products (sold by an admin account) skip the purchase-verified
-      // review requirement entirely — same as free-tier vendors.
-      const isFreeVendor = !v?.account_type || v.account_type === "free" || v?.is_admin;
+      // EPM Shop products (sold by an admin account) require a verified
+      // purchase to review, same as paid-tier vendors — the platform's own
+      // storefront is more reputationally sensitive, not less, so it
+      // deliberately does NOT get the free-vendor "anyone can review" pass.
+      const isFreeVendor = (!v?.account_type || v.account_type === "free") && !v?.is_admin;
 
       if (currentUser) {
         const { data: myProfile } = await supabase.from("profiles").select("is_admin").eq("id", currentUser.id).single();
@@ -191,7 +193,7 @@ export default function ProductPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}
           onClick={() => router.push("/epm-shop")}>
           <img src="/logo-circle.png" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-          <span style={{ fontSize: 13, color: "#701890", fontWeight: "bold" }}>🏢 Entre PRO Market · EPM Shop</span>
+          <span style={{ fontSize: 13, color: "#701890", fontWeight: "bold" }}>🛍️ Entre PRO Market · EPM Shop</span>
         </div>
       ) : vendor && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}
