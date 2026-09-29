@@ -17,7 +17,10 @@ export default function FooterBar() {
 
     const handleTouchStart = () => {
       touchingRef.current = true;
-      setVisible(false);
+      // No setVisible(false) here — forcing a hide on every touch (even a tiny
+      // scroll-tap) was what caused the bar to bob on each short tap. Direction
+      // is already handled by handleScroll; touching only freezes updates
+      // mid-drag (below), it doesn't need to force a hide of its own.
     };
     const handleTouchEnd = () => {
       touchingRef.current = false;
@@ -58,4 +61,3 @@ export default function FooterBar() {
     }} />
   );
 }
-
