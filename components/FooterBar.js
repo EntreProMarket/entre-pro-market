@@ -1,6 +1,13 @@
 // components/FooterBar.js
 import { useEffect, useState, useRef } from "react";
 
+// STICKY, not fixed. position: fixed is what was causing the iPad detachment —
+// iOS Safari does not reliably anchor "fixed" elements to the true screen edge.
+// "sticky" is positioned by the browser's own layout engine relative to the
+// page content instead, so it can't detach the way fixed did. Rendered as the
+// last element on the page (right after PageFooter) so it naturally docks
+// under the purple footer at the end of the page and hugs the bottom edge
+// while scrolling through content above it.
 export default function FooterBar() {
   const [visible, setVisible] = useState(false);
   const lastYRef = useRef(0);
@@ -17,10 +24,7 @@ export default function FooterBar() {
 
     const handleTouchStart = () => {
       touchingRef.current = true;
-      // No setVisible(false) here — forcing a hide on every touch (even a tiny
-      // scroll-tap) was what caused the bar to bob on each short tap. Direction
-      // is already handled by handleScroll; touching only freezes updates
-      // mid-drag (below), it doesn't need to force a hide of its own.
+      // No forced hide here — that was the cause of the bobbing on short taps.
     };
     const handleTouchEnd = () => {
       touchingRef.current = false;
@@ -48,16 +52,16 @@ export default function FooterBar() {
   }, []);
 
   return (
-    <div style={{
-      position: "fixed", left: 0, width: "100%", zIndex: 50,
-      height: 28,
-      bottom: "env(safe-area-inset-bottom, 0px)",
-      backgroundImage: "url('/green-brick.jpg')",
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-      transform: visible ? "translateY(0)" : "translateY(100%)",
-      transition: "transform 0.3s ease",
-      boxShadow: "0 -2px 8px rgba(0,0,0,0.2)",
-    }} />
+    <div style={{ position: "sticky", bottom: 0, height: 28, overflow: "hidden", zIndex: 50, pointerEvents: "none" }}>
+      <div style={{
+        height: 28,
+        backgroundImage: "url('/green-brick.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        transform: visible ? "translateY(0)" : "translateY(100%)",
+        transition: "transform 0.3s ease",
+        boxShadow: "0 -2px 8px rgba(0,0,0,0.2)",
+      }} />
+    </div>
   );
 }
