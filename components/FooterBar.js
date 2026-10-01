@@ -17,7 +17,6 @@ export default function FooterBar() {
 
     const handleTouchStart = () => {
       touchingRef.current = true;
-      setVisible(false);
     };
     const handleTouchEnd = () => {
       touchingRef.current = false;
@@ -58,4 +57,3 @@ export default function FooterBar() {
     }} />
   );
 }
-
