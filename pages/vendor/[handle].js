@@ -203,7 +203,10 @@ export default function VendorPublicProfile() {
 
       {activeTab === "shop" && (
         <div>
-          <h3 style={{ marginBottom: 16 }}>🛒 {vendor.business_name}'s Shop</h3>
+          <div style={{ background: "linear-gradient(135deg, #701890, #AABB23)", borderRadius: 16, padding: "24px 20px", marginBottom: 24, textAlign: "center", color: "white" }}>
+            <h1 style={{ margin: "0 0 6px", fontSize: 22 }}>🛍️ {vendor.business_name}'s Shop</h1>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Browse products from {vendor.business_name}</p>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
             {products.map(p => {
               const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
