@@ -1,12 +1,35 @@
 // components/FooterBar.js
 import { useEffect, useState, useRef } from "react";
 
+// iOS/iPadOS portrait never renders the bar at all — that's the one orientation
+// where it's been detaching. Everything else (Android in any orientation, and
+// Apple devices in landscape) behaves exactly as before, unchanged.
+function isAppleTouchDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const isIPhoneOrIPod = /iPhone|iPod/.test(ua);
+  const isIPad = /iPad/.test(ua) || (ua.includes("Macintosh") && typeof document !== "undefined" && "ontouchend" in document);
+  return isIPhoneOrIPod || isIPad;
+}
+
 export default function FooterBar() {
   const [visible, setVisible] = useState(false);
+  const [suppressed, setSuppressed] = useState(false); // true = Apple device currently in portrait
   const lastYRef = useRef(0);
   const touchingRef = useRef(false);
 
   useEffect(() => {
+    const isApple = isAppleTouchDevice();
+
+    const checkOrientation = () => {
+      if (!isApple) { setSuppressed(false); return; }
+      const portrait = window.matchMedia
+        ? window.matchMedia("(orientation: portrait)").matches
+        : window.innerHeight >= window.innerWidth;
+      setSuppressed(portrait);
+    };
+    checkOrientation();
+
     const handleScroll = () => {
       const currentY = window.scrollY;
       if (!touchingRef.current) {
@@ -24,6 +47,7 @@ export default function FooterBar() {
     };
 
     const handleReset = () => {
+      checkOrientation();
       setVisible(false);
       lastYRef.current = window.scrollY;
     };
@@ -42,6 +66,8 @@ export default function FooterBar() {
       window.removeEventListener("touchend", handleTouchEnd);
     };
   }, []);
+
+  if (suppressed) return null;
 
   return (
     <div style={{
