@@ -56,6 +56,11 @@ function compressImage(file, maxWidth = 1200, quality = 0.9) {
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
+// Product photos show up in a square 64×64 thumbnail, a 180px-tall grid card, and a
+// wide detail image — a square (1:1) source crop is the only shape that renders
+// predictably consistent (via objectFit:cover) across all three, so every product
+// image crop — new or re-cropped — is locked to this ratio.
+const PRODUCT_IMAGE_ASPECT = 1;
 
 export default function VendorProfile() {
   useInactivityLogout();
@@ -104,9 +109,7 @@ export default function VendorProfile() {
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
   const [newProductImages, setNewProductImages] = useState([]);
   const [newProductImageKey, setNewProductImageKey] = useState(0);
-  // ── New-product image crop queue — mirrors the Portfolio pfQueue pattern.
-  // Previously this picker took raw files straight into newProductImages
-  // with no crop step at all, which is why product images displayed wrong. ──
+  // ── New-product image crop queue — mirrors the Portfolio pfQueue pattern. ──
   const [npQueue, setNpQueue] = useState([]);
   const [npIndex, setNpIndex] = useState(0);
   const [npEditSrc, setNpEditSrc] = useState(null);
@@ -115,10 +118,14 @@ export default function VendorProfile() {
   const [editProductImages, setEditProductImages] = useState([]);
   const [editProductNewFiles, setEditProductNewFiles] = useState([]);
   const [editProductFileKey, setEditProductFileKey] = useState(0);
-  // ── Same crop queue for images added while editing an existing product. ──
+  // ── Crop queue for NEW images added while editing an existing product. ──
   const [epQueue, setEpQueue] = useState([]);
   const [epIndex, setEpIndex] = useState(0);
   const [epEditSrc, setEpEditSrc] = useState(null);
+  // ── Re-crop an EXISTING (already-saved) product image — same pattern as
+  // Portfolio's repositioningIndex, uploads immediately on crop. ──
+  const [reposProductImageIndex, setReposProductImageIndex] = useState(null);
+  const [reposProductUploading, setReposProductUploading] = useState(false);
   const [userId, setUserId] = useState(null);
 
   const [markSaleProductId, setMarkSaleProductId] = useState(null);
@@ -305,8 +312,8 @@ const handleSave = async () => {
 
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
-      {/* ── UPLOADING OVERLAY — now also covers the portfolio re-crop upload ── */}
-      {(saving || repoUploading) && (
+      {/* ── UPLOADING OVERLAY ── */}
+      {(saving || repoUploading || reposProductUploading) && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, textAlign: "center" }}>
           <style>{`@keyframes epm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
           <div style={{ fontSize: 56, animation: "epm-spin 1.6s linear infinite", marginBottom: 20 }}>⏳</div>
@@ -386,10 +393,13 @@ const handleSave = async () => {
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
             {portfolioImages.length > 0 && (
+              // ── Natural aspect (height: auto), matching exactly how the real
+              // Portfolio masonry grid displays these — no more preview-vs-final
+              // mismatch. Was previously forced into a cropped 90px-tall box. ──
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
                   <div key={i} style={{ position: "relative" }}>
-                    <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                    <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={img} alt="" style={{ width: "100%", height: "auto", display: "block" }} /></div>
                     <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
                     <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Crop</button>
                   </div>
@@ -436,11 +446,12 @@ const handleSave = async () => {
                 <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
                   📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
                 </div>
+                {/* ── Same natural-aspect fix applied to staged (not-yet-saved) images. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
                   {portfolioFiles.map((file, i) => (
                     <div key={i} style={{ position: "relative" }}>
-                      <div style={{ height: 80, borderRadius: 6, overflow: "hidden", border: "1px solid #f0c040" }}>
-                        <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #f0c040" }}>
+                        <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "auto", display: "block" }} />
                       </div>
                       <button onClick={() => setPortfolioFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
                     </div>
@@ -499,7 +510,7 @@ const handleSave = async () => {
               <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
               <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
-              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main)</span></label>
+              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main, square crop)</span></label>
               {newProductImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
                   {newProductImages.map((file, i) => (
@@ -511,14 +522,13 @@ const handleSave = async () => {
                   ))}
                 </div>
               )}
-              {/* ── Crop queue: each newly picked image is cropped via ImageEditor
-                   before it's added to newProductImages — same pattern as Portfolio. ── */}
               {npEditSrc && (
                 <div style={{ marginBottom: 14 }}>
                   <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {npIndex + 1} of {npQueue.length}</p>
                   <ImageEditor
                     src={npEditSrc}
-                    aspect={null}
+                    aspect={PRODUCT_IMAGE_ASPECT}
+                    outputAspect={PRODUCT_IMAGE_ASPECT}
                     onCancel={() => { setNpQueue([]); setNpIndex(0); setNpEditSrc(null); }}
                     onDone={(file) => {
                       setNewProductImages(prev => [...prev, file].slice(0, productImageLimit));
@@ -567,18 +577,40 @@ const handleSave = async () => {
                                 <div key={i} style={{ position: "relative" }}>
                                   <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
                                   <button onClick={() => removeEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
+                                  {/* ── NEW: re-crop an already-saved product image, same pattern as Portfolio's 🎯 Crop ── */}
+                                  <button onClick={() => setReposProductImageIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 6px", fontSize: 9, cursor: "pointer" }}>🎯 Crop</button>
                                   {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
                                 </div>
                               ))}
                             </div>
                           )}
-                          {/* ── Same crop queue applied to images added while editing. ── */}
+                          {reposProductImageIndex !== null && editProductImages[reposProductImageIndex] && (
+                            <div style={{ marginBottom: 10, padding: 10, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
+                              <ImageEditor
+                                src={editProductImages[reposProductImageIndex]}
+                                aspect={PRODUCT_IMAGE_ASPECT}
+                                outputAspect={PRODUCT_IMAGE_ASPECT}
+                                onCancel={() => setReposProductImageIndex(null)}
+                                onDone={async (file) => {
+                                  const idx = reposProductImageIndex;
+                                  setReposProductImageIndex(null);
+                                  setReposProductUploading(true);
+                                  setMessage("");
+                                  const comp = await compressImage(file, 1200, 0.9);
+                                  const url = await uploadFile(comp, "vendor-portfolio");
+                                  if (url) { setEditProductImages(prev => prev.map((u, i2) => i2 === idx ? url : u)); setMessage("✅ Image updated — click Save to apply."); }
+                                  setReposProductUploading(false);
+                                }}
+                              />
+                            </div>
+                          )}
                           {epEditSrc && (
                             <div style={{ marginBottom: 10 }}>
                               <p style={{ fontSize: 11, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {epIndex + 1} of {epQueue.length}</p>
                               <ImageEditor
                                 src={epEditSrc}
-                                aspect={null}
+                                aspect={PRODUCT_IMAGE_ASPECT}
+                                outputAspect={PRODUCT_IMAGE_ASPECT}
                                 onCancel={() => { setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }}
                                 onDone={(file) => {
                                   setEditProductNewFiles(prev => [...prev, file]);
@@ -603,7 +635,7 @@ const handleSave = async () => {
                           )}
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={saveEditProduct} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Save</button>
-                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
+                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); setReposProductImageIndex(null); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
                           </div>
                         </>
                       ) : (
@@ -641,7 +673,7 @@ const handleSave = async () => {
                             </div>
                           ) : (
                             <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                              <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                              <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); setReposProductImageIndex(null); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                               <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                               <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                               <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleProofFile(null); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
