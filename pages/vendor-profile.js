@@ -56,11 +56,8 @@ function compressImage(file, maxWidth = 1200, quality = 0.9) {
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
-// Product photos show up in a square 64×64 thumbnail, a 180px-tall grid card, and a
-// wide detail image — a square (1:1) source crop is the only shape that renders
-// predictably consistent (via objectFit:cover) across all three, so every product
-// image crop — new or re-cropped — is locked to this ratio.
-const PRODUCT_IMAGE_ASPECT = 1;
+// Product image crops are freeform (aspect=null), same as Logo and Portfolio —
+// no forced shape, so the whole photo can always be kept if the vendor wants it.
 
 export default function VendorProfile() {
   useInactivityLogout();
@@ -515,7 +512,7 @@ const handleSave = async () => {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
                   {newProductImages.map((file, i) => (
                     <div key={i} style={{ position: "relative" }}>
-                      <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                      <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "auto", display: "block" }} /></div>
                       <button onClick={() => setNewProductImages(newProductImages.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
                       {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
                     </div>
@@ -527,8 +524,7 @@ const handleSave = async () => {
                   <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {npIndex + 1} of {npQueue.length}</p>
                   <ImageEditor
                     src={npEditSrc}
-                    aspect={PRODUCT_IMAGE_ASPECT}
-                    outputAspect={PRODUCT_IMAGE_ASPECT}
+                    aspect={null}
                     onCancel={() => { setNpQueue([]); setNpIndex(0); setNpEditSrc(null); }}
                     onDone={(file) => {
                       setNewProductImages(prev => [...prev, file].slice(0, productImageLimit));
@@ -565,7 +561,7 @@ const handleSave = async () => {
                 return (
                   <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
                     {productImages.length > 0 && <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={productImages[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       {editingProduct === p.id ? (
                         <>
                           <input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} style={{ ...iS, marginBottom: 6 }} />
@@ -575,7 +571,7 @@ const handleSave = async () => {
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
                               {editProductImages.map((url, i) => (
                                 <div key={i} style={{ position: "relative" }}>
-                                  <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                                  <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "auto", display: "block" }} /></div>
                                   <button onClick={() => removeEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
                                   {/* ── NEW: re-crop an already-saved product image, same pattern as Portfolio's 🎯 Crop ── */}
                                   <button onClick={() => setReposProductImageIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 6px", fontSize: 9, cursor: "pointer" }}>🎯 Crop</button>
@@ -588,8 +584,7 @@ const handleSave = async () => {
                             <div style={{ marginBottom: 10, padding: 10, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
                               <ImageEditor
                                 src={editProductImages[reposProductImageIndex]}
-                                aspect={PRODUCT_IMAGE_ASPECT}
-                                outputAspect={PRODUCT_IMAGE_ASPECT}
+                                aspect={null}
                                 onCancel={() => setReposProductImageIndex(null)}
                                 onDone={async (file) => {
                                   const idx = reposProductImageIndex;
@@ -609,8 +604,7 @@ const handleSave = async () => {
                               <p style={{ fontSize: 11, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {epIndex + 1} of {epQueue.length}</p>
                               <ImageEditor
                                 src={epEditSrc}
-                                aspect={PRODUCT_IMAGE_ASPECT}
-                                outputAspect={PRODUCT_IMAGE_ASPECT}
+                                aspect={null}
                                 onCancel={() => { setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }}
                                 onDone={(file) => {
                                   setEditProductNewFiles(prev => [...prev, file]);
