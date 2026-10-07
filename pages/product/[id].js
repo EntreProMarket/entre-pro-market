@@ -146,9 +146,11 @@ export default function ProductPage() {
 
       {images.length > 0 && (
         <div style={{ position: "relative", marginBottom: 24 }}>
+          {/* ── Full image always visible — objectFit:"contain" instead of "cover" so
+               nothing gets cropped (no more cut-off heads); letterboxed if needed. ── */}
           <img src={images[currentImg]} alt={product.title}
             onClick={() => setFullscreen(true)}
-            style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: 12, cursor: "zoom-in", display: "block" }} />
+            style={{ width: "100%", maxHeight: "70vh", objectFit: "contain", backgroundColor: "#f5f5f5", borderRadius: 12, cursor: "zoom-in", display: "block" }} />
 
           <div style={{ position: "absolute", bottom: 10, right: 12, backgroundColor: "rgba(0,0,0,0.5)", color: "white", fontSize: 11, padding: "3px 8px", borderRadius: 10 }}>
             Tap to enlarge
