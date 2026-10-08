@@ -123,7 +123,7 @@ export default function EventsPage() {
                 )}
                 {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444" }}>📍 {selectedEvent.venue}</p>}
                 {selectedEvent.event_type && <p style={{ margin: "0 0 12px", fontSize: 13, color: "#888" }}>🎭 {selectedEvent.event_type}</p>}
-                {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
+                {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedEvent.description}</p>}
                 {selectedEvent.info_url && (
                   <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer"
                     style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>
