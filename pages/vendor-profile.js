@@ -1,5 +1,5 @@
 // pages/vendor-profile.js
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import useInactivityLogout from "../hooks/useInactivityLogout";
@@ -53,11 +53,57 @@ function compressImage(file, maxWidth = 1200, quality = 0.9) {
   });
 }
 
+// ── Product images: non-destructive drag-to-reposition, same technique as the
+// EPM Events flyer. The position is stored as a #pos=x,y tag on the image's
+// own URL — never a separate cropped file — so the edit screen and every
+// place the image is shown use the identical box + position and can never
+// disagree. This also fixes the Shop grid's ragged whitespace: every card
+// now uses the same fixed box, so rows always line up evenly. ──
+const PRODUCT_ASPECT = 0.8; // 4:5, a standard product-photo ratio
+function parseProductPos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 } };
+  const [x, y] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+}
+function withProductPos(url, pos) {
+  if (!url) return url;
+  const base = url.split("#")[0];
+  if (!pos) return base;
+  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
+}
+function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null }) {
+  const ref = useRef(null);
+  const dragState = useRef(null);
+  const handlePointerDown = (e) => {
+    if (readOnly) return;
+    dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
+    e.target.setPointerCapture?.(e.pointerId);
+  };
+  const handlePointerMove = (e) => {
+    if (readOnly || !dragState.current || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
+    onChange({
+      x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)),
+      y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)),
+    });
+  };
+  const handlePointerUp = () => { dragState.current = null; };
+  return (
+    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
+      style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : "2px solid #701890", cursor: readOnly ? "default" : "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
+      <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
+      {!readOnly && <div style={{ position: "absolute", bottom: 4, right: 6, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 8 }}>✋ Drag</div>}
+      {badge}
+    </div>
+  );
+}
+
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
-// Product image crops are freeform (aspect=null), same as Logo and Portfolio —
-// no forced shape, so the whole photo can always be kept if the vendor wants it.
 
 export default function VendorProfile() {
   useInactivityLogout();
@@ -104,25 +150,18 @@ export default function VendorProfile() {
   const productImageLimit = PRODUCT_IMAGE_LIMITS[accountType] ?? PRODUCT_IMAGE_LIMITS.free;
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
+  // ── Each entry: { file, position: {x,y} } — no crop step, just a file + a
+  // draggable position, set before the product is even added. ──
   const [newProductImages, setNewProductImages] = useState([]);
   const [newProductImageKey, setNewProductImageKey] = useState(0);
-  // ── New-product image crop queue — mirrors the Portfolio pfQueue pattern. ──
-  const [npQueue, setNpQueue] = useState([]);
-  const [npIndex, setNpIndex] = useState(0);
-  const [npEditSrc, setNpEditSrc] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({ title: "", description: "", price: "" });
+  // ── Each entry: { url, position: {x,y} } — position parsed from the saved
+  // URL's #pos= tag when editing starts. ──
   const [editProductImages, setEditProductImages] = useState([]);
+  // ── Each entry: { file, position: {x,y} } — newly added while editing. ──
   const [editProductNewFiles, setEditProductNewFiles] = useState([]);
   const [editProductFileKey, setEditProductFileKey] = useState(0);
-  // ── Crop queue for NEW images added while editing an existing product. ──
-  const [epQueue, setEpQueue] = useState([]);
-  const [epIndex, setEpIndex] = useState(0);
-  const [epEditSrc, setEpEditSrc] = useState(null);
-  // ── Re-crop an EXISTING (already-saved) product image — same pattern as
-  // Portfolio's repositioningIndex, uploads immediately on crop. ──
-  const [reposProductImageIndex, setReposProductImageIndex] = useState(null);
-  const [reposProductUploading, setReposProductUploading] = useState(false);
   const [userId, setUserId] = useState(null);
 
   const [markSaleProductId, setMarkSaleProductId] = useState(null);
@@ -132,9 +171,6 @@ export default function VendorProfile() {
   const [markingSale, setMarkingSale] = useState(false);
   const [markSaleMessage, setMarkSaleMessage] = useState("");
 
-  // ── Tracks the standalone portfolio re-crop upload (outside the main Save
-  // Profile flow) so it also triggers the full-screen uploading overlay
-  // instead of only a small text message that's easy to miss. ──
   const [repoUploading, setRepoUploading] = useState(false);
 
   useEffect(() => {
@@ -239,10 +275,10 @@ const handleSave = async () => {
     if (shopProducts.length >= productLimit) { alert(`Your ${accountType} plan allows up to ${productLimit} products.`); return; }
     setMessage("⏳ Uploading product images...");
     const uploadedUrls = [];
-    for (const file of newProductImages) {
-      const comp = await compressImage(file, 1200, 0.9);
+    for (const item of newProductImages) {
+      const comp = await compressImage(item.file, 1200, 0.9);
       const url = await uploadFile(comp, "vendor-portfolio");
-      if (url) uploadedUrls.push(url);
+      if (url) uploadedUrls.push(withProductPos(url, item.position));
     }
     if (uploadedUrls.length === 0) return;
     const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: newProduct.title, description: newProduct.description, price: Math.round(parseFloat(newProduct.price) * 100), image_url: uploadedUrls[0], images: uploadedUrls, is_active: true });
@@ -250,31 +286,30 @@ const handleSave = async () => {
     setMessage("✅ Product added!");
     setNewProduct({ title: "", description: "", price: "" });
     setNewProductImages([]); setNewProductImageKey(k => k + 1);
-    setNpQueue([]); setNpIndex(0); setNpEditSrc(null);
     await loadProducts(userId);
   };
 
   const saveEditProduct = async () => {
     if (!editForm.title || !editForm.price) { alert("Title and price are required."); return; }
-    let updatedImages = [...editProductImages];
+    // Apply each image's current drag position into its URL.
+    let updatedImages = editProductImages.map(item => withProductPos(item.url, item.position));
     if (editProductNewFiles.length > 0) {
       setMessage("⏳ Uploading new images...");
       const remaining = productImageLimit - updatedImages.length;
-      for (const file of editProductNewFiles.slice(0, remaining)) {
-        const comp = await compressImage(file, 1200, 0.9);
+      for (const item of editProductNewFiles.slice(0, remaining)) {
+        const comp = await compressImage(item.file, 1200, 0.9);
         const url = await uploadFile(comp, "vendor-portfolio");
-        if (url) updatedImages.push(url);
+        if (url) updatedImages.push(withProductPos(url, item.position));
       }
     }
     const { error } = await supabase.from("vendor_products").update({ title: editForm.title, description: editForm.description, price: Math.round(parseFloat(editForm.price) * 100), image_url: updatedImages[0] || null, images: updatedImages }).eq("id", editingProduct);
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product updated!"); setEditingProduct(null);
     setEditProductNewFiles([]); setEditProductFileKey(k => k + 1);
-    setEpQueue([]); setEpIndex(0); setEpEditSrc(null);
     await loadProducts(userId);
   };
 
-  const removeEditImage = (url) => setEditProductImages(editProductImages.filter(u => u !== url));
+  const removeEditImage = (url) => setEditProductImages(editProductImages.filter(item => item.url !== url));
   const toggleProduct = async (id, current) => { await supabase.from("vendor_products").update({ is_active: !current }).eq("id", id); await loadProducts(userId); };
   const deleteProduct = async (id) => { if (!confirm("Delete this product?")) return; await supabase.from("vendor_products").delete().eq("id", id); await loadProducts(userId); };
 
@@ -310,7 +345,7 @@ const handleSave = async () => {
   return (
     <div style={{ maxWidth: 700, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
       {/* ── UPLOADING OVERLAY ── */}
-      {(saving || repoUploading || reposProductUploading) && (
+      {(saving || repoUploading) && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, textAlign: "center" }}>
           <style>{`@keyframes epm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
           <div style={{ fontSize: 56, animation: "epm-spin 1.6s linear infinite", marginBottom: 20 }}>⏳</div>
@@ -390,9 +425,6 @@ const handleSave = async () => {
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
             {portfolioImages.length > 0 && (
-              // ── Natural aspect (height: auto), matching exactly how the real
-              // Portfolio masonry grid displays these — no more preview-vs-final
-              // mismatch. Was previously forced into a cropped 90px-tall box. ──
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
                   <div key={i} style={{ position: "relative" }}>
@@ -443,7 +475,6 @@ const handleSave = async () => {
                 <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
                   📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
                 </div>
-                {/* ── Same natural-aspect fix applied to staged (not-yet-saved) images. ── */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
                   {portfolioFiles.map((file, i) => (
                     <div key={i} style={{ position: "relative" }}>
@@ -507,41 +538,29 @@ const handleSave = async () => {
               <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
               <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
-              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main, square crop)</span></label>
+              <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main. Drag each photo to position it)</span></label>
               {newProductImages.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
-                  {newProductImages.map((file, i) => (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
+                  {newProductImages.map((item, i) => (
                     <div key={i} style={{ position: "relative" }}>
-                      <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "auto", display: "block" }} /></div>
-                      <button onClick={() => setNewProductImages(newProductImages.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                      {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+                      <PositionableProductImage
+                        src={URL.createObjectURL(item.file)}
+                        position={item.position}
+                        onChange={(pos) => setNewProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
+                        badge={i === 0 && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+                      />
+                      <button onClick={() => setNewProductImages(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
                     </div>
                   ))}
                 </div>
               )}
-              {npEditSrc && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {npIndex + 1} of {npQueue.length}</p>
-                  <ImageEditor
-                    src={npEditSrc}
-                    aspect={null}
-                    onCancel={() => { setNpQueue([]); setNpIndex(0); setNpEditSrc(null); }}
-                    onDone={(file) => {
-                      setNewProductImages(prev => [...prev, file].slice(0, productImageLimit));
-                      const next = npIndex + 1;
-                      if (next < npQueue.length) { setNpIndex(next); setNpEditSrc(URL.createObjectURL(npQueue[next])); }
-                      else { setNpQueue([]); setNpIndex(0); setNpEditSrc(null); }
-                    }}
-                  />
-                </div>
-              )}
-              {!npEditSrc && newProductImages.length < productImageLimit && (
+              {newProductImages.length < productImageLimit && (
                 <input key={newProductImageKey} type="file" accept="image/*" multiple onChange={e => {
                   const remaining = productImageLimit - newProductImages.length;
                   const files = Array.from(e.target.files).slice(0, remaining);
                   e.target.value = "";
                   if (files.length === 0) return;
-                  setNpQueue(files); setNpIndex(0); setNpEditSrc(URL.createObjectURL(files[0]));
+                  setNewProductImages(prev => [...prev, ...files.map(file => ({ file, position: { x: 50, y: 50 } }))]);
                 }} style={{ display: "block", marginBottom: 12 }} />
               )}
               <button onClick={addProduct} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
@@ -558,9 +577,10 @@ const handleSave = async () => {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {shopProducts.map(p => {
                 const productImages = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
+                const mainParsed = productImages[0] ? parseProductPos(productImages[0]) : null;
                 return (
                   <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
-                    {productImages.length > 0 && <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={productImages[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
+                    {mainParsed && <div style={{ width: 80, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={mainParsed.src} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${mainParsed.position.x}% ${mainParsed.position.y}%`, display: "block" }} /></div>}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {editingProduct === p.id ? (
                         <>
@@ -568,68 +588,49 @@ const handleSave = async () => {
                           <textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
                           <input type="number" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} style={{ ...iS, marginBottom: 8 }} />
                           {editProductImages.length > 0 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
-                              {editProductImages.map((url, i) => (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
+                              {editProductImages.map((item, i) => (
                                 <div key={i} style={{ position: "relative" }}>
-                                  <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "auto", display: "block" }} /></div>
-                                  <button onClick={() => removeEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
-                                  {/* ── NEW: re-crop an already-saved product image, same pattern as Portfolio's 🎯 Crop ── */}
-                                  <button onClick={() => setReposProductImageIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 6px", fontSize: 9, cursor: "pointer" }}>🎯 Crop</button>
-                                  {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+                                  <PositionableProductImage
+                                    src={item.src}
+                                    position={item.position}
+                                    onChange={(pos) => setEditProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
+                                    badge={i === 0 && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
+                                  />
+                                  <button onClick={() => removeEditImage(item.url)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
                                 </div>
                               ))}
                             </div>
                           )}
-                          {reposProductImageIndex !== null && editProductImages[reposProductImageIndex] && (
-                            <div style={{ marginBottom: 10, padding: 10, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                              <ImageEditor
-                                src={editProductImages[reposProductImageIndex]}
-                                aspect={null}
-                                onCancel={() => setReposProductImageIndex(null)}
-                                onDone={async (file) => {
-                                  const idx = reposProductImageIndex;
-                                  setReposProductImageIndex(null);
-                                  setReposProductUploading(true);
-                                  setMessage("");
-                                  const comp = await compressImage(file, 1200, 0.9);
-                                  const url = await uploadFile(comp, "vendor-portfolio");
-                                  if (url) { setEditProductImages(prev => prev.map((u, i2) => i2 === idx ? url : u)); setMessage("✅ Image updated — click Save to apply."); }
-                                  setReposProductUploading(false);
-                                }}
-                              />
+                          {editProductNewFiles.length > 0 && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
+                              {editProductNewFiles.map((item, i) => (
+                                <div key={i} style={{ position: "relative" }}>
+                                  <PositionableProductImage
+                                    src={URL.createObjectURL(item.file)}
+                                    position={item.position}
+                                    onChange={(pos) => setEditProductNewFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
+                                  />
+                                  <button onClick={() => setEditProductNewFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
+                                </div>
+                              ))}
                             </div>
                           )}
-                          {epEditSrc && (
-                            <div style={{ marginBottom: 10 }}>
-                              <p style={{ fontSize: 11, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {epIndex + 1} of {epQueue.length}</p>
-                              <ImageEditor
-                                src={epEditSrc}
-                                aspect={null}
-                                onCancel={() => { setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }}
-                                onDone={(file) => {
-                                  setEditProductNewFiles(prev => [...prev, file]);
-                                  const next = epIndex + 1;
-                                  if (next < epQueue.length) { setEpIndex(next); setEpEditSrc(URL.createObjectURL(epQueue[next])); }
-                                  else { setEpQueue([]); setEpIndex(0); setEpEditSrc(null); }
-                                }}
-                              />
-                            </div>
-                          )}
-                          {!epEditSrc && editProductImages.length < productImageLimit && (
+                          {(editProductImages.length + editProductNewFiles.length) < productImageLimit && (
                             <div style={{ marginBottom: 8 }}>
-                              <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more ({editProductImages.length}/{productImageLimit})</label>
+                              <label style={{ fontSize: 12, color: "#555", display: "block", marginBottom: 4 }}>Add more ({editProductImages.length + editProductNewFiles.length}/{productImageLimit}) — drag each to position</label>
                               <input key={editProductFileKey} type="file" accept="image/*" multiple onChange={e => {
-                                const remaining = productImageLimit - editProductImages.length;
+                                const remaining = productImageLimit - (editProductImages.length + editProductNewFiles.length);
                                 const files = Array.from(e.target.files).slice(0, remaining);
                                 e.target.value = "";
                                 if (files.length === 0) return;
-                                setEpQueue(files); setEpIndex(0); setEpEditSrc(URL.createObjectURL(files[0]));
+                                setEditProductNewFiles(prev => [...prev, ...files.map(file => ({ file, position: { x: 50, y: 50 } }))]);
                               }} style={{ display: "block" }} />
                             </div>
                           )}
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={saveEditProduct} style={{ padding: "6px 14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Save</button>
-                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); setReposProductImageIndex(null); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
+                            <button onClick={() => { setEditingProduct(null); setEditProductNewFiles([]); setEditProductFileKey(k => k + 1); }} style={{ padding: "6px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold", fontSize: 12 }}>Cancel</button>
                           </div>
                         </>
                       ) : (
@@ -667,7 +668,13 @@ const handleSave = async () => {
                             </div>
                           ) : (
                             <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                              <button onClick={() => { const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []); setEditingProduct(p.id); setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) }); setEditProductImages(imgs); setEditProductNewFiles([]); setEpQueue([]); setEpIndex(0); setEpEditSrc(null); setReposProductImageIndex(null); }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                              <button onClick={() => {
+                                const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
+                                setEditingProduct(p.id);
+                                setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) });
+                                setEditProductImages(imgs.map(url => { const parsed = parseProductPos(url); return { url: parsed.src, src: parsed.src, position: parsed.position }; }));
+                                setEditProductNewFiles([]);
+                              }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                               <button onClick={() => toggleProduct(p.id, p.is_active)} style={{ padding: "5px 12px", backgroundColor: p.is_active ? "#888" : "#AABB23", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>{p.is_active ? "Hide" : "Show"}</button>
                               <button onClick={() => deleteProduct(p.id)} style={{ padding: "5px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                               <button onClick={() => { setMarkSaleProductId(p.id); setMarkSaleEmail(""); setMarkSaleProofFile(null); setMarkSaleMessage(""); }} style={{ padding: "5px 12px", backgroundColor: "#00D632", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>💸 Mark Sale Paid</button>
