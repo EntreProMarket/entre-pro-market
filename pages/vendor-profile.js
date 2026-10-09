@@ -101,6 +101,70 @@ function PositionableProductImage({ src, position, onChange, readOnly = false, b
   );
 }
 
+// ── Portfolio: same non-destructive drag-to-reposition technique as Products
+// and the EPM Events flyer, but the box for each photo is sized to that
+// photo's OWN natural aspect ratio (measured on load) instead of one fixed
+// shape — this is what keeps the collage/puzzle look of different-sized
+// images, while still replacing the old crop-and-trim flow. Position (and
+// pinch/scroll zoom, per standing preference — never a slider) is stored as
+// a #pos=x,y,zoom tag on the image's own URL, the original file is never
+// altered. ──
+function parsePortfolioPos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
+}
+function withPortfolioPos(url, pos, zoom = 1) {
+  if (!url) return url;
+  const base = url.split("#")[0];
+  if (!pos) return base;
+  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
+}
+function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange }) {
+  const [aspect, setAspect] = useState(1);
+  const ref = useRef(null);
+  const dragState = useRef(null);
+  const pinchState = useRef(null);
+  const handleImgLoad = (e) => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setAspect(el.naturalWidth / el.naturalHeight); };
+  const handlePointerDown = (e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.target.setPointerCapture?.(e.pointerId); };
+  const handlePointerMove = (e) => {
+    if (!dragState.current || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
+    onChange({
+      x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)),
+      y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)),
+    });
+  };
+  const handlePointerUp = () => { dragState.current = null; };
+  const handleWheel = (e) => { e.preventDefault(); onZoomChange(Math.min(3, Math.max(1, zoom + (e.deltaY < 0 ? 0.1 : -0.1)))); };
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      const [t0, t1] = e.touches;
+      pinchState.current = { dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), startZoom: zoom };
+    }
+  };
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && pinchState.current) {
+      e.preventDefault();
+      const [t0, t1] = e.touches;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      onZoomChange(Math.min(3, Math.max(1, pinchState.current.startZoom * (dist / pinchState.current.dist))));
+    }
+  };
+  const handleTouchEnd = () => { pinchState.current = null; };
+  return (
+    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
+      onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
+      <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: 4, right: 6, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 8 }}>✋ Drag{zoom > 1 ? ` · 🔍${zoom.toFixed(1)}x` : ""} · pinch to zoom</div>
+    </div>
+  );
+}
+
 const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const PRODUCT_LIMITS = { free: 4, premium: 10, featured: 30 };
 const PRODUCT_IMAGE_LIMITS = { free: 6, premium: 14, featured: 40 };
@@ -134,12 +198,12 @@ export default function VendorProfile() {
   const [editingLogo, setEditingLogo] = useState(false);
   const [logoEditSrc, setLogoEditSrc] = useState(null);
   const [logoOriginalSrc, setLogoOriginalSrc] = useState(null);
+  // ── portfolioFiles: [{ file, position, zoom }] — staged new uploads. ──
   const [portfolioFiles, setPortfolioFiles] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
-  const [repositioningIndex, setRepositioningIndex] = useState(null);
-  const [pfQueue, setPfQueue] = useState([]);
-  const [pfIndex, setPfIndex] = useState(0);
-  const [pfEditSrc, setPfEditSrc] = useState(null);
+  // ── portfolioPositions: position/zoom for each EXISTING saved image,
+  // parsed from its URL when loaded, keyed by index into portfolioImages. ──
+  const [portfolioPositions, setPortfolioPositions] = useState([]);
   const [accountType, setAccountType] = useState("free");
   const [videoUrls, setVideoUrls] = useState(["","","","","","","","","",""]);
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
@@ -194,7 +258,9 @@ export default function VendorProfile() {
         setCity(p.city || ""); setState(p.state || ""); setDescription(p.description || "");
         setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
         setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
-        setPortfolioImages(p.portfolio_images || []);
+        const pImgs = p.portfolio_images || [];
+        setPortfolioImages(pImgs.map(u => parsePortfolioPos(u).src));
+        setPortfolioPositions(pImgs.map(u => { const parsed = parsePortfolioPos(u); return { position: parsed.position, zoom: parsed.zoom }; }));
         setLogoUrl(p.logo_url ? p.logo_url.split("#")[0] : "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
@@ -233,13 +299,13 @@ const handleSave = async () => {
         const up = await uploadFile(comp, "vendor-logos");
         if (up) finalLogoUrl = up;
       }
-      let portfolio = [...portfolioImages];
+      let portfolio = portfolioImages.map((url, i) => withPortfolioPos(url, portfolioPositions[i]?.position, portfolioPositions[i]?.zoom));
       if (portfolioFiles.length > 0) {
         for (let i = 0; i < portfolioFiles.length; i++) {
           setMessage(`⏳ Uploading ${i + 1} of ${portfolioFiles.length} images...`);
-          const comp = await compressImage(portfolioFiles[i], 1200, 0.9);
+          const comp = await compressImage(portfolioFiles[i].file, 1200, 0.9);
           const url = await uploadFile(comp, "vendor-portfolio");
-          if (url) portfolio.push(url);
+          if (url) portfolio.push(withPortfolioPos(url, portfolioFiles[i].position, portfolioFiles[i].zoom));
         }
       }
       if (portfolio.length > photoLimit) portfolio = portfolio.slice(0, photoLimit);
@@ -260,14 +326,19 @@ const handleSave = async () => {
         logo_url: finalLogoUrl, portfolio_images: portfolio,
       }).eq("id", user.id);
       if (error) throw error;
-      setPortfolioImages(portfolio); setPortfolioFiles([]); setLogoUrl(finalLogoUrl); setLogoFile(null); setLogoFilePreview(null);
+      setPortfolioImages(portfolio.map(u => parsePortfolioPos(u).src));
+      setPortfolioPositions(portfolio.map(u => { const parsed = parsePortfolioPos(u); return { position: parsed.position, zoom: parsed.zoom }; }));
+      setPortfolioFiles([]); setLogoUrl(finalLogoUrl); setLogoFile(null); setLogoFilePreview(null);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/vendor/${handle}`), 1200);
     } catch (err) { setMessage("❌ Error: " + err.message); }
     setSaving(false);
   };
 
-  const removePortfolioImage = (url) => setPortfolioImages(portfolioImages.filter(x => x !== url));
+  const removePortfolioImage = (idx) => {
+    setPortfolioImages(prev => prev.filter((_, i) => i !== idx));
+    setPortfolioPositions(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const addProduct = async () => {
     if (!newProduct.title || !newProduct.price) { alert("Title and price are required."); return; }
@@ -425,76 +496,50 @@ const handleSave = async () => {
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
             {portfolioImages.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
                   <div key={i} style={{ position: "relative" }}>
-                    <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={img} alt="" style={{ width: "100%", height: "auto", display: "block" }} /></div>
-                    <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: 11, lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                    <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Crop</button>
+                    <PositionablePortfolioImage
+                      src={img}
+                      position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
+                      zoom={portfolioPositions[i]?.zoom || 1}
+                      onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
+                      onZoomChange={(z) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, zoom: z } : p))}
+                    />
+                    <button onClick={() => removePortfolioImage(i)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
                   </div>
                 ))}
-              </div>
-            )}
-            {repositioningIndex !== null && portfolioImages[repositioningIndex] && (
-              <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-                <ImageEditor
-                  src={portfolioImages[repositioningIndex]}
-                  aspect={null}
-                  onCancel={() => setRepositioningIndex(null)}
-                  onDone={async (file) => {
-                    const idx = repositioningIndex;
-                    setRepositioningIndex(null);
-                    setRepoUploading(true);
-                    setMessage("");
-                    const comp = await compressImage(file, 1200, 0.9);
-                    const url = await uploadFile(comp, "vendor-portfolio");
-                    if (url) { setPortfolioImages(prev => prev.map((u, i2) => i2 === idx ? url : u)); setMessage("✅ Image updated — remember to Save Profile."); }
-                    setRepoUploading(false);
-                  }}
-                />
-              </div>
-            )}
-            {pfEditSrc && (
-              <div style={{ marginBottom: 14 }}>
-                <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Editing image {pfIndex + 1} of {pfQueue.length}</p>
-                <ImageEditor
-                  src={pfEditSrc}
-                  aspect={null}
-                  onCancel={() => { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }}
-                  onDone={(file) => {
-                    setPortfolioFiles(prev => [...prev, file]);
-                    const next = pfIndex + 1;
-                    if (next < pfQueue.length) { setPfIndex(next); setPfEditSrc(URL.createObjectURL(pfQueue[next])); }
-                    else { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }
-                  }}
-                />
               </div>
             )}
             {portfolioFiles.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
-                  📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
+                  📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — drag to position, then click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
-                  {portfolioFiles.map((file, i) => (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+                  {portfolioFiles.map((item, i) => (
                     <div key={i} style={{ position: "relative" }}>
-                      <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #f0c040" }}>
-                        <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "auto", display: "block" }} />
-                      </div>
-                      <button onClick={() => setPortfolioFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
+                      <PositionablePortfolioImage
+                        src={URL.createObjectURL(item.file)}
+                        position={item.position}
+                        zoom={item.zoom}
+                        onChange={(pos) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
+                        onZoomChange={(z) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, zoom: z } : it))}
+                      />
+                      <button onClick={() => setPortfolioFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            {portfolioImages.length < photoLimit && (
+            {portfolioImages.length + portfolioFiles.length < photoLimit && (
               <input type="file" accept="image/*" multiple onChange={e => {
-                const remaining = photoLimit - portfolioImages.length;
+                const remaining = photoLimit - portfolioImages.length - portfolioFiles.length;
                 const files = Array.from(e.target.files).slice(0, remaining);
                 if (Array.from(e.target.files).length > remaining) alert(`You can only add ${remaining} more image(s).`);
                 e.target.value = "";
                 if (files.length === 0) return;
-                setPfQueue(files); setPfIndex(0); setPfEditSrc(URL.createObjectURL(files[0]));
+                setPortfolioFiles(prev => [...prev, ...files.map(file => ({ file, position: { x: 50, y: 50 }, zoom: 1 }))]);
               }} />
             )}
           </div>
