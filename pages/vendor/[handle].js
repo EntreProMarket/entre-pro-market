@@ -20,6 +20,34 @@ function parseProductPos(url) {
   return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
 }
 
+// Portfolio images carry a 3-value tag (#pos=x,y,zoom). Showing position and
+// zoom correctly requires a box sized to that photo's own natural aspect
+// (measured on load) with objectFit:cover — a bare CSS transform would zoom
+// toward the image's center and ignore the dragged position entirely. This
+// keeps each photo's own shape (the collage look) while still honoring the
+// saved framing.
+function parsePortfolioPos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
+}
+function PortfolioGridImage({ url, onClick }) {
+  const [aspect, setAspect] = useState(null);
+  const parsed = parsePortfolioPos(url);
+  return (
+    <div onClick={() => onClick(parsed.src)} style={{ breakInside: "avoid", marginBottom: 10, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", backgroundColor: "#f5f5f5", aspectRatio: aspect || undefined }}>
+      <img
+        src={parsed.src}
+        alt="portfolio"
+        onLoad={e => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setAspect(el.naturalWidth / el.naturalHeight); }}
+        style={{ width: "100%", height: aspect ? "100%" : "auto", display: "block", objectFit: "cover", objectPosition: `${parsed.position.x}% ${parsed.position.y}%`, transform: parsed.zoom > 1 ? `scale(${parsed.zoom})` : undefined, transformOrigin: "center" }}
+      />
+    </div>
+  );
+}
+
 export default function VendorPublicProfile() {
   useInactivityLogout();
   useForceLogoutIfExpired();
@@ -170,9 +198,7 @@ export default function VendorPublicProfile() {
             {vendor.portfolio_images?.length > 0 ? (
               <div style={{ columnWidth: 150, columnGap: 10 }}>
                 {vendor.portfolio_images.map((img, i) => (
-                  <div key={i} onClick={() => setSelectedImage(img)} style={{ breakInside: "avoid", marginBottom: 10, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" }}>
-                    <img src={img} alt="portfolio" style={{ width: "100%", height: "auto", display: "block" }} />
-                  </div>
+                  <PortfolioGridImage key={i} url={img} onClick={(src) => setSelectedImage(src)} />
                 ))}
               </div>
             ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
