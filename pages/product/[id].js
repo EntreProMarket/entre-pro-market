@@ -207,7 +207,7 @@ export default function ProductPage() {
 
       <h1 style={{ margin: "0 0 8px", fontSize: 22 }}>{product.title}</h1>
       <p style={{ margin: "0 0 20px", fontSize: 28, fontWeight: "bold", color: "#701890" }}>${price}</p>
-      {product.description && <p style={{ margin: "0 0 28px", fontSize: 15, color: "#444", lineHeight: 1.6 }}>{product.description}</p>}
+      {product.description && <p style={{ margin: "0 0 28px", fontSize: 15, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{product.description}</p>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <button onClick={handleBuyWithStripe} disabled={buying}
