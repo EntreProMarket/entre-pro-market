@@ -270,7 +270,7 @@ export default function HomePage() {
               <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
               {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444", whiteSpace: "pre-line" }}>📍 {selectedEvent.venue}{selectedEvent.venue_address ? `\n${selectedEvent.venue_address}` : ""}</p>}
               {selectedEvent.price && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold", whiteSpace: "pre-line" }}>💵 {selectedEvent.price}</p>}
-              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
+              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedEvent.description}</p>}
               {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
               {selectedEvent._source === "epm" ? (
                 <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Hosted by <span style={{ color: "#701890", fontWeight: "bold" }}>Entre PRO Market</span></p>
