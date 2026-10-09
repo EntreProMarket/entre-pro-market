@@ -146,7 +146,8 @@ export default function OrganizerPublicProfile() {
       <div style={{ marginTop: 16 }}>
         <p><strong>Category:</strong> {organizer.category || "N/A"}</p>
         <p><strong>Location:</strong> {organizer.city}{organizer.state ? `, ${organizer.state}` : ""}</p>
-        {organizer.description && <p style={{ marginTop: 16, lineHeight: 1.6 }}>{organizer.description}</p>}
+        {/* ── FIX: whiteSpace pre-wrap added — line breaks in the bio were being collapsed ── */}
+        {organizer.description && <p style={{ marginTop: 16, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{organizer.description}</p>}
         <div style={{ marginTop: 12 }}>
           {organizer.tags?.map(tag => <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>{tag}</span>)}
         </div>
@@ -261,7 +262,8 @@ export default function OrganizerPublicProfile() {
               {(selectedEvent.event_start_time || selectedEvent.event_end_time) && <p style={{ margin: "0 0 8px", fontSize: 13, color: "#555" }}>🕐 {formatTime(selectedEvent.event_start_time)}{selectedEvent.event_end_time && ` – ${formatTime(selectedEvent.event_end_time)}`}</p>}
               {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444", whiteSpace: "pre-line" }}>📍 {selectedEvent.venue}{selectedEvent.venue_address ? `\n${selectedEvent.venue_address}` : ""}</p>}
               {selectedEvent.price && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>💵 {selectedEvent.price}</p>}
-              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6 }}>{selectedEvent.description}</p>}
+              {/* ── FIX: whiteSpace pre-wrap added — same bug as home.js's event popup ── */}
+              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedEvent.description}</p>}
               {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
               <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Event by <span style={{ color: "#701890", fontWeight: "bold" }}>@{organizer.handle}</span></p>
             </div>
