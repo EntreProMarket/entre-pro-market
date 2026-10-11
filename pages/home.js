@@ -195,13 +195,11 @@ export default function HomePage() {
             {upcomingEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
           </div>
           {visibleEvents.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, alignItems: "start" }}>
               {visibleEvents.map(event => (
                 <div key={`${event._source}-${event.id}`} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
                   {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
-                  <div style={{ height: 150, overflow: "hidden" }}>
-                    {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, transform: `scale(${p.zoom})`, transformOrigin: "center", display: "block" }} />; })() : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
-                  </div>
+                  {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "auto", display: "block" }} />; })() : <div style={{ width: "100%", height: 150, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
                   <div style={{ padding: 12 }}>
                     <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h3>
                     {event.category && <p style={{ margin: "0 0 2px", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{event.category}</p>}
@@ -222,15 +220,13 @@ export default function HomePage() {
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           {newsArticles.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, alignItems: "start" }}>
               {newsArticles.map(article => {
                 const cover = parsePos(article.cover_image_url || "");
                 const firstParagraph = article.content_blocks?.find(b => b.type === "paragraph")?.text || "";
                 return (
                   <div key={article.id} onClick={() => setSelectedArticle(article)} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
-                    <div style={{ aspectRatio: COVER_ASPECT_RATIO, overflow: "hidden", backgroundColor: "#f0f0f0" }}>
-                      {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: "center", display: "block" }} /> : <div style={{ width: "100%", height: "100%", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
-                    </div>
+                    {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "auto", display: "block" }} /> : <div style={{ width: "100%", height: 150, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
                     <div style={{ padding: 12 }}>
                       <h3 style={{ margin: "0 0 6px", fontSize: 14 }}>{article.title}</h3>
                       {firstParagraph && <p style={{ margin: 0, fontSize: 12, color: "#888", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{firstParagraph}</p>}
@@ -323,4 +319,3 @@ export default function HomePage() {
     </div>
   );
 }
-
