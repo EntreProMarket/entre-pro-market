@@ -7,6 +7,17 @@ import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
 
+// Rotates display order on each page visit (Fisher-Yates) — same idea as
+// vendor listing rotation, applied to Portfolio order.
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const logoBoxStyle = { maxWidth: 220, borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" };
 
@@ -71,7 +82,7 @@ export default function OrganizerPublicProfile() {
         setLoading(false); return;
       }
 
-      setOrganizer(data);
+      setOrganizer({ ...data, portfolio_images: shuffleArray(data.portfolio_images || []) });
       if (data.account_type === "elite") {
         const { data: evData } = await supabase.from("organizer_events").select("*").eq("organizer_id", data.id).order("event_date", { ascending: true });
         setEvents(evData || []);
