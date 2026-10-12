@@ -17,7 +17,10 @@ export default function EpmShop() {
       const adminIds = (adminProfiles || []).map(p => p.id);
       if (adminIds.length === 0) { setProducts([]); setLoading(false); return; }
       const { data } = await supabase.from("vendor_products").select("*").in("vendor_id", adminIds).eq("is_active", true).order("created_at", { ascending: false });
-      setProducts(data || []);
+      // Rotate display order on every visit — same idea as vendor listing rotation.
+      const a = [...(data || [])];
+      for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+      setProducts(a);
       setLoading(false);
     };
     load();
