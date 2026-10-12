@@ -7,6 +7,17 @@ import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
 
+// Rotates display order on each page visit (Fisher-Yates) — same idea as
+// vendor listing rotation, applied to Portfolio and Shop product order.
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const logoBoxStyle = { maxWidth: 220, borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" };
 
@@ -96,7 +107,8 @@ export default function VendorPublicProfile() {
         setLoading(false); return;
       }
 
-      setVendor(data);
+      // Rotate display order on every visit — same idea as vendor listing rotation.
+      setVendor({ ...data, portfolio_images: shuffleArray(data.portfolio_images || []) });
       const ownerViewing = user && data.id === user.id;
       if (ownerViewing) setIsOwner(true);
 
@@ -112,7 +124,7 @@ export default function VendorPublicProfile() {
       }
 
       const { data: prods } = await supabase.from("vendor_products").select("*").eq("vendor_id", data.id).eq("is_active", true).order("created_at", { ascending: false });
-      setProducts(prods || []);
+      setProducts(shuffleArray(prods || []));
       setLoading(false);
     };
     fetchVendor();
