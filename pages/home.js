@@ -171,24 +171,25 @@ export default function HomePage() {
           )}
         </div>
 
-        <div style={{ marginBottom: 32, position: "relative" }}>
+        <div style={{ marginBottom: 32 }}>
           {epmShopHasProducts && (
-            <button
-              onClick={() => router.push("/epm-shop")}
-              title="EPM Shop"
-              style={{
-                position: "absolute", top: -14, right: 0, zIndex: 2,
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                width: 64, height: 64, borderRadius: "50%",
-                background: "linear-gradient(135deg, #701890, #AABB23)",
-                color: "white", border: "3px solid white",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-                cursor: "pointer", fontWeight: "bold", lineHeight: 1.1, padding: 0
-              }}
-            >
-              <span style={{ fontSize: 13 }}>EPM</span>
-              <span style={{ fontSize: 9 }}>SHOP</span>
-            </button>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+              <button
+                onClick={() => router.push("/epm-shop")}
+                title="EPM Shop"
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #701890, #AABB23)",
+                  color: "white", border: "3px solid white",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+                  cursor: "pointer", fontWeight: "bold", lineHeight: 1.1, padding: 0
+                }}
+              >
+                <span style={{ fontSize: 13 }}>EPM</span>
+                <span style={{ fontSize: 9 }}>SHOP</span>
+              </button>
+            </div>
           )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <h2 style={{ margin: 0, fontSize: 18 }}>👑 Upcoming Events</h2>
