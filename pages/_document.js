@@ -1,4 +1,4 @@
-        // pages/_document.js
+// pages/_document.js
 
 import { Html, Head, Main, NextScript } from "next/document";
 
@@ -14,9 +14,15 @@ export default function Document() {
             margin: 0;
             padding: 0;
             max-width: 100vw;
-            overflow-x: hidden;
+            overflow-x: clip;
             touch-action: pan-x pan-y;
             -ms-touch-action: pan-x pan-y;
+            /* The safe-area strip below FooterBar (gesture-nav area on some
+               Android devices) isn't covered by any page element — it just
+               shows this background. Matching it to brand purple instead of
+               the browser default white is what actually fixes the white
+               sliver at the very bottom of every page. */
+            background-color: #701890;
           }
         `}</style>
         <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
