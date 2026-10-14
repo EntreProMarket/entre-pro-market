@@ -10,6 +10,24 @@ function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
 function isValidHandle(value) { return value.length > 0 && /^[a-zA-Z0-9_-]+$/.test(value); }
 
+// ── DRAFT SAVING — every text field below auto-saves to this device's
+// localStorage as the user types, and restores automatically if they leave
+// without saving. Cleared the moment Save Profile succeeds. ──
+const DRAFT_PREFIX = "draft_vendor_profile_";
+function loadDraft(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  const v = window.localStorage.getItem(DRAFT_PREFIX + key);
+  return v !== null ? v : fallback;
+}
+function saveDraft(key, value) {
+  if (typeof window === "undefined") return;
+  if (value) window.localStorage.setItem(DRAFT_PREFIX + key, value);
+  else window.localStorage.removeItem(DRAFT_PREFIX + key);
+}
+const PROFILE_DRAFT_KEYS = ["businessName", "handle", "category", "city", "state", "description", "website", "instagram", "facebook", "tiktok", "youtube", "xTwitter", "tags"];
+function clearDrafts(keys) { keys.forEach(k => saveDraft(k, "")); }
+const MAX_PINNED = 4;
+
 function formatSocialLink(platform, value) {
   if (!value || !value.trim()) return "";
   const v = value.trim();
@@ -204,6 +222,7 @@ export default function VendorProfile() {
   // ── portfolioPositions: position/zoom for each EXISTING saved image,
   // parsed from its URL when loaded, keyed by index into portfolioImages. ──
   const [portfolioPositions, setPortfolioPositions] = useState([]);
+  const [pinnedPortfolio, setPinnedPortfolio] = useState([]); // up to 4 URLs, most-recently-pinned first
   const [accountType, setAccountType] = useState("free");
   const [videoUrls, setVideoUrls] = useState(["","","","","","","","","",""]);
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
@@ -252,15 +271,16 @@ export default function VendorProfile() {
       }
       const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       if (p) {
-        setBusinessName(p.business_name || ""); setHandle(p.handle || ""); setCategory(p.category || "");
-        setTags(p.tags ? p.tags.join(", ") : ""); setAccountType(p.account_type || "free");
+        setBusinessName(loadDraft("businessName", p.business_name || "")); setHandle(loadDraft("handle", p.handle || "")); setCategory(loadDraft("category", p.category || ""));
+        setTags(loadDraft("tags", p.tags ? p.tags.join(", ") : "")); setAccountType(p.account_type || "free");
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
-        setCity(p.city || ""); setState(p.state || ""); setDescription(p.description || "");
-        setWebsite(p.website || ""); setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
-        setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
+        setCity(loadDraft("city", p.city || "")); setState(loadDraft("state", p.state || "")); setDescription(loadDraft("description", p.description || ""));
+        setWebsite(loadDraft("website", p.website || "")); setInstagram(loadDraft("instagram", p.instagram || "")); setFacebook(loadDraft("facebook", p.facebook || ""));
+        setTiktok(loadDraft("tiktok", p.tiktok || "")); setYoutube(loadDraft("youtube", p.youtube || "")); setXTwitter(loadDraft("xTwitter", p.x_twitter || ""));
         const pImgs = p.portfolio_images || [];
         setPortfolioImages(pImgs.map(u => parsePortfolioPos(u).src));
         setPortfolioPositions(pImgs.map(u => { const parsed = parsePortfolioPos(u); return { position: parsed.position, zoom: parsed.zoom }; }));
+        setPinnedPortfolio((p.pinned_portfolio || []).slice(0, MAX_PINNED));
         setLogoUrl(p.logo_url ? p.logo_url.split("#")[0] : "");
         setCashappHandle(p.cashapp_handle || ""); setVenmoHandle(p.venmo_handle || "");
       }
@@ -281,6 +301,22 @@ export default function VendorProfile() {
     if (error) { setMessage("❌ Upload error: " + error.message); return null; }
     return supabase.storage.from(bucket).getPublicUrl(fileName).data.publicUrl;
   };
+
+  // ── field helper: updates state + saves draft in one call ──
+  const setField = (setter, draftKey) => (value) => { setter(value); saveDraft(draftKey, value); };
+  const fBusinessName = setField(setBusinessName, "businessName");
+  const fHandle = (v) => { const clean = sanitizeHandle(v); setHandle(clean); saveDraft("handle", clean); };
+  const fCategory = setField(setCategory, "category");
+  const fCity = setField(setCity, "city");
+  const fState = setField(setState, "state");
+  const fDescription = setField(setDescription, "description");
+  const fWebsite = setField(setWebsite, "website");
+  const fInstagram = setField(setInstagram, "instagram");
+  const fFacebook = setField(setFacebook, "facebook");
+  const fTiktok = setField(setTiktok, "tiktok");
+  const fYoutube = setField(setYoutube, "youtube");
+  const fXTwitter = setField(setXTwitter, "xTwitter");
+  const fTags = setField(setTags, "tags");
 
 const handleSave = async () => {
     const { data: authData } = await supabase.auth.getUser();
@@ -323,12 +359,13 @@ const handleSave = async () => {
         x_twitter: formatSocialLink("x_twitter", xTwitter),
         cashapp_handle: cashappHandle.replace(/^\$/, "").trim(),
         venmo_handle: venmoHandle.replace(/^@/, "").trim(),
-        logo_url: finalLogoUrl, portfolio_images: portfolio,
+        logo_url: finalLogoUrl, portfolio_images: portfolio, pinned_portfolio: pinnedPortfolio,
       }).eq("id", user.id);
       if (error) throw error;
       setPortfolioImages(portfolio.map(u => parsePortfolioPos(u).src));
       setPortfolioPositions(portfolio.map(u => { const parsed = parsePortfolioPos(u); return { position: parsed.position, zoom: parsed.zoom }; }));
       setPortfolioFiles([]); setLogoUrl(finalLogoUrl); setLogoFile(null); setLogoFilePreview(null);
+      clearDrafts(PROFILE_DRAFT_KEYS);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/vendor/${handle}`), 1200);
     } catch (err) { setMessage("❌ Error: " + err.message); }
@@ -336,8 +373,19 @@ const handleSave = async () => {
   };
 
   const removePortfolioImage = (idx) => {
+    const url = portfolioImages[idx];
     setPortfolioImages(prev => prev.filter((_, i) => i !== idx));
     setPortfolioPositions(prev => prev.filter((_, i) => i !== idx));
+    setPinnedPortfolio(prev => prev.filter(u => u !== url));
+  };
+
+  // ── Pin a saved portfolio image to the top (up to 4). Newest pin always
+  // goes to position 0. Clicking an already-pinned image unpins it. ──
+  const togglePin = (url) => {
+    setPinnedPortfolio(prev => {
+      if (prev.includes(url)) return prev.filter(u => u !== url);
+      return [url, ...prev].slice(0, MAX_PINNED);
+    });
   };
 
   const addProduct = async () => {
@@ -411,6 +459,14 @@ const handleSave = async () => {
     setMarkingSale(false);
   };
 
+  // ── Display order: pinned (in pin order) first, then the rest in their saved order. ──
+  const orderedPortfolioIndexes = (() => {
+    const pinnedSet = new Set(pinnedPortfolio);
+    const pinnedIdxInPinOrder = pinnedPortfolio.map(u => portfolioImages.indexOf(u)).filter(i => i !== -1);
+    const restIdx = portfolioImages.map((_, i) => i).filter(i => !pinnedSet.has(portfolioImages[i]));
+    return [...pinnedIdxInPinOrder, ...restIdx];
+  })();
+
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
@@ -433,26 +489,26 @@ const handleSave = async () => {
 
       {activeTab === "profile" && (
         <>
-          <input placeholder="Business Name" value={businessName} onChange={e => setBusinessName(e.target.value)} style={iS} />
+          <input placeholder="Business Name" value={businessName} onChange={e => fBusinessName(e.target.value)} style={iS} />
           <div style={{ marginBottom: 12 }}>
-            <input placeholder="Handle (e.g. MyBakery)" value={handle} onChange={e => setHandle(sanitizeHandle(e.target.value))} style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
+            <input placeholder="Handle (e.g. MyBakery)" value={handle} onChange={e => fHandle(e.target.value)} style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
             {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/vendor/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your URL: app.entrepromarket.com/vendor/YourHandle</p>}
           </div>
-          <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
+          <select value={category} onChange={e => fCategory(e.target.value)} style={iS}>
             <option value="">Select a Category...</option>
             {["DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <input placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={iS} />
-          <input placeholder="State" value={state} onChange={e => setState(e.target.value)} style={iS} />
-          <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
-          <input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} style={iS} />
+          <input placeholder="City" value={city} onChange={e => fCity(e.target.value)} style={iS} />
+          <input placeholder="State" value={state} onChange={e => fState(e.target.value)} style={iS} />
+          <textarea placeholder="Description" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+          <input placeholder="Tags (comma separated)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
           <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>⚠️ Links must be public or they may not open correctly.</div>
-          <input placeholder="Website" value={website} onChange={e => setWebsite(e.target.value)} style={iS} />
-          <input placeholder="Instagram" value={instagram} onChange={e => setInstagram(e.target.value)} style={iS} />
-          <input placeholder="Facebook" value={facebook} onChange={e => setFacebook(e.target.value)} style={iS} />
-          <input placeholder="TikTok" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
-          <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
-          <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
+          <input placeholder="Website" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
+          <input placeholder="Instagram" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
+          <input placeholder="Facebook" value={facebook} onChange={e => fFacebook(e.target.value)} style={iS} />
+          <input placeholder="TikTok" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
+          <input placeholder="YouTube" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
+          <input placeholder="X / Twitter" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
 
               <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
@@ -494,10 +550,13 @@ const handleSave = async () => {
           <div style={{ marginTop: 20, marginBottom: 8 }}>
             <label style={lS}>Portfolio</label>
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos). Tap 📌 to pin up to {MAX_PINNED} photos to the top — the most recently pinned always shows first.</div>
             {portfolioImages.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
-                {portfolioImages.map((img, i) => (
+                {orderedPortfolioIndexes.map(i => {
+                  const img = portfolioImages[i];
+                  const isPinned = pinnedPortfolio.includes(img);
+                  return (
                   <div key={i} style={{ position: "relative" }}>
                     <PositionablePortfolioImage
                       src={img}
@@ -507,8 +566,10 @@ const handleSave = async () => {
                       onZoomChange={(z) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, zoom: z } : p))}
                     />
                     <button onClick={() => removePortfolioImage(i)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
+                    <button onClick={() => togglePin(img)} style={{ position: "absolute", top: 4, left: 4, background: isPinned ? "#AABB23" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer", fontWeight: "bold" }}>{isPinned ? `📌 ${pinnedPortfolio.indexOf(img) + 1}` : "📌 Pin"}</button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             {portfolioFiles.length > 0 && (
