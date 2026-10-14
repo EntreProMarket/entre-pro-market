@@ -82,7 +82,13 @@ export default function OrganizerPublicProfile() {
         setLoading(false); return;
       }
 
-      setOrganizer({ ...data, portfolio_images: shuffleArray(data.portfolio_images || []) });
+      // Portfolio order: pinned photos first (in pin order), then the rest
+      // in their saved order — organizer's choice, not rotated.
+      const pImgs = data.portfolio_images || [];
+      const pinned = data.pinned_portfolio || [];
+      const pinnedSet = new Set(pinned);
+      const ordered = [...pinned.filter(u => pImgs.includes(u)), ...pImgs.filter(u => !pinnedSet.has(u))];
+      setOrganizer({ ...data, portfolio_images: ordered });
       if (data.account_type === "elite") {
         const { data: evData } = await supabase.from("organizer_events").select("*").eq("organizer_id", data.id).order("event_date", { ascending: true });
         setEvents(evData || []);
