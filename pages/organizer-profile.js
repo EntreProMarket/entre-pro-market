@@ -40,6 +40,25 @@ function formatTime(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+// ── DRAFT SAVING — every text field below auto-saves to this device's
+// localStorage as the user types, and restores automatically if they leave
+// without saving. Cleared the moment Save Profile (or Add/Update Event)
+// succeeds. ──
+const DRAFT_PREFIX = "draft_organizer_profile_";
+function loadDraft(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  const v = window.localStorage.getItem(DRAFT_PREFIX + key);
+  return v !== null ? v : fallback;
+}
+function saveDraft(key, value) {
+  if (typeof window === "undefined") return;
+  if (value) window.localStorage.setItem(DRAFT_PREFIX + key, value);
+  else window.localStorage.removeItem(DRAFT_PREFIX + key);
+}
+const PROFILE_DRAFT_KEYS = ["organizerName", "handle", "category", "city", "stateVal", "description", "website", "instagram", "facebook", "tiktok", "youtube", "xTwitter", "tags"];
+const EVENT_DRAFT_KEYS = ["event_name", "event_date", "event_end_date", "event_start_time", "event_end_time", "venue", "venue_address", "event_type", "category", "description", "info_url", "price"];
+function clearDrafts(keys) { keys.forEach(k => saveDraft(k, "")); }
+
 // ── VIDEO/GIF HELPERS ──
 const VIDEO_EXT = [".mp4", ".mov", ".webm", ".ogg", ".m4v"];
 const GIF_EXT = [".gif"];
@@ -52,6 +71,58 @@ const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const BLANK_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
+const MAX_PINNED = 4;
+
+// ── Portfolio: non-destructive drag-to-reposition (same as Vendor), box
+// sized to each photo's own natural aspect so the collage look is kept.
+// Position/zoom stored as a #pos=x,y,zoom tag on the image's own URL. ──
+function parsePortfolioPos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
+}
+function withPortfolioPos(url, pos, zoom = 1) {
+  if (!url) return url;
+  const base = url.split("#")[0];
+  if (!pos) return base;
+  return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
+}
+function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange }) {
+  const [aspect, setAspect] = useState(1);
+  const ref = useRef(null);
+  const dragState = useRef(null);
+  const pinchState = useRef(null);
+  const handleImgLoad = (e) => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setAspect(el.naturalWidth / el.naturalHeight); };
+  const handlePointerDown = (e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.target.setPointerCapture?.(e.pointerId); };
+  const handlePointerMove = (e) => {
+    if (!dragState.current || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
+    onChange({ x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)), y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)) });
+  };
+  const handlePointerUp = () => { dragState.current = null; };
+  const handleWheel = (e) => { e.preventDefault(); onZoomChange(Math.min(3, Math.max(1, zoom + (e.deltaY < 0 ? 0.1 : -0.1)))); };
+  const handleTouchStart = (e) => { if (e.touches.length === 2) { const [t0, t1] = e.touches; pinchState.current = { dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), startZoom: zoom }; } };
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && pinchState.current) {
+      e.preventDefault();
+      const [t0, t1] = e.touches;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      onZoomChange(Math.min(3, Math.max(1, pinchState.current.startZoom * (dist / pinchState.current.dist))));
+    }
+  };
+  const handleTouchEnd = () => { pinchState.current = null; };
+  return (
+    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
+      onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: "2px solid #AABB23", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
+      <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: 4, right: 6, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 8 }}>✋ Drag{zoom > 1 ? ` · 🔍${zoom.toFixed(1)}x` : ""} · pinch to zoom</div>
+    </div>
+  );
+}
 
 export default function OrganizerProfile() {
   useInactivityLogout();
@@ -78,8 +149,10 @@ export default function OrganizerProfile() {
   const [logoFile, setLogoFile] = useState(null);
   const [logoFilePreview, setLogoFilePreview] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
-  const [portfolioFiles, setPortfolioFiles] = useState([]);
+  const [portfolioFiles, setPortfolioFiles] = useState([]); // [{file, position, zoom}]
   const [portfolioImages, setPortfolioImages] = useState([]);
+  const [portfolioPositions, setPortfolioPositions] = useState([]); // [{position, zoom}] parallel to portfolioImages
+  const [pinnedPortfolio, setPinnedPortfolio] = useState([]); // up to 4 URLs, most-recently-pinned first
   const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
   const [videoUrls, setVideoUrls] = useState(["","","","",""]);
   const [videoFiles, setVideoFiles] = useState([null, null, null, null, null]);
@@ -95,10 +168,6 @@ export default function OrganizerProfile() {
   const [editingLogo, setEditingLogo] = useState(false);
   const [logoEditSrc, setLogoEditSrc] = useState(null);
   const [logoOriginalSrc, setLogoOriginalSrc] = useState(null);
-  const [repositioningIndex, setRepositioningIndex] = useState(null);
-  const [pfQueue, setPfQueue] = useState([]);
-  const [pfIndex, setPfIndex] = useState(0);
-  const [pfEditSrc, setPfEditSrc] = useState(null);
   const [repoUploading, setRepoUploading] = useState(false);
 
   useEffect(() => {
@@ -115,14 +184,26 @@ export default function OrganizerProfile() {
       }
       const { data: p } = await supabase.from("profiles").select("*").eq("id", u.id).single();
       if (p) {
-        setOrganizerName(p.organizer_name || ""); setHandle(p.handle || "");
-        setCategory(p.category || ""); setCity(p.city || ""); setStateVal(p.state || "");
-        setDescription(p.description || ""); setWebsite(p.website || "");
-        setInstagram(p.instagram || ""); setFacebook(p.facebook || "");
-        setTiktok(p.tiktok || ""); setYoutube(p.youtube || ""); setXTwitter(p.x_twitter || "");
-        setTags(p.tags ? p.tags.join(", ") : "");
+        // ── Restore any unsaved draft first, falling back to the saved DB value. ──
+        setOrganizerName(loadDraft("organizerName", p.organizer_name || ""));
+        setHandle(loadDraft("handle", p.handle || ""));
+        setCategory(loadDraft("category", p.category || ""));
+        setCity(loadDraft("city", p.city || ""));
+        setStateVal(loadDraft("stateVal", p.state || ""));
+        setDescription(loadDraft("description", p.description || ""));
+        setWebsite(loadDraft("website", p.website || ""));
+        setInstagram(loadDraft("instagram", p.instagram || ""));
+        setFacebook(loadDraft("facebook", p.facebook || ""));
+        setTiktok(loadDraft("tiktok", p.tiktok || ""));
+        setYoutube(loadDraft("youtube", p.youtube || ""));
+        setXTwitter(loadDraft("xTwitter", p.x_twitter || ""));
+        setTags(loadDraft("tags", p.tags ? p.tags.join(", ") : ""));
         setLogoUrl(p.logo_url ? p.logo_url.split("#")[0] : "");
-        setPortfolioImages(p.portfolio_images || []); setAccountType(p.account_type || "basic");
+        const pImgs = p.portfolio_images || [];
+        setPortfolioImages(pImgs.map(url => parsePortfolioPos(url).src));
+        setPortfolioPositions(pImgs.map(url => { const parsed = parsePortfolioPos(url); return { position: parsed.position, zoom: parsed.zoom }; }));
+        setPinnedPortfolio((p.pinned_portfolio || []).slice(0, MAX_PINNED));
+        setAccountType(p.account_type || "basic");
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","",""]).slice(0, 5));
         if (p.account_type === "elite") {
           const { data: ev } = await supabase.from("organizer_events").select("*").eq("organizer_id", u.id).order("event_date", { ascending: true });
@@ -157,6 +238,22 @@ export default function OrganizerProfile() {
     }
   };
 
+  // ── field helper: updates state + saves draft in one call ──
+  const setField = (setter, draftKey) => (value) => { setter(value); saveDraft(draftKey, value); };
+  const fOrganizerName = setField(setOrganizerName, "organizerName");
+  const fHandle = (v) => { const clean = sanitizeHandle(v); setHandle(clean); saveDraft("handle", clean); };
+  const fCategory = setField(setCategory, "category");
+  const fCity = setField(setCity, "city");
+  const fStateVal = setField(setStateVal, "stateVal");
+  const fDescription = setField(setDescription, "description");
+  const fWebsite = setField(setWebsite, "website");
+  const fInstagram = setField(setInstagram, "instagram");
+  const fFacebook = setField(setFacebook, "facebook");
+  const fTiktok = setField(setTiktok, "tiktok");
+  const fYoutube = setField(setYoutube, "youtube");
+  const fXTwitter = setField(setXTwitter, "xTwitter");
+  const fTags = setField(setTags, "tags");
+
   // ── VIDEO/GIF FILE PICK ──
   const handleVideoFilePick = (i, file) => {
     if (!file) return;
@@ -175,6 +272,15 @@ export default function OrganizerProfile() {
     const vu = [...videoUrls]; vu[i] = ""; setVideoUrls(vu);
   };
 
+  // ── Pin a saved portfolio image to the top (up to 4). Newest pin always
+  // goes to position 0. Clicking an already-pinned image unpins it. ──
+  const togglePin = (url) => {
+    setPinnedPortfolio(prev => {
+      if (prev.includes(url)) return prev.filter(u => u !== url);
+      return [url, ...prev].slice(0, MAX_PINNED);
+    });
+  };
+
   const handleSave = async () => {
     if (accountType === "elite" && (eventForm.event_name.trim() !== "" || flyerFile)) {
       setMessage(`⚠️ You have an unsaved event in progress ("${eventForm.event_name || "untitled"}"). Please tap "${editingEvent ? "Update Event" : "Add Event"}" first, or clear the event fields, before saving your profile — otherwise it will be lost.`);
@@ -190,12 +296,13 @@ export default function OrganizerProfile() {
     try {
       let uploadedLogoUrl = logoUrl;
       if (logoFile) { const up = await uploadFile(logoFile, "organizer-logos"); if (up) uploadedLogoUrl = up; }
-      let updatedPortfolio = [...portfolioImages];
+
+      let updatedPortfolio = portfolioImages.map((url, i) => withPortfolioPos(url, portfolioPositions[i]?.position, portfolioPositions[i]?.zoom));
       if (portfolioFiles.length > 0) {
         const remaining = (imageLimits[accountType] ?? 10) - updatedPortfolio.length;
-        for (const file of portfolioFiles.slice(0, remaining)) {
-          const url = await uploadFile(file, "organizer-portfolio");
-          if (url) updatedPortfolio.push(url);
+        for (const item of portfolioFiles.slice(0, remaining)) {
+          const url = await uploadFile(item.file, "organizer-portfolio");
+          if (url) updatedPortfolio.push(withPortfolioPos(url, item.position, item.zoom));
         }
       }
       let finalVideoUrls = [...videoUrls];
@@ -212,18 +319,23 @@ export default function OrganizerProfile() {
         facebook: formatSocialLink("facebook", facebook), tiktok: formatSocialLink("tiktok", tiktok),
         youtube: formatSocialLink("youtube", youtube), x_twitter: formatSocialLink("x_twitter", xTwitter),
         tags: tags.split(",").map(t => t.trim()).filter(Boolean), logo_url: uploadedLogoUrl,
-        portfolio_images: updatedPortfolio,
+        portfolio_images: updatedPortfolio, pinned_portfolio: pinnedPortfolio,
         video_urls: accountType === "elite" ? finalVideoUrls.filter(v => v.trim()) : [],
         role: "organizer",
       });
       if (error) throw error;
-      setPortfolioImages(updatedPortfolio); setPortfolioFiles([]); setLogoUrl(uploadedLogoUrl); setLogoFile(null); setLogoFilePreview(null);
+      setPortfolioImages(updatedPortfolio.map(u => parsePortfolioPos(u).src));
+      setPortfolioPositions(updatedPortfolio.map(u => { const parsed = parsePortfolioPos(u); return { position: parsed.position, zoom: parsed.zoom }; }));
+      setPortfolioFiles([]); setLogoUrl(uploadedLogoUrl); setLogoFile(null); setLogoFilePreview(null);
       setVideoUrls(finalVideoUrls); setVideoFiles([null, null, null, null, null]);
+      clearDrafts(PROFILE_DRAFT_KEYS);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/organizer/${handle}`), 1200);
     } catch (err) { setMessage("❌ Error: " + err.message); }
     setSaving(false);
   };
+
+  const fEvent = (field) => (value) => { setEventForm(prev => { const next = { ...prev, [field]: value }; saveDraft(`event_${field}`, value); return next; }); };
 
   const saveEvent = async () => {
     if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
@@ -253,6 +365,7 @@ export default function OrganizerProfile() {
         if (data) setEvents([...events, data]);
       }
       setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false);
+      clearDrafts(EVENT_DRAFT_KEYS.map(k => `event_${k}`));
       setMessage("✅ Event saved!");
     } catch (err) {
       setMessage("❌ Error saving event: " + err.message);
@@ -266,15 +379,19 @@ export default function OrganizerProfile() {
     setEvents(events.filter(e => e.id !== id));
   };
 
-  const removePortfolioImage = async (url) => {
+  const removePortfolioImage = async (idx) => {
+    const url = portfolioImages[idx];
     await supabase.storage.from("organizer-portfolio").remove([url.split("/").pop()]);
-    const updated = portfolioImages.filter(img => img !== url);
-    setPortfolioImages(updated);
-    if (user) await supabase.from("profiles").update({ portfolio_images: updated }).eq("id", user.id);
+    const updatedImages = portfolioImages.filter((_, i) => i !== idx);
+    const updatedPositions = portfolioPositions.filter((_, i) => i !== idx);
+    setPortfolioImages(updatedImages);
+    setPortfolioPositions(updatedPositions);
+    setPinnedPortfolio(prev => prev.filter(u => u !== url));
+    if (user) await supabase.from("profiles").update({ portfolio_images: updatedImages.map((u, i) => withPortfolioPos(u, updatedPositions[i]?.position, updatedPositions[i]?.zoom)), pinned_portfolio: pinnedPortfolio.filter(u => u !== url) }).eq("id", user.id);
   };
 
   const imageLimit = imageLimits[accountType] ?? 10;
-  const atLimit = portfolioImages.length >= imageLimit;
+  const atLimit = portfolioImages.length + portfolioFiles.length >= imageLimit;
   useEffect(() => {
     if (!flyerFile) { setFlyerFilePreview(null); return; }
     const url = URL.createObjectURL(flyerFile);
@@ -283,11 +400,18 @@ export default function OrganizerProfile() {
   }, [flyerFile]);
   const flyerPreviewSrc = flyerFilePreview || eventForm.flyer_url;
 
+  // ── Display order: pinned (in pin order) first, then the rest in their saved order. ──
+  const orderedPortfolioIndexes = (() => {
+    const pinnedSet = new Set(pinnedPortfolio);
+    const pinnedIdxInPinOrder = pinnedPortfolio.map(u => portfolioImages.indexOf(u)).filter(i => i !== -1);
+    const restIdx = portfolioImages.map((_, i) => i).filter(i => !pinnedSet.has(portfolioImages[i]));
+    return [...pinnedIdxInPinOrder, ...restIdx];
+  })();
+
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", padding: 20, fontFamily: "sans-serif" }}>
-      {/* ── UPLOADING OVERLAY — now also covers the portfolio re-crop upload ── */}
       {(saving || savingEvent || repoUploading) && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.75)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 30, textAlign: "center" }}>
           <style>{`@keyframes epm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
@@ -299,29 +423,29 @@ export default function OrganizerProfile() {
 
       <h1 style={{ marginBottom: 20 }}>Edit Organizer Profile</h1>
 
-      <input placeholder="Organizer Name" value={organizerName} onChange={e => setOrganizerName(e.target.value)} style={iS} />
+      <input placeholder="Organizer Name" value={organizerName} onChange={e => fOrganizerName(e.target.value)} style={iS} />
 
       <div style={{ marginBottom: 12 }}>
-        <input placeholder="Handle (e.g. MyEvents)" value={handle} onChange={e => setHandle(sanitizeHandle(e.target.value))}
+        <input placeholder="Handle (e.g. MyEvents)" value={handle} onChange={e => fHandle(e.target.value)}
           style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
         {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
       </div>
 
-      <select value={category} onChange={e => setCategory(e.target.value)} style={iS}>
+      <select value={category} onChange={e => fCategory(e.target.value)} style={iS}>
         <option value="">Select a Category...</option>
         {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
-      <input placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={iS} />
-      <input placeholder="State" value={stateVal} onChange={e => setStateVal(e.target.value)} style={iS} />
-      <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+      <input placeholder="City" value={city} onChange={e => fCity(e.target.value)} style={iS} />
+      <input placeholder="State" value={stateVal} onChange={e => fStateVal(e.target.value)} style={iS} />
+      <textarea placeholder="Description" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>⚠️ Links must be public or they may not open correctly.</div>
-      <input placeholder="Website" value={website} onChange={e => setWebsite(e.target.value)} style={iS} />
-      <input placeholder="Instagram" value={instagram} onChange={e => setInstagram(e.target.value)} style={iS} />
-      <input placeholder="Facebook" value={facebook} onChange={e => setFacebook(e.target.value)} style={iS} />
-      <input placeholder="TikTok" value={tiktok} onChange={e => setTiktok(e.target.value)} style={iS} />
-      <input placeholder="YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} style={iS} />
-      <input placeholder="X / Twitter" value={xTwitter} onChange={e => setXTwitter(e.target.value)} style={iS} />
-      <input placeholder="Tags (comma separated)" value={tags} onChange={e => setTags(e.target.value)} style={iS} />
+      <input placeholder="Website" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
+      <input placeholder="Instagram" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
+      <input placeholder="Facebook" value={facebook} onChange={e => fFacebook(e.target.value)} style={iS} />
+      <input placeholder="TikTok" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
+      <input placeholder="YouTube" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
+      <input placeholder="X / Twitter" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
+      <input placeholder="Tags (comma separated)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
 
           {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
@@ -367,71 +491,44 @@ export default function OrganizerProfile() {
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={lS}>Portfolio</label>
         <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8 }}>{portfolioImages.length}/{imageLimit} images{atLimit && " — Remove some before adding more"}</p>
-        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC.</div>
+        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. Tap 📌 to pin up to {MAX_PINNED} photos to the top — the most recently pinned always shows first.</div>
         {portfolioImages.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, marginBottom: 12 }}>
-            {portfolioImages.map((img, i) => (
-              <div key={i} style={{ position: "relative" }}>
-                <div style={{ height: 90, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-                  <img src={img} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
+            {orderedPortfolioIndexes.map(i => {
+              const img = portfolioImages[i];
+              const isPinned = pinnedPortfolio.includes(img);
+              return (
+                <div key={i} style={{ position: "relative" }}>
+                  <PositionablePortfolioImage
+                    src={img}
+                    position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
+                    zoom={portfolioPositions[i]?.zoom || 1}
+                    onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
+                    onZoomChange={(z) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, zoom: z } : p))}
+                  />
+                  <button onClick={() => removePortfolioImage(i)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
+                  <button onClick={() => togglePin(img)} style={{ position: "absolute", top: 4, left: 4, background: isPinned ? "#AABB23" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer", fontWeight: "bold" }}>{isPinned ? `📌 ${pinnedPortfolio.indexOf(img) + 1}` : "📌 Pin"}</button>
                 </div>
-                <button onClick={() => removePortfolioImage(img)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 11, cursor: "pointer", lineHeight: "20px", textAlign: "center", padding: 0 }}>×</button>
-                <button onClick={() => setRepositioningIndex(i)} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer" }}>🎯 Crop</button>
-              </div>
-            ))}
-          </div>
-        )}
-        {repositioningIndex !== null && portfolioImages[repositioningIndex] && (
-          <div style={{ marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8, border: "1px solid #eee" }}>
-            <ImageEditor
-              src={portfolioImages[repositioningIndex]}
-              aspect={null}
-              onCancel={() => setRepositioningIndex(null)}
-              onDone={async (file) => {
-                const idx = repositioningIndex;
-                setRepositioningIndex(null);
-                setRepoUploading(true);
-                setMessage("");
-                const url = await uploadFile(file, "organizer-portfolio");
-                if (url && user) {
-                  const updated = portfolioImages.map((u, i2) => i2 === idx ? url : u);
-                  setPortfolioImages(updated);
-                  await supabase.from("profiles").update({ portfolio_images: updated }).eq("id", user.id);
-                  setMessage("✅ Image updated!");
-                }
-                setRepoUploading(false);
-              }}
-            />
-          </div>
-        )}
-        {pfEditSrc && (
-          <div style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Editing image {pfIndex + 1} of {pfQueue.length}</p>
-            <ImageEditor
-              src={pfEditSrc}
-              aspect={null}
-              onCancel={() => { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }}
-              onDone={(file) => {
-                setPortfolioFiles(prev => [...prev, file]);
-                const next = pfIndex + 1;
-                if (next < pfQueue.length) { setPfIndex(next); setPfEditSrc(URL.createObjectURL(pfQueue[next])); }
-                else { setPfQueue([]); setPfIndex(0); setPfEditSrc(null); }
-              }}
-            />
+              );
+            })}
           </div>
         )}
         {portfolioFiles.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
-              📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
+              📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — drag to position, then click <strong>Save Profile</strong> below.
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
-              {portfolioFiles.map((file, i) => (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+              {portfolioFiles.map((item, i) => (
                 <div key={i} style={{ position: "relative" }}>
-                  <div style={{ height: 80, borderRadius: 6, overflow: "hidden", border: "1px solid #f0c040" }}>
-                    <img src={URL.createObjectURL(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  </div>
-                  <button onClick={() => setPortfolioFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
+                  <PositionablePortfolioImage
+                    src={URL.createObjectURL(item.file)}
+                    position={item.position}
+                    zoom={item.zoom}
+                    onChange={(pos) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
+                    onZoomChange={(z) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, zoom: z } : it))}
+                  />
+                  <button onClick={() => setPortfolioFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
                 </div>
               ))}
             </div>
@@ -439,12 +536,12 @@ export default function OrganizerProfile() {
         )}
         {!atLimit && (
           <input type="file" accept="image/*" multiple onChange={e => {
-            const rem = imageLimit - portfolioImages.length;
+            const rem = imageLimit - portfolioImages.length - portfolioFiles.length;
             const files = Array.from(e.target.files).slice(0, rem);
             if (Array.from(e.target.files).length > rem) alert(`You can only add ${rem} more image(s).`);
             e.target.value = "";
             if (files.length === 0) return;
-            setPfQueue(files); setPfIndex(0); setPfEditSrc(URL.createObjectURL(files[0]));
+            setPortfolioFiles(prev => [...prev, ...files.map(file => ({ file, position: { x: 50, y: 50 }, zoom: 1 }))]);
           }} style={{ display: "block" }} />
         )}
       </div>
@@ -512,29 +609,29 @@ export default function OrganizerProfile() {
           <label style={{ ...lS, color: "#888B00" }}>👑 Events (Elite — Create & Manage)</label>
           <div style={{ backgroundColor: "white", borderRadius: 8, padding: 16, marginBottom: 16, border: "1px solid #eee" }}>
             <p style={{ fontWeight: "bold", marginBottom: 10, fontSize: 14 }}>{editingEvent ? "✏️ Edit Event" : "➕ Add New Event"}</p>
-            <input placeholder="Event Name *" value={eventForm.event_name} onChange={e => setEventForm({ ...eventForm, event_name: e.target.value })} style={iS} />
+            <input placeholder="Event Name *" value={eventForm.event_name} onChange={e => fEvent("event_name")(e.target.value)} style={iS} />
             <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category</label>
-            <select value={eventForm.category} onChange={e => setEventForm({ ...eventForm, category: e.target.value })} style={iS}>
+            <select value={eventForm.category} onChange={e => fEvent("category")(e.target.value)} style={iS}>
               <option value="">Select a Category...</option>
               {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Date</label><input type="date" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date</label><input type="date" value={eventForm.event_end_date} onChange={e => setEventForm({ ...eventForm, event_end_date: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Date</label><input type="date" value={eventForm.event_date} onChange={e => fEvent("event_date")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date</label><input type="date" value={eventForm.event_end_date} onChange={e => fEvent("event_end_date")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => setEventForm({ ...eventForm, event_start_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => setEventForm({ ...eventForm, event_end_time: e.target.value })} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => fEvent("event_start_time")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => fEvent("event_end_time")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
-            <input placeholder="Venue Name" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={iS} />
-            <textarea placeholder="Address (street, city, state)" value={eventForm.venue_address || ""} onChange={e => setEventForm({ ...eventForm, venue_address: e.target.value })} rows={2} style={{ ...iS, resize: "vertical" }} />
-            <input placeholder="Event Type" value={eventForm.event_type} onChange={e => setEventForm({ ...eventForm, event_type: e.target.value })} style={iS} />
-            <textarea placeholder="Event Description" value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Venue Name" value={eventForm.venue} onChange={e => fEvent("venue")(e.target.value)} style={iS} />
+            <textarea placeholder="Address (street, city, state)" value={eventForm.venue_address || ""} onChange={e => fEvent("venue_address")(e.target.value)} rows={2} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Event Type" value={eventForm.event_type} onChange={e => fEvent("event_type")(e.target.value)} style={iS} />
+            <textarea placeholder="Event Description" value={eventForm.description} onChange={e => fEvent("description")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
-            <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => setEventForm({ ...eventForm, price: e.target.value })} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => fEvent("price")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
             <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#701890" }}>💳 Add your Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — you're not limited to Eventbrite. Use this to promote and sell tickets straight through the app.</div>
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
-            <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={eventForm.info_url} onChange={e => setEventForm({ ...eventForm, info_url: e.target.value })} style={iS} />
+            <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={eventForm.info_url} onChange={e => fEvent("info_url")(e.target.value)} style={iS} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span></label>
             {flyerEditSrc ? (
               <div style={{ marginBottom: 10 }}>
@@ -573,7 +670,7 @@ export default function OrganizerProfile() {
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+              {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); clearDrafts(EVENT_DRAFT_KEYS.map(k => `event_${k}`)); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
               <button onClick={saveEvent} disabled={savingEvent} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEvent ? "Saving..." : editingEvent ? "Update Event" : "Add Event"}</button>
             </div>
           </div>
