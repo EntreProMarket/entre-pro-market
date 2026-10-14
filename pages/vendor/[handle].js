@@ -107,8 +107,13 @@ export default function VendorPublicProfile() {
         setLoading(false); return;
       }
 
-      // Rotate display order on every visit — same idea as vendor listing rotation.
-      setVendor({ ...data, portfolio_images: shuffleArray(data.portfolio_images || []) });
+      // Portfolio order: pinned photos first (in pin order), then the rest
+      // in their saved order — vendor's choice, not rotated.
+      const pImgs = data.portfolio_images || [];
+      const pinned = data.pinned_portfolio || [];
+      const pinnedSet = new Set(pinned);
+      const ordered = [...pinned.filter(u => pImgs.includes(u)), ...pImgs.filter(u => !pinnedSet.has(u))];
+      setVendor({ ...data, portfolio_images: ordered });
       const ownerViewing = user && data.id === user.id;
       if (ownerViewing) setIsOwner(true);
 
