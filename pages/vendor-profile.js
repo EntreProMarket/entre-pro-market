@@ -232,7 +232,15 @@ export default function VendorProfile() {
   const productLimit = PRODUCT_LIMITS[accountType] ?? PRODUCT_LIMITS.free;
   const productImageLimit = PRODUCT_IMAGE_LIMITS[accountType] ?? PRODUCT_IMAGE_LIMITS.free;
   const [shopProducts, setShopProducts] = useState([]);
-  const [newProduct, setNewProduct] = useState({ title: "", description: "", price: "" });
+  const [newProduct, setNewProduct] = useState({
+    title: loadDraft("newProductTitle", ""),
+    description: loadDraft("newProductDescription", ""),
+    price: loadDraft("newProductPrice", ""),
+  });
+  const setNewProductField = (field, draftKey) => (value) => { setNewProduct(prev => ({ ...prev, [field]: value })); saveDraft(draftKey, value); };
+  const fNewProductTitle = setNewProductField("title", "newProductTitle");
+  const fNewProductDescription = setNewProductField("description", "newProductDescription");
+  const fNewProductPrice = setNewProductField("price", "newProductPrice");
   // ── Each entry: { file, position: {x,y} } — no crop step, just a file + a
   // draggable position, set before the product is even added. ──
   const [newProductImages, setNewProductImages] = useState([]);
@@ -402,6 +410,7 @@ const handleSave = async () => {
     if (uploadedUrls.length === 0) return;
     const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: newProduct.title, description: newProduct.description, price: Math.round(parseFloat(newProduct.price) * 100), image_url: uploadedUrls[0], images: uploadedUrls, is_active: true });
     if (error) { setMessage("❌ Error: " + error.message); return; }
+    clearDrafts(["newProductTitle", "newProductDescription", "newProductPrice"]);
     setMessage("✅ Product added!");
     setNewProduct({ title: "", description: "", price: "" });
     setNewProductImages([]); setNewProductImageKey(k => k + 1);
@@ -641,9 +650,9 @@ const handleSave = async () => {
           {shopProducts.length < productLimit && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
-              <input placeholder="Product Title *" value={newProduct.title} onChange={e => setNewProduct({ ...newProduct, title: e.target.value })} style={iS} />
-              <textarea placeholder="Description" value={newProduct.description} onChange={e => setNewProduct({ ...newProduct, description: e.target.value })} style={{ ...iS, height: 80, resize: "vertical" }} />
-              <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} style={iS} />
+              <input placeholder="Product Title *" value={newProduct.title} onChange={e => fNewProductTitle(e.target.value)} style={iS} />
+              <textarea placeholder="Description" value={newProduct.description} onChange={e => fNewProductDescription(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
+              <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => fNewProductPrice(e.target.value)} style={iS} />
               <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main. Drag each photo to position it)</span></label>
               {newProductImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
