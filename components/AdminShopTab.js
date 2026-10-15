@@ -15,7 +15,25 @@ export default function AdminShopTab({ adminId }) {
   const [loadingShop, setLoadingShop] = useState(true);
   const [message, setMessage] = useState("");
 
-  const [shopNewProduct, setShopNewProduct] = useState({ title: "", description: "", price: "" });
+
+// ── DRAFT SAVING — auto-saves as admin types, restores if they leave without
+// saving. Cleared once the product is successfully added. ──
+const DRAFT_PREFIX = "draft_admin_shop_";
+function loadDraft(key, fallback) {
+  if (typeof window === "undefined") return fallback;
+  const v = window.localStorage.getItem(DRAFT_PREFIX + key);
+  return v !== null ? v : fallback;
+}
+function saveDraft(key, value) {
+  if (typeof window === "undefined") return;
+  if (value) window.localStorage.setItem(DRAFT_PREFIX + key, value);
+  else window.localStorage.removeItem(DRAFT_PREFIX + key);
+}
+
+  const [shopNewProduct, setShopNewProduct] = useState({ title: loadDraft("title", ""), description: loadDraft("description", ""), price: loadDraft("price", "") });
+  const fShopTitle = (v) => { setShopNewProduct(prev => ({ ...prev, title: v })); saveDraft("title", v); };
+  const fShopDescription = (v) => { setShopNewProduct(prev => ({ ...prev, description: v })); saveDraft("description", v); };
+  const fShopPrice = (v) => { setShopNewProduct(prev => ({ ...prev, price: v })); saveDraft("price", v); };
   const [shopNewProductImages, setShopNewProductImages] = useState([]);
   const [shopNewProductImageKey, setShopNewProductImageKey] = useState(0);
   const [shopNpQueue, setShopNpQueue] = useState([]);
@@ -80,6 +98,7 @@ export default function AdminShopTab({ adminId }) {
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setMessage("✅ Product added to EPM Shop!");
     setShopNewProduct({ title: "", description: "", price: "" });
+    saveDraft("title", ""); saveDraft("description", ""); saveDraft("price", "");
     setShopNewProductImages([]); setShopNewProductImageKey(k => k + 1);
     setShopNpQueue([]); setShopNpIndex(0); setShopNpEditSrc(null);
     await loadShopProducts();
@@ -121,9 +140,9 @@ export default function AdminShopTab({ adminId }) {
 
       <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 20, marginBottom: 24 }}>
         <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>➕ Add New Product</p>
-        <input placeholder="Product Title *" value={shopNewProduct.title} onChange={e => setShopNewProduct({ ...shopNewProduct, title: e.target.value })} style={inputStyle} />
-        <textarea placeholder="Description" value={shopNewProduct.description} onChange={e => setShopNewProduct({ ...shopNewProduct, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-        <input type="number" step="0.01" placeholder="Price in USD *" value={shopNewProduct.price} onChange={e => setShopNewProduct({ ...shopNewProduct, price: e.target.value })} style={inputStyle} />
+        <input placeholder="Product Title *" value={shopNewProduct.title} onChange={e => fShopTitle(e.target.value)} style={inputStyle} />
+        <textarea placeholder="Description" value={shopNewProduct.description} onChange={e => fShopDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+        <input type="number" step="0.01" placeholder="Price in USD *" value={shopNewProduct.price} onChange={e => fShopPrice(e.target.value)} style={inputStyle} />
         <label style={labelStyle}>Product Images * <span style={{ fontWeight: "normal", color: "#888" }}>(up to {SHOP_PRODUCT_IMAGE_LIMIT} — first is main)</span></label>
         {shopNewProductImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
