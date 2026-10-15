@@ -17,12 +17,6 @@ export default function Document() {
             overflow-x: clip;
             touch-action: pan-x pan-y;
             -ms-touch-action: pan-x pan-y;
-            /* The safe-area strip below FooterBar (gesture-nav area on some
-               Android devices) isn't covered by any page element — it just
-               shows this background. Matching it to brand purple instead of
-               the browser default white is what actually fixes the white
-               sliver at the very bottom of every page. */
-            background-color: #701890;
           }
         `}</style>
         <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
@@ -53,6 +47,12 @@ export default function Document() {
       <body>
         <Main />
         <NextScript />
+        {/* ── Covers ONLY the system gesture-bar/taskbar strip at the very
+             bottom of the screen (env(safe-area-inset-bottom)) with brand
+             purple. Height is 0 on devices with no such area, so this never
+             affects normal page layout — it only paints that one strip,
+             not the page body. ── */}
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: "env(safe-area-inset-bottom, 0px)", backgroundColor: "#701890", zIndex: 99999, pointerEvents: "none" }} />
       </body>
     </Html>
   );
