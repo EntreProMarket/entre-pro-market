@@ -247,6 +247,12 @@ export default function VendorProfile() {
   const [newProductImageKey, setNewProductImageKey] = useState(0);
   const [editingProduct, setEditingProduct] = useState(null);
   const [editForm, setEditForm] = useState({ title: "", description: "", price: "" });
+  // ── Edit-product drafts are keyed by product id, so an unsaved edit on one
+  // product never bleeds onto a different product you open next. ──
+  const setEditFormField = (field) => (value) => { setEditForm(prev => ({ ...prev, [field]: value })); if (editingProduct) saveDraft(`editProduct_${editingProduct}_${field}`, value); };
+  const fEditTitle = setEditFormField("title");
+  const fEditDescription = setEditFormField("description");
+  const fEditPrice = setEditFormField("price");
   // ── Each entry: { url, position: {x,y} } — position parsed from the saved
   // URL's #pos= tag when editing starts. ──
   const [editProductImages, setEditProductImages] = useState([]);
@@ -432,6 +438,7 @@ const handleSave = async () => {
     }
     const { error } = await supabase.from("vendor_products").update({ title: editForm.title, description: editForm.description, price: Math.round(parseFloat(editForm.price) * 100), image_url: updatedImages[0] || null, images: updatedImages }).eq("id", editingProduct);
     if (error) { setMessage("❌ Error: " + error.message); return; }
+    clearDrafts([`editProduct_${editingProduct}_title`, `editProduct_${editingProduct}_description`, `editProduct_${editingProduct}_price`]);
     setMessage("✅ Product updated!"); setEditingProduct(null);
     setEditProductNewFiles([]); setEditProductFileKey(k => k + 1);
     await loadProducts(userId);
@@ -699,9 +706,9 @@ const handleSave = async () => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {editingProduct === p.id ? (
                         <>
-                          <input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} style={{ ...iS, marginBottom: 6 }} />
-                          <textarea value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
-                          <input type="number" step="0.01" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: e.target.value })} style={{ ...iS, marginBottom: 8 }} />
+                          <input value={editForm.title} onChange={e => fEditTitle(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
+                          <textarea value={editForm.description} onChange={e => fEditDescription(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
+                          <input type="number" step="0.01" value={editForm.price} onChange={e => fEditPrice(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
                           {editProductImages.length > 0 && (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
                               {editProductImages.map((item, i) => (
@@ -786,7 +793,11 @@ const handleSave = async () => {
                               <button onClick={() => {
                                 const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
                                 setEditingProduct(p.id);
-                                setEditForm({ title: p.title, description: p.description || "", price: (p.price / 100).toFixed(2) });
+                                setEditForm({
+                                  title: loadDraft(`editProduct_${p.id}_title`, p.title),
+                                  description: loadDraft(`editProduct_${p.id}_description`, p.description || ""),
+                                  price: loadDraft(`editProduct_${p.id}_price`, (p.price / 100).toFixed(2)),
+                                });
                                 setEditProductImages(imgs.map(url => { const parsed = parseProductPos(url); return { url: parsed.src, src: parsed.src, position: parsed.position }; }));
                                 setEditProductNewFiles([]);
                               }} style={{ padding: "5px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
