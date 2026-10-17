@@ -46,7 +46,17 @@ function PositionableImage({ src, position, onChange, height }) {
 export default function AdminEpmEventsTab() {
   const [epmEvents, setEpmEvents] = useState([]);
   const [editingEpmEvent, setEditingEpmEvent] = useState(null);
-  const [epmEventForm, setEpmEventForm] = useState(BLANK_EPM_EVENT);
+  
+// ── DRAFT SAVING — auto-saves this form as one blob and restores it if
+// left unsaved. Cleared on successful save or explicit Cancel/Reset. ──
+const DRAFT_KEY_EPM = "draft_key_epm";
+function loadFormDraft(fallback) {
+  if (typeof window === "undefined") return fallback;
+  try { const v = window.localStorage.getItem(DRAFT_KEY_EPM); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+function clearFormDraft() { if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY_EPM); }
+  const [epmEventForm, setEpmEventForm] = useState(() => loadFormDraft(BLANK_EPM_EVENT));
+  useEffect(() => { if (typeof window !== "undefined") window.localStorage.setItem(DRAFT_KEY_EPM, JSON.stringify(epmEventForm)); }, [epmEventForm]);
   const [savingEpmEvent, setSavingEpmEvent] = useState(false);
   const [epmFlyerFile, setEpmFlyerFile] = useState(null);
   const [showEpmFlyerPicker, setShowEpmFlyerPicker] = useState(false);
@@ -108,7 +118,7 @@ export default function AdminEpmEventsTab() {
         if (error) throw error;
         if (data) setEpmEvents([...epmEvents, data]);
       }
-      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false);
+      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); clearFormDraft();
       setMessage("✅ EPM Event saved!");
     } catch (err) {
       setMessage("❌ Error saving EPM event: " + err.message);
@@ -187,7 +197,7 @@ export default function AdminEpmEventsTab() {
           </div>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          {editingEpmEvent && <button onClick={() => { setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setShowEpmFlyerPicker(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+          {editingEpmEvent && <button onClick={() => { setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setShowEpmFlyerPicker(false); clearFormDraft(); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
           <button onClick={saveEpmEvent} disabled={savingEpmEvent} style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEpmEvent ? "Saving..." : editingEpmEvent ? "Update Event" : "Add Event"}</button>
         </div>
       </div>
