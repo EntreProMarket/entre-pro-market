@@ -4,7 +4,7 @@
 "description": "The marketplace connecting vendors with event organizers",
 "start_url": "/",
 "display": "standalone",
-"background_color": "#701890",
+"background_color": "#ffffff",
 "theme_color": "#701890",
 "orientation": "portrait",
 "icons": [
