@@ -1,5 +1,5 @@
 // components/OrganizerShopTab.js
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 import useDragReorder from "./useDragReorder";
@@ -62,24 +62,23 @@ function withProductPos(url, pos) {
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
 }
 function PositionableProductImage({ src, position, onChange, badge = null }) {
-  const [box, setBox] = useState(null);
-  const startRef = { current: null };
-  let dragState = null;
+  const ref = useRef(null);
+  const dragState = useRef(null);
   return (
     <div
-      ref={(el) => { if (el && el !== box) setBox(el); }}
-      onPointerDown={(e) => { dragState = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.currentTarget.setPointerCapture?.(e.pointerId); startRef.current = dragState; }}
+      ref={ref}
+      onPointerDown={(e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }}
       onPointerMove={(e) => {
-        const d = startRef.current;
-        if (!d || !box) return;
-        const rect = box.getBoundingClientRect();
+        const d = dragState.current;
+        if (!d || !ref.current) return;
+        const rect = ref.current.getBoundingClientRect();
         onChange({
           x: Math.min(100, Math.max(0, d.posX - ((e.clientX - d.x) / rect.width) * 100)),
           y: Math.min(100, Math.max(0, d.posY - ((e.clientY - d.y) / rect.height) * 100)),
         });
       }}
-      onPointerUp={() => { startRef.current = null; }}
-      onPointerCancel={() => { startRef.current = null; }}
+      onPointerUp={() => { dragState.current = null; }}
+      onPointerCancel={() => { dragState.current = null; }}
       style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
     >
       <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
