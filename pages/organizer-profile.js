@@ -4,6 +4,8 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import useInactivityLogout from "../hooks/useInactivityLogout";
 import ImageEditor from "../components/ImageEditor";
+import useDragReorder from "../components/useDragReorder";
+import OrganizerShopTab from "../components/OrganizerShopTab";
 
 function cleanHandle(v) { return v.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -71,7 +73,7 @@ const DEFAULT_LOGOS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const BLANK_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
-const MAX_PINNED = 4;
+const FEATURED_COUNT = 4; // first 4 photos in the saved order are the featured/top ones
 
 // ── Portfolio: non-destructive drag-to-reposition (same as Vendor), box
 // sized to each photo's own natural aspect so the collage look is kept.
@@ -152,7 +154,8 @@ export default function OrganizerProfile() {
   const [portfolioFiles, setPortfolioFiles] = useState([]); // [{file, position, zoom}]
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [portfolioPositions, setPortfolioPositions] = useState([]); // [{position, zoom}] parallel to portfolioImages
-  const [pinnedPortfolio, setPinnedPortfolio] = useState([]); // up to 4 URLs, most-recently-pinned first
+  const portfolioDrag = useDragReorder((from, to) => movePortfolioImage(from, to));
+  const [activeTab, setActiveTab] = useState("profile");
   const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
   const [videoUrls, setVideoUrls] = useState(["","","","",""]);
   const [videoFiles, setVideoFiles] = useState([null, null, null, null, null]);
@@ -202,7 +205,6 @@ export default function OrganizerProfile() {
         const pImgs = p.portfolio_images || [];
         setPortfolioImages(pImgs.map(url => parsePortfolioPos(url).src));
         setPortfolioPositions(pImgs.map(url => { const parsed = parsePortfolioPos(url); return { position: parsed.position, zoom: parsed.zoom }; }));
-        setPinnedPortfolio((p.pinned_portfolio || []).slice(0, MAX_PINNED));
         setAccountType(p.account_type || "basic");
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","",""]).slice(0, 5));
         if (p.account_type === "elite") {
@@ -272,13 +274,14 @@ export default function OrganizerProfile() {
     const vu = [...videoUrls]; vu[i] = ""; setVideoUrls(vu);
   };
 
-  // ── Pin a saved portfolio image to the top (up to 4). Newest pin always
-  // goes to position 0. Clicking an already-pinned image unpins it. ──
-  const togglePin = (url) => {
-    setPinnedPortfolio(prev => {
-      if (prev.includes(url)) return prev.filter(u => u !== url);
-      return [url, ...prev].slice(0, MAX_PINNED);
-    });
+  // ── Drag to reorder: moves the photo from one slot to another in BOTH
+  // arrays together so each photo keeps its own position/zoom. The saved
+  // order IS the display order — the first 4 are the featured ones. ──
+  const movePortfolioImage = (from, to) => {
+    if (from === to || from < 0 || to < 0) return;
+    const reorder = (arr) => { const a = [...arr]; const [item] = a.splice(from, 1); a.splice(to, 0, item); return a; };
+    setPortfolioImages(prev => reorder(prev));
+    setPortfolioPositions(prev => reorder(prev));
   };
 
   const handleSave = async () => {
@@ -319,7 +322,7 @@ export default function OrganizerProfile() {
         facebook: formatSocialLink("facebook", facebook), tiktok: formatSocialLink("tiktok", tiktok),
         youtube: formatSocialLink("youtube", youtube), x_twitter: formatSocialLink("x_twitter", xTwitter),
         tags: tags.split(",").map(t => t.trim()).filter(Boolean), logo_url: uploadedLogoUrl,
-        portfolio_images: updatedPortfolio, pinned_portfolio: pinnedPortfolio,
+        portfolio_images: updatedPortfolio, pinned_portfolio: [],
         video_urls: accountType === "elite" ? finalVideoUrls.filter(v => v.trim()) : [],
         role: "organizer",
       });
@@ -386,8 +389,7 @@ export default function OrganizerProfile() {
     const updatedPositions = portfolioPositions.filter((_, i) => i !== idx);
     setPortfolioImages(updatedImages);
     setPortfolioPositions(updatedPositions);
-    setPinnedPortfolio(prev => prev.filter(u => u !== url));
-    if (user) await supabase.from("profiles").update({ portfolio_images: updatedImages.map((u, i) => withPortfolioPos(u, updatedPositions[i]?.position, updatedPositions[i]?.zoom)), pinned_portfolio: pinnedPortfolio.filter(u => u !== url) }).eq("id", user.id);
+    if (user) await supabase.from("profiles").update({ portfolio_images: updatedImages.map((u, i) => withPortfolioPos(u, updatedPositions[i]?.position, updatedPositions[i]?.zoom)), pinned_portfolio: [] }).eq("id", user.id);
   };
 
   const imageLimit = imageLimits[accountType] ?? 10;
@@ -399,14 +401,6 @@ export default function OrganizerProfile() {
     return () => URL.revokeObjectURL(url);
   }, [flyerFile]);
   const flyerPreviewSrc = flyerFilePreview || eventForm.flyer_url;
-
-  // ── Display order: pinned (in pin order) first, then the rest in their saved order. ──
-  const orderedPortfolioIndexes = (() => {
-    const pinnedSet = new Set(pinnedPortfolio);
-    const pinnedIdxInPinOrder = pinnedPortfolio.map(u => portfolioImages.indexOf(u)).filter(i => i !== -1);
-    const restIdx = portfolioImages.map((_, i) => i).filter(i => !pinnedSet.has(portfolioImages[i]));
-    return [...pinnedIdxInPinOrder, ...restIdx];
-  })();
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
@@ -422,6 +416,18 @@ export default function OrganizerProfile() {
       )}
 
       <h1 style={{ marginBottom: 20 }}>Edit Organizer Profile</h1>
+
+      {accountType === "elite" && (
+        <div style={{ display: "flex", marginBottom: 24, borderBottom: "2px solid #ddd" }}>
+          <button onClick={() => setActiveTab("profile")} style={{ flex: 1, padding: 12, border: "none", background: "none", cursor: "pointer", fontWeight: activeTab === "profile" ? "bold" : "normal", borderBottom: activeTab === "profile" ? "4px solid #701890" : "4px solid transparent" }}>📋 Profile</button>
+          <button onClick={() => setActiveTab("shop")} style={{ flex: 1, padding: 12, border: "none", background: "none", cursor: "pointer", fontWeight: activeTab === "shop" ? "bold" : "normal", borderBottom: activeTab === "shop" ? "4px solid #701890" : "4px solid transparent" }}>🛒 Shop / Products</button>
+        </div>
+      )}
+
+      {accountType === "elite" && activeTab === "shop" && user && <OrganizerShopTab userId={user.id} />}
+
+      {(accountType !== "elite" || activeTab === "profile") && (
+      <>
 
       <input placeholder="Organizer Name" value={organizerName} onChange={e => fOrganizerName(e.target.value)} style={iS} />
 
@@ -491,26 +497,26 @@ export default function OrganizerProfile() {
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={lS}>Portfolio</label>
         <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8 }}>{portfolioImages.length}/{imageLimit} images{atLimit && " — Remove some before adding more"}</p>
-        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. Tap 📌 to pin up to {MAX_PINNED} photos to the top — the most recently pinned always shows first.</div>
+        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. Hold and drag the ⠿ handle on any photo to slide it into the order you want — the first {FEATURED_COUNT} photos are your featured ones at the top.</div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
-            {orderedPortfolioIndexes.map(i => {
-              const img = portfolioImages[i];
-              const isPinned = pinnedPortfolio.includes(img);
-              return (
-                <div key={i} style={{ position: "relative" }}>
-                  <PositionablePortfolioImage
-                    src={img}
-                    position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
-                    zoom={portfolioPositions[i]?.zoom || 1}
-                    onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
-                    onZoomChange={(z) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, zoom: z } : p))}
-                  />
-                  <button onClick={() => removePortfolioImage(i)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
-                  <button onClick={() => togglePin(img)} style={{ position: "absolute", top: 4, left: 4, background: isPinned ? "#AABB23" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "2px 7px", fontSize: 10, cursor: "pointer", fontWeight: "bold" }}>{isPinned ? `📌 ${pinnedPortfolio.indexOf(img) + 1}` : "📌 Pin"}</button>
-                </div>
-              );
-            })}
+            {portfolioImages.map((img, i) => (
+              <div key={img} ref={portfolioDrag.setItemRef(i)} style={{ position: "relative", borderRadius: 8, ...portfolioDrag.itemStyle(i) }}>
+                <PositionablePortfolioImage
+                  src={img}
+                  position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
+                  zoom={portfolioPositions[i]?.zoom || 1}
+                  onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
+                  onZoomChange={(z) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, zoom: z } : p))}
+                />
+                <button onClick={() => removePortfolioImage(i)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
+                <div
+                  {...portfolioDrag.handleProps(i)}
+                  title="Hold and drag to reorder"
+                  style={{ position: "absolute", top: 4, left: 4, ...portfolioDrag.handleBaseStyle, background: i < FEATURED_COUNT ? "#AABB23" : "rgba(0,0,0,0.6)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}
+                >⠿ {i + 1}</div>
+              </div>
+            ))}
           </div>
         )}
         {portfolioFiles.length > 0 && (
@@ -706,6 +712,9 @@ export default function OrganizerProfile() {
         <button onClick={() => router.replace("/organizer-dashboard")} style={{ padding: "12px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer" }}>← Back</button>
         <button onClick={handleSave} disabled={saving} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, fontWeight: "bold", cursor: "pointer", fontSize: 15 }}>{saving ? "Saving..." : "Save Profile"}</button>
       </div>
+
+      </>
+      )}
 
       {flyerFullscreen && flyerPreviewSrc && (
         <div onClick={() => setFlyerFullscreen(false)} style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, cursor: "zoom-out" }}>
