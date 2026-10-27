@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/router";
 import useInactivityLogout from "../hooks/useInactivityLogout";
 import ImageEditor from "../components/ImageEditor";
+import useDragReorder from "../components/useDragReorder";
 import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
@@ -222,8 +223,9 @@ export default function VendorProfile() {
   // ── portfolioPositions: position/zoom for each EXISTING saved image,
   // parsed from its URL when loaded, keyed by index into portfolioImages. ──
   const [portfolioPositions, setPortfolioPositions] = useState([]);
-  const [dragIndex, setDragIndex] = useState(null); // index of the Portfolio photo currently being dragged to reorder
-  const portfolioTileRefs = useRef([]);
+  const portfolioDrag = useDragReorder((from, to) => movePortfolioImage(from, to));
+  const productDrag = useDragReorder((from, to) => reorderShopProducts(from, to));
+  const [productOrder, setProductOrder] = useState([]);
   const [accountType, setAccountType] = useState("free");
   const [videoUrls, setVideoUrls] = useState(["","","","","","","","","",""]);
   const [photoLimits, setPhotoLimits] = useState({ free: 5, premium: 20, featured: 40 });
@@ -232,6 +234,7 @@ export default function VendorProfile() {
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
   const productLimit = PRODUCT_LIMITS[accountType] ?? PRODUCT_LIMITS.free;
   const productImageLimit = PRODUCT_IMAGE_LIMITS[accountType] ?? PRODUCT_IMAGE_LIMITS.free;
+  const canReorder = accountType !== "free"; // hold-and-drag ordering + top-4 pinning: Premium and Featured only
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
     title: loadDraft("newProductTitle", ""),
@@ -287,7 +290,7 @@ export default function VendorProfile() {
       const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       if (p) {
         setBusinessName(loadDraft("businessName", p.business_name || "")); setHandle(loadDraft("handle", p.handle || "")); setCategory(loadDraft("category", p.category || ""));
-        setTags(loadDraft("tags", p.tags ? p.tags.join(", ") : "")); setAccountType(p.account_type || "free");
+        setTags(loadDraft("tags", p.tags ? p.tags.join(", ") : "")); setAccountType(p.account_type || "free"); setProductOrder(p.product_order || []);
         if (p.video_urls) setVideoUrls(p.video_urls.concat(["","","","","","","","","",""]).slice(0, 10));
         setCity(loadDraft("city", p.city || "")); setState(loadDraft("state", p.state || "")); setDescription(loadDraft("description", p.description || ""));
         setWebsite(loadDraft("website", p.website || "")); setInstagram(loadDraft("instagram", p.instagram || "")); setFacebook(loadDraft("facebook", p.facebook || ""));
@@ -400,18 +403,16 @@ const handleSave = async () => {
     setPortfolioImages(prev => reorder(prev));
     setPortfolioPositions(prev => reorder(prev));
   };
-  const handleReorderMove = (e) => {
-    if (dragIndex === null) return;
-    const x = e.clientX, y = e.clientY;
-    let over = -1;
-    portfolioTileRefs.current.forEach((el, idx) => {
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) over = idx;
-    });
-    if (over !== -1 && over !== dragIndex) { movePortfolioImage(dragIndex, over); setDragIndex(over); }
+
+  // ── Shop product order: the vendor's dragged order. The first 4 are pinned to
+  // the top of the public shop; the rest keep rotating for each visitor. ──
+  const reorderShopProducts = async (from, to) => {
+    const ids = orderedShopProducts.map(p => p.id);
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    setProductOrder(ids);
+    await supabase.from("profiles").update({ product_order: ids }).eq("id", userId);
   };
-  const endReorder = () => setDragIndex(null);
 
   const addProduct = async () => {
     if (!newProduct.title || !newProduct.price) { alert("Title and price are required."); return; }
@@ -485,6 +486,13 @@ const handleSave = async () => {
     }
     setMarkingSale(false);
   };
+
+  const orderedShopProducts = (() => {
+    const byId = new Map(shopProducts.map(p => [p.id, p]));
+    const inOrder = productOrder.map(id => byId.get(id)).filter(Boolean);
+    const seen = new Set(inOrder.map(p => p.id));
+    return [...inOrder, ...shopProducts.filter(p => !seen.has(p.id))];
+  })();
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
@@ -569,11 +577,11 @@ const handleSave = async () => {
           <div style={{ marginTop: 20, marginBottom: 8 }}>
             <label style={lS}>Portfolio</label>
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos). Hold and drag the ⠿ handle on any photo to slide it into the order you want — the first {FEATURED_COUNT} photos are your featured ones at the top.</div>
+            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).{canReorder && ` Hold and drag the ⠿ handle on any photo to slide it into the order you want — the first ${FEATURED_COUNT} photos are your featured ones at the top.`}</div>
             {portfolioImages.length > 0 && (
-              <div onPointerMove={handleReorderMove} onPointerUp={endReorder} onPointerCancel={endReorder} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
-                  <div key={img} ref={el => { portfolioTileRefs.current[i] = el; }} style={{ position: "relative", opacity: dragIndex === i ? 0.55 : 1, outline: dragIndex === i ? "2px dashed #701890" : "none", borderRadius: 8 }}>
+                  <div key={img} ref={portfolioDrag.setItemRef(i)} style={{ position: "relative", borderRadius: 8, ...portfolioDrag.itemStyle(i) }}>
                     <PositionablePortfolioImage
                       src={img}
                       position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
@@ -582,11 +590,13 @@ const handleSave = async () => {
                       onZoomChange={(z) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, zoom: z } : p))}
                     />
                     <button onClick={() => removePortfolioImage(i)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12, lineHeight: "22px", textAlign: "center", padding: 0 }}>×</button>
-                    <div
-                      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); setDragIndex(i); }}
-                      title="Hold and drag to reorder"
-                      style={{ position: "absolute", top: 4, left: 4, background: i < FEATURED_COUNT ? "#AABB23" : "rgba(0,0,0,0.6)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold", cursor: "grab", touchAction: "none", userSelect: "none" }}
-                    >⠿ {i + 1}</div>
+                    {canReorder && (
+                      <div
+                        {...portfolioDrag.handleProps(i)}
+                        title="Hold and drag to reorder"
+                        style={{ position: "absolute", top: 4, left: 4, ...portfolioDrag.handleBaseStyle, background: i < FEATURED_COUNT ? "#AABB23" : "rgba(0,0,0,0.6)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}
+                      >⠿ {i + 1}</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -654,6 +664,7 @@ const handleSave = async () => {
             <span style={{ fontSize: 13, color: shopProducts.length >= productLimit ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {productLimit}</span>
           </div>
           <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.</p>
+          {canReorder && shopProducts.length > 1 && (<p style={{ fontSize: 12, color: "#701890", marginBottom: 16, marginTop: -8 }}>Hold and drag the ⠿ handle to reorder. The first 4 are pinned to the top of your shop; the rest rotate for each visitor.</p>)}
 
           {shopProducts.length >= productLimit && <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>⚠️ You've reached your {productLimit}-product limit. Upgrade to add more.</div>}
 
@@ -700,11 +711,18 @@ const handleSave = async () => {
 
           {shopProducts.length === 0 ? <p style={{ color: "#888", textAlign: "center" }}>No products yet. Add your first product above!</p> : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {shopProducts.map(p => {
+              {orderedShopProducts.map((p, pIdx) => {
                 const productImages = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
                 const mainParsed = productImages[0] ? parseProductPos(productImages[0]) : null;
                 return (
-                  <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  <div key={p.id} ref={productDrag.setItemRef(pIdx)} style={{ position: "relative", backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start", ...productDrag.itemStyle(pIdx) }}>
+                    {canReorder && editingProduct !== p.id && orderedShopProducts.length > 1 && (
+                      <div
+                        {...productDrag.handleProps(pIdx)}
+                        title="Hold and drag to reorder"
+                        style={{ position: "absolute", top: 8, right: 8, zIndex: 2, ...productDrag.handleBaseStyle, background: pIdx < 4 ? "#AABB23" : "rgba(0,0,0,0.55)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}
+                      >⠿ {pIdx + 1}</div>
+                    )}
                     {mainParsed && <div style={{ width: 80, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={mainParsed.src} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${mainParsed.position.x}% ${mainParsed.position.y}%`, display: "block" }} /></div>}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {editingProduct === p.id ? (
