@@ -13,14 +13,21 @@ export default function EpmShop() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: adminProfiles } = await supabase.from("profiles").select("id").eq("is_admin", true);
+      const { data: adminProfiles } = await supabase.from("profiles").select("id, product_order").eq("is_admin", true);
       const adminIds = (adminProfiles || []).map(p => p.id);
       if (adminIds.length === 0) { setProducts([]); setLoading(false); return; }
       const { data } = await supabase.from("vendor_products").select("*").in("vendor_id", adminIds).eq("is_active", true).order("created_at", { ascending: false });
-      // Rotate display order on every visit — same idea as vendor listing rotation.
-      const a = [...(data || [])];
+      // The first 4 products in the admin's chosen order stay pinned at the top permanently;
+      // everything below them keeps rotating on every visit.
+      const orderIds = [];
+      (adminProfiles || []).forEach(ap => (ap.product_order || []).forEach(id => { if (!orderIds.includes(id)) orderIds.push(id); }));
+      const all = [...(data || [])];
+      const byId = new Map(all.map(p => [p.id, p]));
+      const featured = orderIds.map(id => byId.get(id)).filter(Boolean).slice(0, 4);
+      const featuredIds = new Set(featured.map(p => p.id));
+      const a = all.filter(p => !featuredIds.has(p.id));
       for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-      setProducts(a);
+      setProducts([...featured, ...a]);
       setLoading(false);
     };
     load();
