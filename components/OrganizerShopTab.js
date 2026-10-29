@@ -277,7 +277,7 @@ export default function OrganizerShopTab({ userId }) {
         <span style={{ fontSize: 13, color: limitReached ? "#cc0000" : "#888", fontWeight: "bold" }}>{products.length} / {PRODUCT_LIMIT}</span>
       </div>
       <p style={{ fontSize: 12, color: "#888", marginBottom: 6, marginTop: 0 }}>Elite plan: up to <strong>{PRODUCT_LIMIT} products</strong>, <strong>{PRODUCT_IMAGE_LIMIT} images</strong> each.</p>
-      {orderedProducts.length > 1 && (
+      {orderedProducts.length > 0 && (
         <p style={{ fontSize: 12, color: "#701890", marginBottom: 16, marginTop: 0 }}>Hold and drag the ⠿ handle to reorder. The first {FEATURED_COUNT} are pinned to the top of your shop; the rest rotate for each visitor.</p>
       )}
 
@@ -330,7 +330,7 @@ export default function OrganizerShopTab({ userId }) {
             const isEditing = editingId === p.id;
             return (
               <div key={p.id} ref={drag.setItemRef(idx)} style={{ position: "relative", backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start", ...drag.itemStyle(idx) }}>
-                {!isEditing && orderedProducts.length > 1 && (
+                {!isEditing && (
                   <div
                     {...drag.handleProps(idx)}
                     title="Hold and drag to reorder"
