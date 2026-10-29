@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import ImageEditor from "./ImageEditor";
+import useDragReorder from "./useDragReorder";
 
 // ── EPM Shop — admin-managed products, publicly listed at /epm-shop, no schema
 // changes needed: vendor_id just points at whichever admin profile added the item,
@@ -13,6 +14,8 @@ const labelStyle = { display: "block", fontWeight: "bold", marginBottom: 5, font
 export default function AdminShopTab({ adminId }) {
   const [shopProducts, setShopProducts] = useState([]);
   const [loadingShop, setLoadingShop] = useState(true);
+  const [productOrder, setProductOrder] = useState([]);
+  const shopDrag = useDragReorder((from, to) => reorderShopProducts(from, to));
   const [message, setMessage] = useState("");
 
 
@@ -58,7 +61,29 @@ function saveDraft(key, value) {
     if (adminIds.length === 0) { setShopProducts([]); setLoadingShop(false); return; }
     const { data } = await supabase.from("vendor_products").select("*").in("vendor_id", adminIds).order("created_at", { ascending: false });
     setShopProducts(data || []);
+    if (adminId) {
+      const { data: me } = await supabase.from("profiles").select("product_order").eq("id", adminId).single();
+      setProductOrder(me?.product_order || []);
+    }
     setLoadingShop(false);
+  };
+
+  // ── Order of the EPM Shop: your dragged order. The first 4 active products stay pinned
+  // at the top of the public shop; everything below them keeps rotating for each visitor. ──
+  const orderedShopProducts = (() => {
+    const byId = new Map(shopProducts.map(p => [p.id, p]));
+    const inOrder = productOrder.map(id => byId.get(id)).filter(Boolean);
+    const seen = new Set(inOrder.map(p => p.id));
+    return [...inOrder, ...shopProducts.filter(p => !seen.has(p.id))];
+  })();
+  const featuredShopIds = new Set(orderedShopProducts.filter(p => p.is_active).slice(0, 4).map(p => p.id));
+  const reorderShopProducts = async (from, to) => {
+    const ids = orderedShopProducts.map(p => p.id);
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    setProductOrder(ids);
+    const { error } = await supabase.from("profiles").update({ product_order: ids }).eq("id", adminId);
+    if (error) setMessage("❌ Couldn't save the product order: " + error.message);
   };
 
   const uploadFile = async (file, bucket, attempt = 1) => {
@@ -183,14 +208,18 @@ function saveDraft(key, value) {
         <button onClick={addShopProduct} style={{ padding: "10px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
       </div>
 
+      {shopProducts.length > 1 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 active products are pinned to the top of the EPM Shop; the rest rotate for each visitor.</p>}
       {loadingShop ? <p style={{ color: "#888" }}>Loading...</p> : shopProducts.length === 0 ? (
         <p style={{ color: "#888", fontSize: 13 }}>No EPM Shop products yet. Add your first one above!</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {shopProducts.map(p => {
+          {orderedShopProducts.map((p, pIdx) => {
             const productImages = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
             return (
-              <div key={p.id} style={{ backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <div key={p.id} ref={shopDrag.setItemRef(pIdx)} style={{ position: "relative", backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start", ...shopDrag.itemStyle(pIdx) }}>
+                {shopEditingProduct !== p.id && orderedShopProducts.length > 1 && (
+                  <div {...shopDrag.handleProps(pIdx)} title="Hold and drag to reorder" style={{ position: "absolute", top: 8, right: 8, zIndex: 2, ...shopDrag.handleBaseStyle, background: featuredShopIds.has(p.id) ? "#AABB23" : "rgba(0,0,0,0.55)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}>⠿ {pIdx + 1}</div>
+                )}
                 {productImages.length > 0 && <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={productImages[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
                 <div style={{ flex: 1 }}>
                   {shopEditingProduct === p.id ? (
