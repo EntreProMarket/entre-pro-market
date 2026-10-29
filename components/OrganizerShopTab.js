@@ -61,16 +61,18 @@ function withProductPos(url, pos) {
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
 }
-function PositionableProductImage({ src, position, onChange, badge = null }) {
+function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null }) {
   const ref = useRef(null);
   const dragState = useRef(null);
+  const [adjusting, setAdjusting] = useState(false);
+  const active = adjusting && !readOnly; // moving only works while "Adjust" is on, so the page scrolls normally otherwise
   return (
     <div
       ref={ref}
-      onPointerDown={(e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }}
+      onPointerDown={(e) => { if (!active) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }}
       onPointerMove={(e) => {
         const d = dragState.current;
-        if (!d || !ref.current) return;
+        if (!active || !d || !ref.current) return;
         const rect = ref.current.getBoundingClientRect();
         onChange({
           x: Math.min(100, Math.max(0, d.posX - ((e.clientX - d.x) / rect.width) * 100)),
@@ -79,10 +81,12 @@ function PositionableProductImage({ src, position, onChange, badge = null }) {
       }}
       onPointerUp={() => { dragState.current = null; }}
       onPointerCancel={() => { dragState.current = null; }}
-      style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}
+      style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
     >
       <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: 4, right: 6, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 8, pointerEvents: "none" }}>✋ Drag</div>
+      {!readOnly && (
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ position: "absolute", bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, fontWeight: "bold", cursor: "pointer" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
+      )}
       {badge}
     </div>
   );
@@ -147,7 +151,8 @@ export default function OrganizerShopTab({ userId }) {
     const [moved] = ids.splice(from, 1);
     ids.splice(to, 0, moved);
     setProductOrder(ids);
-    await supabase.from("profiles").update({ product_order: ids }).eq("id", userId);
+    const { error } = await supabase.from("profiles").update({ product_order: ids }).eq("id", userId);
+    if (error) setMessage("❌ Couldn't save the product order: " + error.message);
   };
   const drag = useDragReorder((from, to) => reorderProducts(from, to));
 
