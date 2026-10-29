@@ -75,7 +75,20 @@ export default function HomePage() {
       setUpcomingEvents(combined);
 
       const { data: newsData } = await supabase.from("community_news").select("*").eq("published", true).order("created_at", { ascending: false }).limit(12);
-      setNewsArticles(newsData || []);
+      let newsList = newsData || [];
+      // Pinned Community News: the first 4 published articles in the admin's chosen order
+      // stay at the top; everything after them stays newest-first.
+      const { data: newsAdmins } = await supabase.from("profiles").select("news_order").eq("is_admin", true);
+      const newsOrderIds = [];
+      (newsAdmins || []).forEach(a => (a.news_order || []).forEach(id => { if (!newsOrderIds.includes(id)) newsOrderIds.push(id); }));
+      if (newsOrderIds.length > 0) {
+        const { data: orderedRows } = await supabase.from("community_news").select("*").eq("published", true).in("id", newsOrderIds.slice(0, 30));
+        const byId = new Map([...(orderedRows || []), ...newsList].map(a => [a.id, a]));
+        const pinned = newsOrderIds.map(id => byId.get(id)).filter(a => a && (orderedRows || []).some(r => r.id === a.id)).slice(0, 4);
+        const pinnedIds = new Set(pinned.map(a => a.id));
+        newsList = [...pinned, ...newsList.filter(a => !pinnedIds.has(a.id))].slice(0, 12);
+      }
+      setNewsArticles(newsList);
 
       const { data: adminProfiles } = await supabase.from("profiles").select("id").eq("is_admin", true);
       const adminIds = (adminProfiles || []).map(a => a.id);
@@ -94,7 +107,17 @@ export default function HomePage() {
   const visibleEvents = upcomingEvents.slice(0, 6);
 
   return (
-    <div style={{ fontFamily: "sans-serif" }}>
+    <div className="home-shell" style={{ fontFamily: "sans-serif" }}>
+      {/* ── Page always fills at least the full screen height, so PageFooter's
+           purple bar is pushed flush to the true bottom with no gap — the
+           same fix already used on epm-shop.js. Without this, a short page
+           (few events/news items) leaves visible white space below the
+           footer before the screen ends. ── */}
+      <style>{`
+        .home-shell { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+        .home-shell-main { flex: 1 0 auto; width: 100%; }
+      `}</style>
+      <div className="home-shell-main">
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
@@ -244,6 +267,7 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+      </div>
 
     <PageFooter />
     <FooterBar />
