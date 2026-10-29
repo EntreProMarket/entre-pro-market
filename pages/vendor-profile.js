@@ -670,7 +670,7 @@ const handleSave = async () => {
             <span style={{ fontSize: 13, color: shopProducts.length >= productLimit ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {productLimit}</span>
           </div>
           <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.</p>
-          {canReorder && shopProducts.length > 1 && (<p style={{ fontSize: 12, color: "#701890", marginBottom: 16, marginTop: -8 }}>Hold and drag the ⠿ handle to reorder. The first 4 are pinned to the top of your shop; the rest rotate for each visitor.</p>)}
+          {canReorder && shopProducts.length > 0 && (<p style={{ fontSize: 12, color: "#701890", marginBottom: 16, marginTop: -8 }}>Hold and drag the ⠿ handle to reorder. The first 4 are pinned to the top of your shop; the rest rotate for each visitor.</p>)}
 
           {shopProducts.length >= productLimit && <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>⚠️ You've reached your {productLimit}-product limit. Upgrade to add more.</div>}
 
@@ -722,7 +722,7 @@ const handleSave = async () => {
                 const mainParsed = productImages[0] ? parseProductPos(productImages[0]) : null;
                 return (
                   <div key={p.id} ref={productDrag.setItemRef(pIdx)} style={{ position: "relative", backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start", ...productDrag.itemStyle(pIdx) }}>
-                    {canReorder && editingProduct !== p.id && orderedShopProducts.length > 1 && (
+                    {canReorder && editingProduct !== p.id && (
                       <div
                         {...productDrag.handleProps(pIdx)}
                         title="Hold and drag to reorder"
