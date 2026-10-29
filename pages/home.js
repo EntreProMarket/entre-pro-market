@@ -72,7 +72,15 @@ export default function HomePage() {
         if (!b.event_date) return -1;
         return new Date(a.event_date) - new Date(b.event_date);
       });
-      setUpcomingEvents(combined);
+      // Pinned EPM Events: the first 4 upcoming events in the admin's chosen order stay at the top;
+      // everything after them stays in date order.
+      const { data: eventAdmins } = await supabase.from("profiles").select("event_order").eq("is_admin", true);
+      const eventOrderIds = [];
+      (eventAdmins || []).forEach(a => (a.event_order || []).forEach(id => { if (!eventOrderIds.includes(id)) eventOrderIds.push(id); }));
+      const epmById = new Map(epmOnly.map(e => [e.id, e]));
+      const pinnedEvents = eventOrderIds.map(id => epmById.get(id)).filter(Boolean).slice(0, 4);
+      const pinnedEventIds = new Set(pinnedEvents.map(e => e.id));
+      setUpcomingEvents([...pinnedEvents, ...combined.filter(e => !pinnedEventIds.has(e.id))]);
 
       const { data: newsData } = await supabase.from("community_news").select("*").eq("published", true).order("created_at", { ascending: false }).limit(12);
       let newsList = newsData || [];
