@@ -18,6 +18,61 @@ function shuffleArray(arr) {
   return a;
 }
 
+// Same position tags the edit pages write, so the public page shows exactly what was positioned.
+function parseProductPos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 } };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 } };
+  const [x, y] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y } };
+}
+function parsePortfolioPos(url) {
+  if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
+  const [base, frag] = url.split("#pos=");
+  if (!frag) return { src: base, position: { x: 50, y: 50 }, zoom: 1 };
+  const [x, y, z] = frag.split(",").map(Number);
+  return { src: base, position: { x: isNaN(x) ? 50 : x, y: isNaN(y) ? 50 : y }, zoom: isNaN(z) || z < 1 ? 1 : z };
+}
+function PortfolioGridImage({ url, onClick }) {
+  const [aspect, setAspect] = useState(null);
+  const parsed = parsePortfolioPos(url);
+  return (
+    <div onClick={() => onClick(parsed.src)} style={{ marginBottom: 10, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", backgroundColor: "#f5f5f5", aspectRatio: aspect || undefined }}>
+      <img
+        src={parsed.src}
+        alt="portfolio"
+        onLoad={e => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setAspect(el.naturalWidth / el.naturalHeight); }}
+        style={{ width: "100%", height: aspect ? "100%" : "auto", display: "block", objectFit: "cover", objectPosition: `${parsed.position.x}% ${parsed.position.y}%`, transform: parsed.zoom > 1 ? `scale(${parsed.zoom})` : undefined, transformOrigin: "center" }}
+      />
+    </div>
+  );
+}
+
+// Portfolio layout that keeps YOUR order: photos are dealt out left-to-right
+// (1, 2, 3, 4...) into columns, so the first photos you place are always the
+// top ones — instead of CSS columns, which fill the left column top-to-bottom
+// first and scramble the reading order.
+function PortfolioMasonry({ images, onClick }) {
+  const [cols, setCols] = useState(2);
+  useEffect(() => {
+    const update = () => setCols(window.innerWidth >= 700 ? 3 : 2);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  const columns = Array.from({ length: cols }, () => []);
+  images.forEach((img, i) => columns[i % cols].push({ img, i }));
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+      {columns.map((col, c) => (
+        <div key={c} style={{ flex: 1, minWidth: 0 }}>
+          {col.map(({ img, i }) => <PortfolioGridImage key={i + img} url={img} onClick={onClick} />)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const thumbStyle = (w, h, radius = 12) => ({ width: w, height: h, borderRadius: radius, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer", flexShrink: 0, display: "block" });
 const logoBoxStyle = { maxWidth: 220, borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" };
 
@@ -37,7 +92,7 @@ export default function OrganizerPublicProfile() {
   useInactivityLogout();
   useForceLogoutIfExpired();
   const router = useRouter();
-  const { handle, from: fromParam } = router.query;
+  const { handle, from: fromParam, tab } = router.query;
   const [organizer, setOrganizer] = useState(null);
   const [user, setUser] = useState(null);
   const [events, setEvents] = useState([]);
@@ -49,6 +104,9 @@ export default function OrganizerPublicProfile() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notFoundIsOwner, setNotFoundIsOwner] = useState(false);
   const [notFoundIsPaid, setNotFoundIsPaid] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [activeTab, setActiveTab] = useState("profile");
+  useEffect(() => { setActiveTab(tab === "shop" ? "shop" : "profile"); }, [tab]);
 
   useEffect(() => {
     if (!handle) return;
@@ -92,6 +150,20 @@ export default function OrganizerPublicProfile() {
       if (data.account_type === "elite") {
         const { data: evData } = await supabase.from("organizer_events").select("*").eq("organizer_id", data.id).order("event_date", { ascending: true });
         setEvents(evData || []);
+        // Elite Shop: the first 4 products in the organizer's chosen order stay pinned at the
+        // top permanently; everything below them keeps rotating on every visit.
+        const { data: prods } = await supabase.from("vendor_products").select("*").eq("vendor_id", data.id).eq("is_active", true).order("created_at", { ascending: false });
+        const orderIds = data.product_order || [];
+        let productList = prods || [];
+        if (orderIds.length) {
+          const byId = new Map(productList.map(p => [p.id, p]));
+          const featured = orderIds.slice(0, 4).map(id => byId.get(id)).filter(Boolean);
+          const featuredIds = new Set(featured.map(p => p.id));
+          productList = [...featured, ...shuffleArray(productList.filter(p => !featuredIds.has(p.id)))];
+        } else {
+          productList = shuffleArray(productList);
+        }
+        setProducts(productList);
       }
 
       const ownerViewing = currentUser && data.id === currentUser.id;
@@ -154,6 +226,43 @@ export default function OrganizerPublicProfile() {
       <h1 style={{ marginBottom: 4 }}>{organizer.organizer_name || "Organizer"}</h1>
       <p style={{ color: "#777", marginBottom: 16 }}>@{organizer.handle}</p>
 
+      {products.length > 0 && (
+        <div style={{ display: "flex", borderBottom: "2px solid #eee", marginBottom: 20 }}>
+          <button onClick={() => setActiveTab("profile")} style={{ padding: "10px 20px", border: "none", borderBottom: activeTab === "profile" ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === "profile" ? "#701890" : "#666", fontWeight: activeTab === "profile" ? "bold" : "normal", cursor: "pointer", fontSize: 14 }}>📋 Profile</button>
+          <button onClick={() => setActiveTab("shop")} style={{ padding: "10px 20px", border: "none", borderBottom: activeTab === "shop" ? "3px solid #701890" : "3px solid transparent", backgroundColor: "transparent", color: activeTab === "shop" ? "#701890" : "#666", fontWeight: activeTab === "shop" ? "bold" : "normal", cursor: "pointer", fontSize: 14 }}>🛒 Shop ({products.length})</button>
+        </div>
+      )}
+
+      {activeTab === "shop" && products.length > 0 && (
+        <div>
+          <div style={{ background: "linear-gradient(135deg, #701890, #AABB23)", borderRadius: 16, padding: "24px 20px", marginBottom: 24, textAlign: "center", color: "white" }}>
+            <h1 style={{ margin: "0 0 6px", fontSize: 22 }}>🛍️ {organizer.organizer_name || "Organizer"}'s Shop</h1>
+            <p style={{ margin: 0, opacity: 0.9, fontSize: 14 }}>Browse products from {organizer.organizer_name || "this organizer"}</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {products.map(p => {
+              const imgs = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
+              const main = imgs[0] ? parseProductPos(imgs[0]) : null;
+              return (
+                <div key={p.id} onClick={() => router.push(`/product/${p.id}`)} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", backgroundColor: "white", cursor: "pointer" }}>
+                  <div style={{ position: "relative", width: "100%", aspectRatio: 0.8, backgroundColor: "#f5f5f5" }}>
+                    {main ? <img src={main.src} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${main.position.x}% ${main.position.y}%`, display: "block" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc" }}>No Image</div>}
+                    {imgs.length > 1 && <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 6px", borderRadius: 8 }}>1/{imgs.length}</div>}
+                  </div>
+                  <div style={{ padding: 12 }}>
+                    <p style={{ margin: "0 0 6px", fontWeight: "bold", fontSize: 14 }}>{p.title}</p>
+                    <p style={{ margin: 0, color: "#701890", fontWeight: "bold", fontSize: 16 }}>${(p.price / 100).toFixed(2)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {(activeTab === "profile" || products.length === 0) && (
+      <>
+
       {organizer.logo_url && (
         <div onClick={() => setSelectedImage(organizer.logo_url)} style={logoBoxStyle}>
           <img src={organizer.logo_url} alt="logo" style={{ width: "100%", height: "auto", display: "block" }} />
@@ -178,13 +287,7 @@ export default function OrganizerPublicProfile() {
       <div style={{ marginTop: 28 }}>
         <h3>Portfolio</h3>
         {organizer.portfolio_images?.length > 0 ? (
-          <div style={{ columnWidth: 150, columnGap: 10 }}>
-            {organizer.portfolio_images.map((img, i) => (
-              <div key={i} onClick={() => setSelectedImage(img)} style={{ breakInside: "avoid", marginBottom: 10, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden", cursor: "pointer" }}>
-                <img src={img} alt="portfolio" style={{ width: "100%", height: "auto", display: "block" }} />
-              </div>
-            ))}
-          </div>
+          <PortfolioMasonry images={organizer.portfolio_images} onClick={(src) => setSelectedImage(src)} />
         ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
       </div>
 
@@ -246,6 +349,9 @@ export default function OrganizerPublicProfile() {
           </div>
         ) : null;
       })()}
+
+      </>
+      )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 40 }}>
         <button onClick={handleBack} style={{ padding: "10px 14px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>← Back</button>
