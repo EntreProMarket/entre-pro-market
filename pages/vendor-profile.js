@@ -95,26 +95,29 @@ function withProductPos(url, pos) {
 function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null }) {
   const ref = useRef(null);
   const dragState = useRef(null);
-  const handlePointerDown = (e) => {
-    if (readOnly) return;
-    dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y };
-    e.target.setPointerCapture?.(e.pointerId);
-  };
-  const handlePointerMove = (e) => {
-    if (readOnly || !dragState.current || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
-    onChange({
-      x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)),
-      y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)),
-    });
-  };
-  const handlePointerUp = () => { dragState.current = null; };
+  const [adjusting, setAdjusting] = useState(false);
+  const active = adjusting && !readOnly; // moving only works while "Adjust" is on, so the page scrolls normally otherwise
   return (
-    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
-      style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : "2px solid #701890", cursor: readOnly ? "default" : "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
+    <div
+      ref={ref}
+      onPointerDown={(e) => { if (!active) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }}
+      onPointerMove={(e) => {
+        const d = dragState.current;
+        if (!active || !d || !ref.current) return;
+        const rect = ref.current.getBoundingClientRect();
+        onChange({
+          x: Math.min(100, Math.max(0, d.posX - ((e.clientX - d.x) / rect.width) * 100)),
+          y: Math.min(100, Math.max(0, d.posY - ((e.clientY - d.y) / rect.height) * 100)),
+        });
+      }}
+      onPointerUp={() => { dragState.current = null; }}
+      onPointerCancel={() => { dragState.current = null; }}
+      style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
+    >
       <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
-      {!readOnly && <div style={{ position: "absolute", bottom: 4, right: 6, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 8 }}>✋ Drag</div>}
+      {!readOnly && (
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ position: "absolute", bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, fontWeight: "bold", cursor: "pointer" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
+      )}
       {badge}
     </div>
   );
@@ -143,31 +146,24 @@ function withPortfolioPos(url, pos, zoom = 1) {
 }
 function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange }) {
   const [aspect, setAspect] = useState(1);
+  const [adjusting, setAdjusting] = useState(false);
   const ref = useRef(null);
   const dragState = useRef(null);
   const pinchState = useRef(null);
   const handleImgLoad = (e) => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setAspect(el.naturalWidth / el.naturalHeight); };
-  const handlePointerDown = (e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.target.setPointerCapture?.(e.pointerId); };
+  // Moving/zooming only works while "Adjust" is on for this photo, so the page always scrolls normally otherwise.
+  const handlePointerDown = (e) => { if (!adjusting) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } };
   const handlePointerMove = (e) => {
-    if (!dragState.current || !ref.current) return;
+    if (!adjusting || !dragState.current || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
-    onChange({
-      x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)),
-      y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)),
-    });
+    onChange({ x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)), y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)) });
   };
   const handlePointerUp = () => { dragState.current = null; };
-  const handleWheel = (e) => { e.preventDefault(); onZoomChange(Math.min(3, Math.max(1, zoom + (e.deltaY < 0 ? 0.1 : -0.1)))); };
-  const handleTouchStart = (e) => {
-    if (e.touches.length === 2) {
-      const [t0, t1] = e.touches;
-      pinchState.current = { dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), startZoom: zoom };
-    }
-  };
+  const handleWheel = (e) => { if (!adjusting) return; onZoomChange(Math.min(3, Math.max(1, zoom + (e.deltaY < 0 ? 0.1 : -0.1)))); };
+  const handleTouchStart = (e) => { if (adjusting && e.touches.length === 2) { const [t0, t1] = e.touches; pinchState.current = { dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), startZoom: zoom }; } };
   const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && pinchState.current) {
-      e.preventDefault();
+    if (adjusting && e.touches.length === 2 && pinchState.current) {
       const [t0, t1] = e.touches;
       const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
       onZoomChange(Math.min(3, Math.max(1, pinchState.current.startZoom * (dist / pinchState.current.dist))));
@@ -175,11 +171,12 @@ function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChang
   };
   const handleTouchEnd = () => { pinchState.current = null; };
   return (
-    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
+    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
       onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-      style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
+      style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
       <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: 4, right: 6, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 8 }}>✋ Drag{zoom > 1 ? ` · 🔍${zoom.toFixed(1)}x` : ""} · pinch to zoom</div>
+      {adjusting && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 7px", borderRadius: 8, pointerEvents: "none" }}>Drag · pinch</div>}
+      <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ position: "absolute", bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, fontWeight: "bold", cursor: "pointer" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
     </div>
   );
 }
@@ -379,6 +376,14 @@ const handleSave = async () => {
         logo_url: finalLogoUrl, portfolio_images: portfolio, pinned_portfolio: [],
       }).eq("id", user.id);
       if (error) throw error;
+      // Double-check the database really kept the photo order + positions.
+      const { data: check } = await supabase.from("profiles").select("portfolio_images").eq("id", user.id).single();
+      const savedList = check?.portfolio_images || [];
+      if (savedList.length !== portfolio.length || savedList.some((u, i) => u !== portfolio[i])) {
+        setMessage("⚠️ Saved, but the database did not keep your photo order/positions exactly. Please screenshot this and send it to Claude.");
+        setSaving(false);
+        return;
+      }
       setPortfolioImages(portfolio.map(u => parsePortfolioPos(u).src));
       setPortfolioPositions(portfolio.map(u => { const parsed = parsePortfolioPos(u); return { position: parsed.position, zoom: parsed.zoom }; }));
       setPortfolioFiles([]); setLogoUrl(finalLogoUrl); setLogoFile(null); setLogoFilePreview(null);
@@ -411,7 +416,8 @@ const handleSave = async () => {
     const [moved] = ids.splice(from, 1);
     ids.splice(to, 0, moved);
     setProductOrder(ids);
-    await supabase.from("profiles").update({ product_order: ids }).eq("id", userId);
+    const { error } = await supabase.from("profiles").update({ product_order: ids }).eq("id", userId);
+    if (error) setMessage("❌ Couldn't save the product order: " + error.message);
   };
 
   const addProduct = async () => {
