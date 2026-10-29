@@ -1,6 +1,7 @@
 // components/AdminEpmEventsTab.js
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import useDragReorder from "./useDragReorder";
 
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
@@ -45,6 +46,8 @@ function PositionableImage({ src, position, onChange, height }) {
 
 export default function AdminEpmEventsTab() {
   const [epmEvents, setEpmEvents] = useState([]);
+  const [eventOrder, setEventOrder] = useState([]);
+  const eventDrag = useDragReorder((from, to) => reorderEpmEvents(from, to));
   const [editingEpmEvent, setEditingEpmEvent] = useState(null);
   
 // ── DRAFT SAVING — auto-saves this form as one blob and restores it if
@@ -69,6 +72,32 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
   const loadEpmEvents = async () => {
     const { data } = await supabase.from("epm_events").select("*").order("event_date", { ascending: true });
     setEpmEvents(data || []);
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user) {
+      const { data: me } = await supabase.from("profiles").select("event_order").eq("id", authData.user.id).single();
+      setEventOrder(me?.event_order || []);
+    }
+  };
+
+  // ── Order of EPM Events: your dragged order. The first 4 UPCOMING events stay pinned at the
+  // top of the homepage's Upcoming Events; everything after them stays in date order. ──
+  const orderedEpmEvents = (() => {
+    const byId = new Map(epmEvents.map(e => [e.id, e]));
+    const inOrder = eventOrder.map(id => byId.get(id)).filter(Boolean);
+    const seen = new Set(inOrder.map(e => e.id));
+    return [...inOrder, ...epmEvents.filter(e => !seen.has(e.id))];
+  })();
+  const todayStrForPins = new Date().toISOString().split("T")[0];
+  const featuredEventIds = new Set(orderedEpmEvents.filter(e => e.event_date && e.event_date >= todayStrForPins).slice(0, 4).map(e => e.id));
+  const reorderEpmEvents = async (from, to) => {
+    const ids = orderedEpmEvents.map(e => e.id);
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    setEventOrder(ids);
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) return;
+    const { error } = await supabase.from("profiles").update({ event_order: ids }).eq("id", authData.user.id);
+    if (error) alert("Couldn't save the event order: " + error.message);
   };
 
   const uploadFile = async (file, bucket, attempt = 1) => {
@@ -202,11 +231,13 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
         </div>
       </div>
 
+      {epmEvents.length > 0 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 upcoming events are pinned to the top of the homepage's Upcoming Events; the rest stay in date order.</p>}
       {epmEvents.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {epmEvents.map(ev => (
-            <div key={ev.id} style={{ backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+          {orderedEpmEvents.map((ev, eIdx) => (
+            <div key={ev.id} ref={eventDrag.setItemRef(eIdx)} style={{ position: "relative", backgroundColor: "white", borderRadius: 8, padding: "12px 16px", border: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, ...eventDrag.itemStyle(eIdx) }}>
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div {...eventDrag.handleProps(eIdx)} title="Hold and drag to reorder" style={{ flexShrink: 0, ...eventDrag.handleBaseStyle, background: featuredEventIds.has(ev.id) ? "#AABB23" : "rgba(0,0,0,0.55)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}>⠿ {eIdx + 1}</div>
                 {ev.flyer_url && (() => { const p = parsePos(ev.flyer_url); return <div style={{ width: 56, height: 56, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={p.src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${p.position.x}% ${p.position.y}%`, display: "block" }} /></div>; })()}
                 <div>
                   <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{ev.event_name}</p>
