@@ -208,7 +208,7 @@ function saveDraft(key, value) {
         <button onClick={addShopProduct} style={{ padding: "10px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
       </div>
 
-      {shopProducts.length > 1 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 active products are pinned to the top of the EPM Shop; the rest rotate for each visitor.</p>}
+      {shopProducts.length > 0 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 active products are pinned to the top of the EPM Shop; the rest rotate for each visitor.</p>}
       {loadingShop ? <p style={{ color: "#888" }}>Loading...</p> : shopProducts.length === 0 ? (
         <p style={{ color: "#888", fontSize: 13 }}>No EPM Shop products yet. Add your first one above!</p>
       ) : (
@@ -217,7 +217,7 @@ function saveDraft(key, value) {
             const productImages = p.images?.length > 0 ? p.images : (p.image_url ? [p.image_url] : []);
             return (
               <div key={p.id} ref={shopDrag.setItemRef(pIdx)} style={{ position: "relative", backgroundColor: "white", border: `1px solid ${p.is_active ? "#eee" : "#fca5a5"}`, borderRadius: 10, padding: 14, display: "flex", gap: 14, alignItems: "flex-start", ...shopDrag.itemStyle(pIdx) }}>
-                {shopEditingProduct !== p.id && orderedShopProducts.length > 1 && (
+                {shopEditingProduct !== p.id && (
                   <div {...shopDrag.handleProps(pIdx)} title="Hold and drag to reorder" style={{ position: "absolute", top: 8, right: 8, zIndex: 2, ...shopDrag.handleBaseStyle, background: featuredShopIds.has(p.id) ? "#AABB23" : "rgba(0,0,0,0.55)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}>⠿ {pIdx + 1}</div>
                 )}
                 {productImages.length > 0 && <div style={{ width: 80, height: 80, borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb", flexShrink: 0 }}><img src={productImages[0]} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>}
