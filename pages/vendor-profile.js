@@ -6,6 +6,16 @@ import useInactivityLogout from "../hooks/useInactivityLogout";
 import ImageEditor from "../components/ImageEditor";
 import useDragReorder from "../components/useDragReorder";
 import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
+import CropModal from "../components/CropModal";
+
+// One stable preview URL per file. (Making a new one on every render made photos reload and
+// "stick" while you dragged them.)
+const previewUrlCache = new WeakMap();
+function previewUrl(file) {
+  let u = previewUrlCache.get(file);
+  if (!u) { u = URL.createObjectURL(file); previewUrlCache.set(file, u); }
+  return u;
+}
 
 function cleanHandle(value) { return value.trim().replace(/^@/, "").replace(/\s+/g, ""); }
 function sanitizeHandle(value) { return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, ""); }
@@ -92,11 +102,13 @@ function withProductPos(url, pos) {
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
 }
-function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null }) {
+function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null, onReplace }) {
   const ref = useRef(null);
   const dragState = useRef(null);
   const [adjusting, setAdjusting] = useState(false);
+  const [cropping, setCropping] = useState(false);
   const active = adjusting && !readOnly; // moving only works while "Adjust" is on, so the page scrolls normally otherwise
+  const pill = { position: "absolute", background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer" };
   return (
     <div
       ref={ref}
@@ -115,10 +127,14 @@ function PositionableProductImage({ src, position, onChange, readOnly = false, b
       style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
     >
       <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
+      {!readOnly && onReplace && (
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCropping(true); }} style={{ ...pill, top: 4, left: 6 }}>✂️ Crop</button>
+      )}
       {!readOnly && (
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ position: "absolute", bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, fontWeight: "bold", cursor: "pointer" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ ...pill, bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
       )}
       {badge}
+      {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -144,9 +160,10 @@ function withPortfolioPos(url, pos, zoom = 1) {
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
-function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange }) {
+function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange, onReplace }) {
   const [aspect, setAspect] = useState(1);
   const [adjusting, setAdjusting] = useState(false);
+  const [cropping, setCropping] = useState(false);
   const ref = useRef(null);
   const dragState = useRef(null);
   const pinchState = useRef(null);
@@ -170,13 +187,19 @@ function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChang
     }
   };
   const handleTouchEnd = () => { pinchState.current = null; };
+  const pill = { position: "absolute", bottom: 4, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer" };
   return (
     <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
       onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
       style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
       <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-      {adjusting && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 7px", borderRadius: 8, pointerEvents: "none" }}>Drag · pinch</div>}
-      <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ position: "absolute", bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, fontWeight: "bold", cursor: "pointer" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+      {adjusting ? (
+        <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 7px", borderRadius: 8, pointerEvents: "none" }}>Pinch to zoom, then drag</div>
+      ) : (onReplace && (
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCropping(true); }} style={{ ...pill, left: 6 }}>✂️ Crop</button>
+      ))}
+      <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ ...pill, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+      {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -394,6 +417,23 @@ const handleSave = async () => {
     setSaving(false);
   };
 
+  // ── ✂️ Crop: the cropped photo replaces the original in the same slot ──
+  const replaceSavedPortfolioImage = async (i, file) => {
+    setMessage("⏳ Uploading cropped photo...");
+    const url = await uploadFile(file, "vendor-portfolio");
+    if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    setPortfolioImages(prev => prev.map((u, idx) => (idx === i ? url : u)));
+    setPortfolioPositions(prev => prev.map((p, idx) => (idx === i ? { position: { x: 50, y: 50 }, zoom: 1 } : p)));
+    setMessage("✅ Photo cropped — tap Save Profile to keep it.");
+  };
+  const replaceEditProductImage = async (i, file) => {
+    setMessage("⏳ Uploading cropped photo...");
+    const url = await uploadFile(file, "vendor-portfolio");
+    if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    setEditProductImages(prev => prev.map((it, idx) => (idx === i ? { ...it, url, src: url, position: { x: 50, y: 50 } } : it)));
+    setMessage("✅ Photo cropped — tap Save on the product to keep it.");
+  };
+
   const removePortfolioImage = (idx) => {
     setPortfolioImages(prev => prev.filter((_, i) => i !== idx));
     setPortfolioPositions(prev => prev.filter((_, i) => i !== idx));
@@ -590,6 +630,7 @@ const handleSave = async () => {
                   <div key={img} ref={portfolioDrag.setItemRef(i)} style={{ position: "relative", borderRadius: 8, ...portfolioDrag.itemStyle(i) }}>
                     <PositionablePortfolioImage
                       src={img}
+                      onReplace={(file) => replaceSavedPortfolioImage(i, file)}
                       position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
                       zoom={portfolioPositions[i]?.zoom || 1}
                       onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
@@ -616,7 +657,8 @@ const handleSave = async () => {
                   {portfolioFiles.map((item, i) => (
                     <div key={i} style={{ position: "relative" }}>
                       <PositionablePortfolioImage
-                        src={URL.createObjectURL(item.file)}
+                        src={previewUrl(item.file)}
+                        onReplace={(file) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 }, zoom: 1 } : it))}
                         position={item.position}
                         zoom={item.zoom}
                         onChange={(pos) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
@@ -686,7 +728,8 @@ const handleSave = async () => {
                   {newProductImages.map((item, i) => (
                     <div key={i} style={{ position: "relative" }}>
                       <PositionableProductImage
-                        src={URL.createObjectURL(item.file)}
+                        src={previewUrl(item.file)}
+                        onReplace={(file) => setNewProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 } } : it))}
                         position={item.position}
                         onChange={(pos) => setNewProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
                         badge={i === 0 && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
@@ -742,6 +785,7 @@ const handleSave = async () => {
                                 <div key={i} style={{ position: "relative" }}>
                                   <PositionableProductImage
                                     src={item.src}
+                                    onReplace={(file) => replaceEditProductImage(i, file)}
                                     position={item.position}
                                     onChange={(pos) => setEditProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
                                     badge={i === 0 && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
@@ -756,7 +800,8 @@ const handleSave = async () => {
                               {editProductNewFiles.map((item, i) => (
                                 <div key={i} style={{ position: "relative" }}>
                                   <PositionableProductImage
-                                    src={URL.createObjectURL(item.file)}
+                                    src={previewUrl(item.file)}
+                                    onReplace={(file) => setEditProductNewFiles(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 } } : it))}
                                     position={item.position}
                                     onChange={(pos) => setEditProductNewFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
                                   />
