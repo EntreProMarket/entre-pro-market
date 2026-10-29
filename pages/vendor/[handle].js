@@ -59,6 +59,31 @@ function PortfolioGridImage({ url, onClick }) {
   );
 }
 
+// Portfolio layout that keeps YOUR order: photos are dealt out left-to-right
+// (1, 2, 3, 4...) into columns, so the first photos you place are always the
+// top ones — instead of CSS columns, which fill the left column top-to-bottom
+// first and scramble the reading order.
+function PortfolioMasonry({ images, onClick }) {
+  const [cols, setCols] = useState(2);
+  useEffect(() => {
+    const update = () => setCols(window.innerWidth >= 700 ? 3 : 2);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  const columns = Array.from({ length: cols }, () => []);
+  images.forEach((img, i) => columns[i % cols].push({ img, i }));
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+      {columns.map((col, c) => (
+        <div key={c} style={{ flex: 1, minWidth: 0 }}>
+          {col.map(({ img, i }) => <PortfolioGridImage key={i + img} url={img} onClick={onClick} />)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function VendorPublicProfile() {
   useInactivityLogout();
   useForceLogoutIfExpired();
@@ -129,7 +154,20 @@ export default function VendorPublicProfile() {
       }
 
       const { data: prods } = await supabase.from("vendor_products").select("*").eq("vendor_id", data.id).eq("is_active", true).order("created_at", { ascending: false });
-      setProducts(shuffleArray(prods || []));
+      // Paid vendors: the first 4 products in their chosen order stay pinned at the
+      // top permanently; everything below them keeps rotating on every visit.
+      const canPin = data.account_type && data.account_type !== "free";
+      const productOrderIds = data.product_order || [];
+      let productList = prods || [];
+      if (canPin && productOrderIds.length) {
+        const byId = new Map(productList.map(p => [p.id, p]));
+        const featured = productOrderIds.slice(0, 4).map(id => byId.get(id)).filter(Boolean);
+        const featuredIds = new Set(featured.map(p => p.id));
+        productList = [...featured, ...shuffleArray(productList.filter(p => !featuredIds.has(p.id)))];
+      } else {
+        productList = shuffleArray(productList);
+      }
+      setProducts(productList);
       setLoading(false);
     };
     fetchVendor();
@@ -213,11 +251,7 @@ export default function VendorPublicProfile() {
           <div style={{ marginTop: 28 }}>
             <h3>Portfolio</h3>
             {vendor.portfolio_images?.length > 0 ? (
-              <div style={{ columnWidth: 150, columnGap: 10 }}>
-                {vendor.portfolio_images.map((img, i) => (
-                  <PortfolioGridImage key={i} url={img} onClick={(src) => setSelectedImage(src)} />
-                ))}
-              </div>
+              <PortfolioMasonry images={vendor.portfolio_images} onClick={(src) => setSelectedImage(src)} />
             ) : <p style={{ color: "#888" }}>No portfolio images yet.</p>}
           </div>
 
