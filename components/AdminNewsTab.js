@@ -1,6 +1,7 @@
 // components/AdminNewsTab.js
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import useDragReorder from "./useDragReorder";
 
 const COVER_ASPECT_RATIO = "8 / 5";
 const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
@@ -62,6 +63,8 @@ export default function AdminNewsTab() {
   const [savingArticle, setSavingArticle] = useState(false);
   const [composingArticle, setComposingArticle] = useState(false);
   const [message, setMessage] = useState("");
+  const [newsOrder, setNewsOrder] = useState([]);
+  const newsDrag = useDragReorder((from, to) => reorderNews(from, to));
 
   useEffect(() => { loadNewsArticles(); }, []);
 
@@ -69,7 +72,32 @@ export default function AdminNewsTab() {
     setLoadingNews(true);
     const { data } = await supabase.from("community_news").select("*").order("created_at", { ascending: false });
     setNewsArticles(data || []);
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user) {
+      const { data: me } = await supabase.from("profiles").select("news_order").eq("id", authData.user.id).single();
+      setNewsOrder(me?.news_order || []);
+    }
     setLoadingNews(false);
+  };
+
+  // ── Order of Community News: your dragged order. The first 4 PUBLISHED articles stay
+  // pinned at the top of the homepage; everything after them stays newest-first. ──
+  const orderedNews = (() => {
+    const byId = new Map(newsArticles.map(a => [a.id, a]));
+    const inOrder = newsOrder.map(id => byId.get(id)).filter(Boolean);
+    const seen = new Set(inOrder.map(a => a.id));
+    return [...inOrder, ...newsArticles.filter(a => !seen.has(a.id))];
+  })();
+  const featuredNewsIds = new Set(orderedNews.filter(a => a.published).slice(0, 4).map(a => a.id));
+  const reorderNews = async (from, to) => {
+    const ids = orderedNews.map(a => a.id);
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    setNewsOrder(ids);
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) return;
+    const { error } = await supabase.from("profiles").update({ news_order: ids }).eq("id", authData.user.id);
+    if (error) setMessage("❌ Couldn't save the article order: " + error.message);
   };
 
   const uploadFile = async (file, bucket, attempt = 1) => {
@@ -265,14 +293,18 @@ export default function AdminNewsTab() {
         </div>
       )}
 
+      {newsArticles.length > 1 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 published articles are pinned to the top of Community News; the rest stay newest-first.</p>}
       {loadingNews ? <p style={{ color: "#888" }}>Loading...</p> : newsArticles.length === 0 ? (
         <p style={{ color: "#888", fontSize: 13 }}>No articles yet. Write your first one above!</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {newsArticles.map(article => {
+          {orderedNews.map((article, nIdx) => {
             const cover = parsePos(article.cover_image_url || "");
             return (
-              <div key={article.id} style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 14, display: "flex", gap: 12, alignItems: "center" }}>
+              <div key={article.id} ref={newsDrag.setItemRef(nIdx)} style={{ position: "relative", backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 14, display: "flex", gap: 12, alignItems: "center", ...newsDrag.itemStyle(nIdx) }}>
+                {orderedNews.length > 1 && (
+                  <div {...newsDrag.handleProps(nIdx)} title="Hold and drag to reorder" style={{ flexShrink: 0, ...newsDrag.handleBaseStyle, background: featuredNewsIds.has(article.id) ? "#AABB23" : "rgba(0,0,0,0.55)", color: "white", borderRadius: 10, padding: "4px 9px", fontSize: 13, fontWeight: "bold" }}>⠿ {nIdx + 1}</div>
+                )}
                 {cover.src && <div style={{ width: 60, height: 60, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: "1px solid #e5e7eb" }}><img src={cover.src} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${cover.position.x}% ${cover.position.y}%` }} /></div>}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontWeight: "bold", fontSize: 14 }}>{article.title}</p>
