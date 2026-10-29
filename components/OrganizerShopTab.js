@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 import useDragReorder from "./useDragReorder";
+import CropModal from "./CropModal";
 
 const BUCKET = "organizer-portfolio";
 const PRODUCT_LIMIT = 30;
@@ -12,6 +13,15 @@ const PRODUCT_ASPECT = 0.8; // 4:5
 
 // ── Draft saving: text typed in the "Add New Product" form survives leaving the page ──
 const DRAFT_PREFIX = "draft_organizer_shop_";
+// One stable preview URL per file. (Making a new one on every render made photos reload and
+// "stick" while you dragged them.)
+const previewUrlCache = new WeakMap();
+function previewUrl(file) {
+  let u = previewUrlCache.get(file);
+  if (!u) { u = URL.createObjectURL(file); previewUrlCache.set(file, u); }
+  return u;
+}
+
 function loadDraft(key, fallback) {
   if (typeof window === "undefined") return fallback;
   const v = window.localStorage.getItem(DRAFT_PREFIX + key);
@@ -61,11 +71,13 @@ function withProductPos(url, pos) {
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
 }
-function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null }) {
+function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null, onReplace }) {
   const ref = useRef(null);
   const dragState = useRef(null);
   const [adjusting, setAdjusting] = useState(false);
+  const [cropping, setCropping] = useState(false);
   const active = adjusting && !readOnly; // moving only works while "Adjust" is on, so the page scrolls normally otherwise
+  const pill = { position: "absolute", background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer" };
   return (
     <div
       ref={ref}
@@ -84,10 +96,14 @@ function PositionableProductImage({ src, position, onChange, readOnly = false, b
       style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
     >
       <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
+      {!readOnly && onReplace && (
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCropping(true); }} style={{ ...pill, top: 4, left: 6 }}>✂️ Crop</button>
+      )}
       {!readOnly && (
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ position: "absolute", bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 10px", fontSize: 11, fontWeight: "bold", cursor: "pointer" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
+        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ ...pill, bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
       )}
       {badge}
+      {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -229,6 +245,15 @@ export default function OrganizerShopTab({ userId }) {
     await loadProducts();
   };
 
+  // ✂️ Crop a saved photo: the cropped version replaces it in the same slot.
+  const replaceEditImage = async (i, file) => {
+    setMessage("⏳ Uploading cropped photo...");
+    const url = await uploadFile(file);
+    if (!url) return;
+    setEditImages((prev) => prev.map((it, idx) => (idx === i ? { ...it, url, src: url, position: { x: 50, y: 50 } } : it)));
+    setMessage("✅ Photo cropped — tap Save on the product to keep it.");
+  };
+
   const toggleProduct = async (id, current) => { await supabase.from("vendor_products").update({ is_active: !current }).eq("id", id); await loadProducts(); };
   const deleteProduct = async (id) => { if (!confirm("Delete this product?")) return; await supabase.from("vendor_products").delete().eq("id", id); await loadProducts(); };
 
@@ -295,7 +320,8 @@ export default function OrganizerShopTab({ userId }) {
               {newImages.map((item, i) => (
                 <div key={i} style={{ position: "relative" }}>
                   <PositionableProductImage
-                    src={URL.createObjectURL(item.file)}
+                    src={previewUrl(item.file)}
+                    onReplace={(file) => setNewImages((prev) => prev.map((it, idx) => (idx === i ? { ...it, file, position: { x: 50, y: 50 } } : it)))}
                     position={item.position}
                     onChange={(pos) => setNewImages((prev) => prev.map((it, idx) => (idx === i ? { ...it, position: pos } : it)))}
                     badge={i === 0 ? <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div> : null}
@@ -350,6 +376,7 @@ export default function OrganizerShopTab({ userId }) {
                             <div key={i} style={{ position: "relative" }}>
                               <PositionableProductImage
                                 src={item.src}
+                                onReplace={(file) => replaceEditImage(i, file)}
                                 position={item.position}
                                 onChange={(pos) => setEditImages((prev) => prev.map((it, k) => (k === i ? { ...it, position: pos } : it)))}
                                 badge={i === 0 ? <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div> : null}
@@ -364,7 +391,8 @@ export default function OrganizerShopTab({ userId }) {
                           {editNewFiles.map((item, i) => (
                             <div key={i} style={{ position: "relative" }}>
                               <PositionableProductImage
-                                src={URL.createObjectURL(item.file)}
+                                src={previewUrl(item.file)}
+                                onReplace={(file) => setEditNewFiles((prev) => prev.map((it, k) => (k === i ? { ...it, file, position: { x: 50, y: 50 } } : it)))}
                                 position={item.position}
                                 onChange={(pos) => setEditNewFiles((prev) => prev.map((it, k) => (k === i ? { ...it, position: pos } : it)))}
                               />
@@ -409,7 +437,7 @@ export default function OrganizerShopTab({ userId }) {
                           {markSaleProofFile ? (
                             <div style={{ marginBottom: 8, position: "relative", maxWidth: 200 }}>
                               <div style={{ borderRadius: 6, overflow: "hidden", border: "1px solid #AABB23" }}>
-                                <img src={URL.createObjectURL(markSaleProofFile)} alt="proof" style={{ width: "100%", height: "auto", display: "block" }} />
+                                <img src={previewUrl(markSaleProofFile)} alt="proof" style={{ width: "100%", height: "auto", display: "block" }} />
                               </div>
                               <button onClick={() => setMarkSaleProofFile(null)} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 22, height: 22, cursor: "pointer", fontSize: 12 }}>×</button>
                             </div>
