@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import ImageEditor from "./ImageEditor";
+import CropModal from "./CropModal";
 import useDragReorder from "./useDragReorder";
 
 // ── EPM Shop — admin-managed products, publicly listed at /epm-shop, no schema
@@ -22,6 +23,15 @@ export default function AdminShopTab({ adminId }) {
 // ── DRAFT SAVING — auto-saves as admin types, restores if they leave without
 // saving. Cleared once the product is successfully added. ──
 const DRAFT_PREFIX = "draft_admin_shop_";
+// One stable preview URL per file. (Making a new one on every render made photos reload and
+// "stick" while you dragged them.)
+const previewUrlCache = new WeakMap();
+function previewUrl(file) {
+  let u = previewUrlCache.get(file);
+  if (!u) { u = URL.createObjectURL(file); previewUrlCache.set(file, u); }
+  return u;
+}
+
 function loadDraft(key, fallback) {
   if (typeof window === "undefined") return fallback;
   const v = window.localStorage.getItem(DRAFT_PREFIX + key);
@@ -51,6 +61,7 @@ function saveDraft(key, value) {
   const [shopEpQueue, setShopEpQueue] = useState([]);
   const [shopEpIndex, setShopEpIndex] = useState(0);
   const [shopEpEditSrc, setShopEpEditSrc] = useState(null);
+  const [shopEpRecrop, setShopEpRecrop] = useState(null); // { index, src } — re-crop a saved photo
 
   useEffect(() => { loadShopProducts(); }, []);
 
@@ -183,7 +194,7 @@ function saveDraft(key, value) {
         {shopNpEditSrc && (
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 12, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {shopNpIndex + 1} of {shopNpQueue.length}</p>
-            <ImageEditor
+            <CropModal
               src={shopNpEditSrc}
               aspect={null}
               onCancel={() => { setShopNpQueue([]); setShopNpIndex(0); setShopNpEditSrc(null); }}
@@ -231,6 +242,7 @@ function saveDraft(key, value) {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
                           {shopEditProductImages.map((url, i) => (
                             <div key={i} style={{ position: "relative" }}>
+                              <button onClick={() => setShopEpRecrop({ index: i, src: url })} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: 8, padding: "2px 6px", fontSize: 10, cursor: "pointer", zIndex: 2 }}>✂️</button>
                               <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
                               <button onClick={() => removeShopEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
                               {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
@@ -241,7 +253,7 @@ function saveDraft(key, value) {
                       {shopEpEditSrc && (
                         <div style={{ marginBottom: 10 }}>
                           <p style={{ fontSize: 11, color: "#701890", fontWeight: "bold", margin: "0 0 6px" }}>Cropping image {shopEpIndex + 1} of {shopEpQueue.length}</p>
-                          <ImageEditor
+                          <CropModal
                             src={shopEpEditSrc}
                             aspect={null}
                             onCancel={() => { setShopEpQueue([]); setShopEpIndex(0); setShopEpEditSrc(null); }}
@@ -253,6 +265,32 @@ function saveDraft(key, value) {
                             }}
                           />
                         </div>
+                      )}
+                      {shopEditProductNewFiles.length > 0 && (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
+                          {shopEditProductNewFiles.map((file, i) => (
+                            <div key={i} style={{ position: "relative" }}>
+                              <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "2px solid #AABB23" }}><img src={previewUrl(file)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+                              <button onClick={() => setShopEditProductNewFiles(prev => prev.filter((_, k) => k !== i))} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
+                              <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#AABB23", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>NEW</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {shopEpRecrop && (
+                        <CropModal
+                          src={shopEpRecrop.src}
+                          onCancel={() => setShopEpRecrop(null)}
+                          onDone={async (file) => {
+                            const idx = shopEpRecrop.index;
+                            setShopEpRecrop(null);
+                            setMessage("⏳ Uploading cropped photo...");
+                            const url = await uploadFile(file, "vendor-portfolio");
+                            if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+                            setShopEditProductImages(prev => prev.map((u, k) => (k === idx ? url : u)));
+                            setMessage("✅ Photo cropped — tap Save on the product to keep it.");
+                          }}
+                        />
                       )}
                       {!shopEpEditSrc && shopEditProductImages.length < SHOP_PRODUCT_IMAGE_LIMIT && (
                         <div style={{ marginBottom: 8 }}>
