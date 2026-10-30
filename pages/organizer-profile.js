@@ -128,18 +128,19 @@ function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChang
     }
   };
   const handleTouchEnd = () => { pinchState.current = null; };
-  const pill = { position: "absolute", bottom: 4, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer" };
+  const btn = { flex: 1, padding: "10px 4px", border: "none", borderRadius: 8, color: "white", fontSize: 13, fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.3)", whiteSpace: "nowrap" };
   return (
-    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
-      onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-      style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #AABB23", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
-      <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-      {adjusting ? (
-        <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "rgba(0,0,0,0.6)", color: "white", fontSize: 10, padding: "2px 7px", borderRadius: 8, pointerEvents: "none" }}>Pinch to zoom, then drag</div>
-      ) : (onReplace && (
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCropping(true); }} style={{ ...pill, left: 6 }}>✂️ Crop</button>
-      ))}
-      <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ ...pill, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+    <div>
+      <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
+        onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+        style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #AABB23", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
+        <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>Pinch to zoom, then drag</div>}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
+        <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+      </div>
       {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
@@ -534,7 +535,13 @@ export default function OrganizerProfile() {
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={lS}>Portfolio</label>
         <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8 }}>{portfolioImages.length}/{imageLimit} images{atLimit && " — Remove some before adding more"}</p>
-        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 10, fontSize: 12, color: "#856404" }}>⚠️ JPG, PNG, WebP only. No HEIC. Hold and drag the ⠿ handle on any photo to slide it into the order you want — the first {FEATURED_COUNT} photos are your featured ones at the top.</div>
+        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: "#856404", lineHeight: 1.6 }}>
+              <div>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
+              <div style={{ marginTop: 6 }}><strong>✂️ Crop</strong> — tap the purple button under a photo to cut it down to the part you want.</div>
+              <div><strong>✋ Adjust</strong> — tap the green button, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</div>
+              <div><strong>⠿ Number</strong> — hold and drag the number on a photo to move it. The first {FEATURED_COUNT} photos are pinned at the top of your page.</div>
+              <div>Then tap <strong>Save Profile</strong> at the bottom to keep your changes.</div>
+            </div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
             {portfolioImages.map((img, i) => (
@@ -560,7 +567,7 @@ export default function OrganizerProfile() {
         {portfolioFiles.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
-              📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — drag to position, then click <strong>Save Profile</strong> below.
+              📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — tap <strong>✂️ Crop</strong> to cut it or <strong>✋ Adjust</strong> to move/zoom it, then click <strong>Save Profile</strong> below.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
               {portfolioFiles.map((item, i) => (
