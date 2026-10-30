@@ -124,6 +124,18 @@ export default function HomePage() {
       <style>{`
         .home-shell { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
         .home-shell-main { flex: 1 0 auto; width: 100%; }
+        /* EPM Shop badge: far right on phones, centered on iPads / tablets / desktops */
+        .epm-badge-row { display: flex; justify-content: flex-end; margin-bottom: 10px; padding: 8px 6px; }
+        @media (min-width: 700px) { .epm-badge-row { justify-content: center; } }
+        .epm-badge-btn { animation: epmGlow 3.4s ease-in-out infinite; }
+        @keyframes epmGlow {
+          0%   { box-shadow: 0 0 5px 1px rgba(170,187,35,0.25), 0 4px 12px rgba(0,0,0,0.2); }
+          20%  { box-shadow: 0 0 16px 6px rgba(170,187,35,0.95), 0 0 36px 14px rgba(170,187,35,0.55), 0 4px 12px rgba(0,0,0,0.2); }
+          45%  { box-shadow: 0 0 5px 1px rgba(112,24,144,0.25), 0 4px 12px rgba(0,0,0,0.2); }
+          70%  { box-shadow: 0 0 16px 6px rgba(165,60,205,0.95), 0 0 36px 14px rgba(112,24,144,0.6), 0 4px 12px rgba(0,0,0,0.2); }
+          100% { box-shadow: 0 0 5px 1px rgba(170,187,35,0.25), 0 4px 12px rgba(0,0,0,0.2); }
+        }
+        @media (prefers-reduced-motion: reduce) { .epm-badge-btn { animation: none; } }
       `}</style>
       <div className="home-shell-main">
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
@@ -204,8 +216,9 @@ export default function HomePage() {
 
         <div style={{ marginBottom: 32 }}>
           {epmShopHasProducts && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+            <div className="epm-badge-row">
               <button
+                className="epm-badge-btn"
                 onClick={() => router.push("/epm-shop")}
                 title="EPM Shop"
                 style={{
@@ -213,7 +226,6 @@ export default function HomePage() {
                   width: 64, height: 64, borderRadius: "50%",
                   background: "linear-gradient(135deg, #701890, #AABB23)",
                   color: "white", border: "3px solid white",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
                   cursor: "pointer", fontWeight: "bold", lineHeight: 1.1, padding: 0
                 }}
               >
