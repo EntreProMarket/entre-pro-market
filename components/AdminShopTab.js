@@ -242,7 +242,7 @@ function saveDraft(key, value) {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
                           {shopEditProductImages.map((url, i) => (
                             <div key={i} style={{ position: "relative" }}>
-                              <button onClick={() => setShopEpRecrop({ index: i, src: url })} style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: 8, padding: "2px 6px", fontSize: 10, cursor: "pointer", zIndex: 2 }}>✂️</button>
+                              <button onClick={() => setShopEpRecrop({ index: i, src: url })} style={{ position: "absolute", bottom: 3, right: 3, background: "#701890", color: "white", border: "1px solid white", borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer", zIndex: 2, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>✂️ Crop</button>
                               <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
                               <button onClick={() => removeShopEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
                               {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
