@@ -77,32 +77,35 @@ function PositionableProductImage({ src, position, onChange, readOnly = false, b
   const [adjusting, setAdjusting] = useState(false);
   const [cropping, setCropping] = useState(false);
   const active = adjusting && !readOnly; // moving only works while "Adjust" is on, so the page scrolls normally otherwise
-  const pill = { position: "absolute", background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: 10, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer" };
+  const btn = { flex: 1, padding: "10px 4px", border: "none", borderRadius: 8, color: "white", fontSize: 13, fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.3)", whiteSpace: "nowrap" };
   return (
-    <div
-      ref={ref}
-      onPointerDown={(e) => { if (!active) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }}
-      onPointerMove={(e) => {
-        const d = dragState.current;
-        if (!active || !d || !ref.current) return;
-        const rect = ref.current.getBoundingClientRect();
-        onChange({
-          x: Math.min(100, Math.max(0, d.posX - ((e.clientX - d.x) / rect.width) * 100)),
-          y: Math.min(100, Math.max(0, d.posY - ((e.clientY - d.y) / rect.height) * 100)),
-        });
-      }}
-      onPointerUp={() => { dragState.current = null; }}
-      onPointerCancel={() => { dragState.current = null; }}
-      style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
-    >
-      <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
-      {!readOnly && onReplace && (
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setCropping(true); }} style={{ ...pill, top: 4, left: 6 }}>✂️ Crop</button>
-      )}
+    <div>
+      <div
+        ref={ref}
+        onPointerDown={(e) => { if (!active) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }}
+        onPointerMove={(e) => {
+          const d = dragState.current;
+          if (!active || !d || !ref.current) return;
+          const rect = ref.current.getBoundingClientRect();
+          onChange({
+            x: Math.min(100, Math.max(0, d.posX - ((e.clientX - d.x) / rect.width) * 100)),
+            y: Math.min(100, Math.max(0, d.posY - ((e.clientY - d.y) / rect.height) * 100)),
+          });
+        }}
+        onPointerUp={() => { dragState.current = null; }}
+        onPointerCancel={() => { dragState.current = null; }}
+        style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
+      >
+        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
+        {active && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>Drag to move</div>}
+        {badge}
+      </div>
       {!readOnly && (
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setAdjusting((a) => !a); }} style={{ ...pill, bottom: 4, right: 6, background: adjusting ? "#701890" : "rgba(0,0,0,0.6)" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
+        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
+          <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
+        </div>
       )}
-      {badge}
       {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
@@ -314,7 +317,7 @@ export default function OrganizerShopTab({ userId }) {
           <input placeholder="Product Title *" value={newProduct.title} onChange={(e) => setNewField("title")(e.target.value)} style={iS} />
           <textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewField("description")(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
           <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={(e) => setNewField("price")(e.target.value)} style={iS} />
-          <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {PRODUCT_IMAGE_LIMIT} — first is main. Drag each photo to position it)</span></label>
+          <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {PRODUCT_IMAGE_LIMIT} — first is main. Tap ✂️ Crop to cut a photo, or ✋ Adjust to move it)</span></label>
           {newImages.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
               {newImages.map((item, i) => (
