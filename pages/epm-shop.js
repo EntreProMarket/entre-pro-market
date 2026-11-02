@@ -10,9 +10,15 @@ export default function EpmShop() {
   const router = useRouter();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const load = async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        const { data: me } = await supabase.from("profiles").select("is_admin").eq("id", authData.user.id).single();
+        setIsAdmin(!!me?.is_admin);
+      }
       const { data: adminProfiles } = await supabase.from("profiles").select("id, product_order").eq("is_admin", true);
       const adminIds = (adminProfiles || []).map(p => p.id);
       if (adminIds.length === 0) { setProducts([]); setLoading(false); return; }
@@ -48,9 +54,10 @@ export default function EpmShop() {
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
             <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 90, height: 90, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <button onClick={() => router.push("/home")} style={{ padding: "7px 14px", backgroundColor: "white", color: "#701890", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🏡 Home</button>
               <button onClick={() => router.push("/marketplace")} style={{ padding: "7px 14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 13, fontWeight: "bold" }}>🛒 Marketplace</button>
+              {isAdmin && <button onClick={() => router.push("/admin")} style={{ padding: "7px 14px", backgroundColor: "#111", color: "white", border: "1px solid #701890", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛠️ Admin Panel</button>}
             </div>
           </div>
 
