@@ -4,6 +4,8 @@ import { supabase } from "../lib/supabaseClient";
 import ImageEditor from "./ImageEditor";
 import CropModal from "./CropModal";
 import useDragReorder from "./useDragReorder";
+import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
+import HelpTip from "./HelpTip";
 
 // ── EPM Shop — admin-managed products, publicly listed at /epm-shop, no schema
 // changes needed: vendor_id just points at whichever admin profile added the item,
@@ -219,7 +221,7 @@ function saveDraft(key, value) {
         <button onClick={addShopProduct} style={{ padding: "10px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", cursor: "pointer" }}>Add Product</button>
       </div>
 
-      {shopProducts.length > 0 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 active products are pinned to the top of the EPM Shop; the rest rotate for each visitor.</p>}
+      {shopProducts.length > 0 && <div style={{ margin: "0 0 12px" }}><HelpTip title="Reordering"><p style={{ margin: 0 }}>Hold and drag the ⠿ handle to reorder. The first 4 active products are pinned to the top of the EPM Shop; the rest rotate for each visitor.</p></HelpTip></div>}
       {loadingShop ? <p style={{ color: "#888" }}>Loading...</p> : shopProducts.length === 0 ? (
         <p style={{ color: "#888", fontSize: 13 }}>No EPM Shop products yet. Add your first one above!</p>
       ) : (
@@ -242,7 +244,8 @@ function saveDraft(key, value) {
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
                           {shopEditProductImages.map((url, i) => (
                             <div key={i} style={{ position: "relative" }}>
-                              <button onClick={() => setShopEpRecrop({ index: i, src: url })} style={{ position: "absolute", bottom: 3, right: 3, background: "#701890", color: "white", border: "1px solid white", borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer", zIndex: 2, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>✂️ Crop</button>
+                              <button onClick={() => setShopEpRecrop({ index: i, src: getOrigUrl(url) || baseUrl(url) })} style={{ position: "absolute", bottom: 3, right: 3, background: "#701890", color: "white", border: "1px solid white", borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: "bold", cursor: "pointer", zIndex: 2, boxShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>✂️ Crop</button>
+                              {getOrigUrl(url) && (<button onClick={() => setShopEditProductImages(prev => prev.map((u, k) => (k === i ? getOrigUrl(u) : u)))} style={{ position: "absolute", top: 3, left: 3, background: "white", color: "#701890", border: "2px solid #701890", borderRadius: 8, padding: "3px 7px", fontSize: 11, fontWeight: "bold", cursor: "pointer", zIndex: 2 }}>↩ Original</button>)}
                               <div style={{ height: 70, borderRadius: 6, overflow: "hidden", border: "1px solid #e5e7eb" }}><img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
                               <button onClick={() => removeShopEditImage(url)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "white", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", fontSize: 10, lineHeight: "18px", textAlign: "center", padding: 0 }}>×</button>
                               {i === 0 && <div style={{ position: "absolute", bottom: 2, left: 2, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 5px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
@@ -285,8 +288,10 @@ function saveDraft(key, value) {
                             const idx = shopEpRecrop.index;
                             setShopEpRecrop(null);
                             setMessage("⏳ Uploading cropped photo...");
-                            const url = await uploadFile(file, "vendor-portfolio");
-                            if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+                            const uploaded = await uploadFile(file, "vendor-portfolio");
+                            if (!uploaded) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+                            const prevUrl = shopEditProductImages[idx];
+                            const url = tagOrig(uploaded, getOrigUrl(prevUrl) || baseUrl(prevUrl));
                             setShopEditProductImages(prev => prev.map((u, k) => (k === idx ? url : u)));
                             setMessage("✅ Photo cropped — tap Save on the product to keep it.");
                           }}
