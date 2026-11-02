@@ -18,7 +18,6 @@ export default function ImageEditor({ src, aspect = null, onCancel, onDone }) {
   const [loadError, setLoadError] = useState("");
   const [view, setViewState] = useState(null); // { s, ox, oy } — photo scale + position inside the stage
   const [box, setBoxState] = useState(null);   // { x, y, w, h } — crop box inside the stage
-  const [mode, setMode] = useState("photo");   // what dragging INSIDE the box does: move the photo, or move the box
   const [working, setWorking] = useState(false);
 
   const viewRef = useRef(null);
@@ -27,9 +26,7 @@ export default function ImageEditor({ src, aspect = null, onCancel, onDone }) {
   const baseScale = useRef(1);
   const pointers = useRef(new Map());
   const gesture = useRef(null);
-  const modeRef = useRef("photo");
   const sizeRef = useRef({ w: 0, h: 0 });
-  modeRef.current = mode;
   infoRef.current = imgInfo;
   sizeRef.current = { w: stageW, h: stageH };
 
@@ -141,7 +138,6 @@ export default function ImageEditor({ src, aspect = null, onCancel, onDone }) {
     const b = boxRef.current, v = viewRef.current;
     const h = hitTest(p.x, p.y, b);
     if (h) gesture.current = { type: "resize", handle: h, start: p, sb: { ...b } };
-    else if (modeRef.current === "box" && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) gesture.current = { type: "moveBox", start: p, sb: { ...b } };
     else gesture.current = { type: "pan", start: p, sv: { ...v } };
   };
   const onPointerDown = (e) => {
@@ -171,8 +167,6 @@ export default function ImageEditor({ src, aspect = null, onCancel, onDone }) {
       commit(clampView({ s, ox, oy }, b, info), b);
     } else if (g.type === "pan") {
       commit(clampView({ s: g.sv.s, ox: g.sv.ox + (p.x - g.start.x), oy: g.sv.oy + (p.y - g.start.y) }, b, info), b);
-    } else if (g.type === "moveBox") {
-      commit(v, clampBox({ ...g.sb, x: g.sb.x + (p.x - g.start.x), y: g.sb.y + (p.y - g.start.y) }, v, info));
     } else if (g.type === "resize") {
       const nb = resizeBox(g.sb, g.handle, p.x - g.start.x, p.y - g.start.y, v, info);
       commit(clampView(v, nb, info), nb);
@@ -278,14 +272,12 @@ export default function ImageEditor({ src, aspect = null, onCancel, onDone }) {
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-        <button type="button" onClick={() => setMode("photo")} style={{ ...tool, backgroundColor: mode === "photo" ? "#701890" : "#e5e7eb", color: mode === "photo" ? "white" : "#333" }}>✋ Move photo</button>
-        <button type="button" onClick={() => setMode("box")} style={{ ...tool, backgroundColor: mode === "box" ? "#701890" : "#e5e7eb", color: mode === "box" ? "white" : "#333" }}>⬚ Move box</button>
         <button type="button" onClick={() => zoomButton(1 / 1.25)} style={{ ...tool, backgroundColor: "#e5e7eb", color: "#333", minWidth: 44 }}>－</button>
         <button type="button" onClick={() => zoomButton(1.25)} style={{ ...tool, backgroundColor: "#e5e7eb", color: "#333", minWidth: 44 }}>＋</button>
         <button type="button" onClick={resetAll} style={{ ...tool, backgroundColor: "#e5e7eb", color: "#333" }}>↺ Reset</button>
       </div>
       <p style={{ fontSize: 12, color: "#666", margin: "8px 0 10px", lineHeight: 1.5 }}>
-        Drag to move the photo · pinch (or ＋ －) to zoom · drag the white corners and edges to resize the crop box. Tap <strong>⬚ Move box</strong> to drag the box itself.
+        Drag the white corners and edges to resize the crop box. Pinch (or tap ＋ －) to zoom, and drag the photo to frame it. Tip: shrink the box or zoom in first, then drag the photo into place. <strong>↺ Reset</strong> starts the crop over.
       </p>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
         <button type="button" onClick={onCancel} style={{ ...tool, padding: "11px 20px", backgroundColor: "#ccc", color: "#222" }}>Cancel</button>
