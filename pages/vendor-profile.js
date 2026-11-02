@@ -7,6 +7,8 @@ import ImageEditor from "../components/ImageEditor";
 import useDragReorder from "../components/useDragReorder";
 import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 import CropModal from "../components/CropModal";
+import { getOrigUrl, baseUrl, tagOrig } from "../components/cropTags";
+import HelpTip from "../components/HelpTip";
 
 // One stable preview URL per file. (Making a new one on every render made photos reload and
 // "stick" while you dragged them.)
@@ -98,11 +100,15 @@ function parseProductPos(url) {
 }
 function withProductPos(url, pos) {
   if (!url) return url;
-  const base = url.split("#")[0];
+  const base = url.split("#pos=")[0];
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
 }
-function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null, onReplace }) {
+function PositionableProductImage({ src, position, onChange, readOnly = false, badge = null, onReplace, onRestore, canRestore, cropSrc }) {
+  const shown = baseUrl(src);
+  const origUrl = getOrigUrl(src);
+  const cropFrom = cropSrc || origUrl || shown;
+  const restorable = !readOnly && !!onRestore && (canRestore !== undefined ? canRestore : !!origUrl);
   const ref = useRef(null);
   const dragState = useRef(null);
   const [adjusting, setAdjusting] = useState(false);
@@ -127,7 +133,7 @@ function PositionableProductImage({ src, position, onChange, readOnly = false, b
         onPointerCancel={() => { dragState.current = null; }}
         style={{ width: "100%", aspectRatio: PRODUCT_ASPECT, borderRadius: 8, overflow: "hidden", border: readOnly ? "1px solid #e5e7eb" : (active ? "3px solid #AABB23" : "2px solid #701890"), cursor: active ? "grab" : "default", touchAction: active ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}
       >
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
+        <img src={shown} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
         {active && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>Drag to move</div>}
         {badge}
       </div>
@@ -137,7 +143,8 @@ function PositionableProductImage({ src, position, onChange, readOnly = false, b
           <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? "✓ Done" : "✋ Adjust"}</button>
         </div>
       )}
-      {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
+      {restorable && (<button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>)}
+      {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -159,11 +166,15 @@ function parsePortfolioPos(url) {
 }
 function withPortfolioPos(url, pos, zoom = 1) {
   if (!url) return url;
-  const base = url.split("#")[0];
+  const base = url.split("#pos=")[0];
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
-function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange, onReplace }) {
+function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange, onReplace, onRestore, canRestore, cropSrc }) {
+  const shown = baseUrl(src);
+  const origUrl = getOrigUrl(src);
+  const cropFrom = cropSrc || origUrl || shown;
+  const restorable = !!onRestore && (canRestore !== undefined ? canRestore : !!origUrl);
   const [aspect, setAspect] = useState(1);
   const [adjusting, setAdjusting] = useState(false);
   const [cropping, setCropping] = useState(false);
@@ -196,14 +207,15 @@ function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChang
       <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
         onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
         style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
-        <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        <img src={shown} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
         {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>Pinch to zoom, then drag</div>}
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
         <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
       </div>
-      {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
+      {restorable && (<button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>)}
+      {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -382,7 +394,7 @@ const handleSave = async () => {
           setMessage(`⏳ Uploading ${i + 1} of ${portfolioFiles.length} images...`);
           const comp = await compressImage(portfolioFiles[i].file, 1200, 0.9);
           const url = await uploadFile(comp, "vendor-portfolio");
-          if (url) portfolio.push(withPortfolioPos(url, portfolioFiles[i].position, portfolioFiles[i].zoom));
+          if (url) portfolio.push(withPortfolioPos(tagOrig(url, portfolioFiles[i].origUrl), portfolioFiles[i].position, portfolioFiles[i].zoom));
         }
       }
       if (portfolio.length > photoLimit) portfolio = portfolio.slice(0, photoLimit);
@@ -424,19 +436,49 @@ const handleSave = async () => {
   // ── ✂️ Crop: the cropped photo replaces the original in the same slot ──
   const replaceSavedPortfolioImage = async (i, file) => {
     setMessage("⏳ Uploading cropped photo...");
-    const url = await uploadFile(file, "vendor-portfolio");
-    if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    const uploaded = await uploadFile(file, "vendor-portfolio");
+    if (!uploaded) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    const url = tagOrig(uploaded, getOrigUrl(portfolioImages[i]) || baseUrl(portfolioImages[i]));
     setPortfolioImages(prev => prev.map((u, idx) => (idx === i ? url : u)));
     setPortfolioPositions(prev => prev.map((p, idx) => (idx === i ? { position: { x: 50, y: 50 }, zoom: 1 } : p)));
     setMessage("✅ Photo cropped — tap Save Profile to keep it.");
   };
   const replaceEditProductImage = async (i, file) => {
     setMessage("⏳ Uploading cropped photo...");
-    const url = await uploadFile(file, "vendor-portfolio");
-    if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    const uploaded = await uploadFile(file, "vendor-portfolio");
+    if (!uploaded) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    const curSrc = editProductImages[i]?.src;
+    const url = tagOrig(uploaded, getOrigUrl(curSrc) || baseUrl(curSrc));
     setEditProductImages(prev => prev.map((it, idx) => (idx === i ? { ...it, url, src: url, position: { x: 50, y: 50 } } : it)));
     setMessage("✅ Photo cropped — tap Save on the product to keep it.");
   };
+
+  const restoreSavedPortfolioImage = (i) => {
+    const orig = getOrigUrl(portfolioImages[i]);
+    if (!orig) return;
+    setPortfolioImages(prev => prev.map((u, idx) => (idx === i ? orig : u)));
+    setPortfolioPositions(prev => prev.map((p, idx) => (idx === i ? { position: { x: 50, y: 50 }, zoom: 1 } : p)));
+    setMessage("↩ Original photo restored — tap Save Profile to keep it.");
+  };
+  const restoreEditProductImage = (i) => {
+    const orig = getOrigUrl(editProductImages[i]?.src);
+    if (!orig) return;
+    setEditProductImages(prev => prev.map((it, idx) => (idx === i ? { ...it, url: orig, src: orig, position: { x: 50, y: 50 } } : it)));
+  };
+  // ── ✂️ Crop on a NEW (not yet saved) photo: the original is kept too, so it can be restored
+  // before AND after saving. ──
+  const cropStaged = async (list, setList, i, file, bucket) => {
+    const cur = list[i];
+    const origFile = cur.origFile || cur.file;
+    let origUrl = cur.origUrl;
+    if (!origUrl) {
+      setMessage("⏳ Saving the original photo...");
+      origUrl = (await uploadFile(await compressImage(origFile), bucket)) || undefined;
+      setMessage("");
+    }
+    setList(prev => prev.map((it, idx) => (idx === i ? { ...it, file, origFile, origUrl, position: { x: 50, y: 50 }, ...(it.zoom !== undefined ? { zoom: 1 } : {}) } : it)));
+  };
+  const restoreStaged = (setList, i) => setList(prev => prev.map((it, idx) => (idx === i && it.origFile ? { ...it, file: it.origFile, origFile: undefined, origUrl: undefined, position: { x: 50, y: 50 }, ...(it.zoom !== undefined ? { zoom: 1 } : {}) } : it)));
 
   const removePortfolioImage = (idx) => {
     setPortfolioImages(prev => prev.filter((_, i) => i !== idx));
@@ -473,7 +515,7 @@ const handleSave = async () => {
     for (const item of newProductImages) {
       const comp = await compressImage(item.file, 1200, 0.9);
       const url = await uploadFile(comp, "vendor-portfolio");
-      if (url) uploadedUrls.push(withProductPos(url, item.position));
+      if (url) uploadedUrls.push(withProductPos(tagOrig(url, item.origUrl), item.position));
     }
     if (uploadedUrls.length === 0) return;
     const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: newProduct.title, description: newProduct.description, price: Math.round(parseFloat(newProduct.price) * 100), image_url: uploadedUrls[0], images: uploadedUrls, is_active: true });
@@ -495,7 +537,7 @@ const handleSave = async () => {
       for (const item of editProductNewFiles.slice(0, remaining)) {
         const comp = await compressImage(item.file, 1200, 0.9);
         const url = await uploadFile(comp, "vendor-portfolio");
-        if (url) updatedImages.push(withProductPos(url, item.position));
+        if (url) updatedImages.push(withProductPos(tagOrig(url, item.origUrl), item.position));
       }
     }
     const { error } = await supabase.from("vendor_products").update({ title: editForm.title, description: editForm.description, price: Math.round(parseFloat(editForm.price) * 100), image_url: updatedImages[0] || null, images: updatedImages }).eq("id", editingProduct);
@@ -627,13 +669,15 @@ const handleSave = async () => {
           <div style={{ marginTop: 20, marginBottom: 8 }}>
             <label style={lS}>Portfolio</label>
             <p style={{ fontSize: 12, color: portfolioImages.length >= photoLimit ? "#cc0000" : "#888", marginBottom: 8, fontWeight: "bold" }}>{portfolioImages.length} / {photoLimit} images</p>
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: "#856404", lineHeight: 1.6 }}>
-              <div>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
-              <div style={{ marginTop: 6 }}><strong>✂️ Crop</strong> — tap the purple button under a photo to cut it down to the part you want.</div>
-              <div><strong>✋ Adjust</strong> — tap the green button, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</div>
-              {canReorder && <div><strong>⠿ Number</strong> — hold and drag the number on a photo to move it. The first {FEATURED_COUNT} photos are pinned at the top of your page.</div>}
-              <div>Then tap <strong>Save Profile</strong> at the bottom to keep your changes.</div>
-            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+            <HelpTip title="Portfolio photos">
+              <p style={{ margin: "0 0 8px" }}>⚠️ JPG, PNG or WebP only — no HEIC. If a photo won't show, pick it from your Gallery app (not Google Photos).</p>
+              <p style={{ margin: "0 0 8px" }}><strong>✂️ Crop</strong> — tap the purple button under a photo to cut it down. Changed your mind? Tap <strong>↩ Restore original</strong> to undo the crop, any time.</p>
+              <p style={{ margin: "0 0 8px" }}><strong>✋ Adjust</strong> — tap the green button, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</p>
+              {canReorder && <p style={{ margin: "0 0 8px" }}><strong>⠿ Number</strong> — hold and drag the number on a photo to move it. The first {FEATURED_COUNT} photos are pinned at the top of your page.</p>}
+              <p style={{ margin: 0 }}>Then tap <strong>Save Profile</strong> at the bottom to keep your changes.</p>
+            </HelpTip>
+          </div>
             {portfolioImages.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
                 {portfolioImages.map((img, i) => (
@@ -641,6 +685,7 @@ const handleSave = async () => {
                     <PositionablePortfolioImage
                       src={img}
                       onReplace={(file) => replaceSavedPortfolioImage(i, file)}
+                      onRestore={() => restoreSavedPortfolioImage(i)}
                       position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
                       zoom={portfolioPositions[i]?.zoom || 1}
                       onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
@@ -660,15 +705,21 @@ const handleSave = async () => {
             )}
             {portfolioFiles.length > 0 && (
               <div style={{ marginBottom: 14 }}>
-                <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
-                  📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — tap <strong>✂️ Crop</strong> to cut it or <strong>✋ Adjust</strong> to move/zoom it, then click <strong>Save Profile</strong> below to upload {portfolioFiles.length > 1 ? "them" : "it"}.
-                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <HelpTip title="New photos">
+                <p style={{ margin: "0 0 8px" }}>Your new photos upload when you tap <strong>Save Profile</strong> at the bottom.</p>
+                <p style={{ margin: "0 0 8px" }}><strong>✂️ Crop</strong> cuts a photo down (you can restore the original later). <strong>✋ Adjust</strong> lets you pinch to zoom and drag to move it.</p>
+              </HelpTip>
+            </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
                   {portfolioFiles.map((item, i) => (
                     <div key={i} style={{ position: "relative" }}>
                       <PositionablePortfolioImage
                         src={previewUrl(item.file)}
-                        onReplace={(file) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 }, zoom: 1 } : it))}
+                        onReplace={(file) => cropStaged(portfolioFiles, setPortfolioFiles, i, file, "vendor-portfolio")}
+                      onRestore={() => restoreStaged(setPortfolioFiles, i)}
+                      canRestore={!!item.origFile}
+                      cropSrc={item.origFile ? previewUrl(item.origFile) : undefined}
                         position={item.position}
                         zoom={item.zoom}
                         onChange={(pos) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
@@ -722,7 +773,7 @@ const handleSave = async () => {
             <span style={{ fontSize: 13, color: shopProducts.length >= productLimit ? "#cc0000" : "#888", fontWeight: "bold" }}>{shopProducts.length} / {productLimit}</span>
           </div>
           <p style={{ fontSize: 12, color: "#888", marginBottom: 16, marginTop: 0 }}>Your <strong style={{ textTransform: "capitalize" }}>{accountType}</strong> plan: up to <strong>{productLimit} products</strong>, <strong>{productImageLimit} images</strong> each.</p>
-          {canReorder && shopProducts.length > 0 && (<p style={{ fontSize: 12, color: "#701890", marginBottom: 16, marginTop: -8 }}>Hold and drag the ⠿ handle to reorder. The first 4 are pinned to the top of your shop; the rest rotate for each visitor.</p>)}
+          {canReorder && shopProducts.length > 0 && (<div style={{ margin: "0 0 12px" }}><HelpTip title="Reordering"><p style={{ margin: 0 }}>Hold and drag the ⠿ handle to reorder. The first 4 are pinned to the top of your shop; the rest rotate for each visitor.</p></HelpTip></div>)}
 
           {shopProducts.length >= productLimit && <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 8, padding: "12px 16px", marginBottom: 24, fontSize: 13, color: "#856404" }}>⚠️ You've reached your {productLimit}-product limit. Upgrade to add more.</div>}
 
@@ -739,7 +790,10 @@ const handleSave = async () => {
                     <div key={i} style={{ position: "relative" }}>
                       <PositionableProductImage
                         src={previewUrl(item.file)}
-                        onReplace={(file) => setNewProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 } } : it))}
+                        onReplace={(file) => cropStaged(newProductImages, setNewProductImages, i, file, "vendor-portfolio")}
+                    onRestore={() => restoreStaged(setNewProductImages, i)}
+                    canRestore={!!item.origFile}
+                    cropSrc={item.origFile ? previewUrl(item.origFile) : undefined}
                         position={item.position}
                         onChange={(pos) => setNewProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
                         badge={i === 0 && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
@@ -763,9 +817,11 @@ const handleSave = async () => {
           )}
 
           {accountType !== "free" && (
-            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#701890" }}>
-              ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales — the buyer gets review access right away, subject to a proof review by Entre PRO Market within 3 business days.
-            </div>
+            <div style={{ marginBottom: 14 }}>
+        <HelpTip title="About reviews">
+          <p style={{ margin: 0 }}>ℹ️ As a {accountType} vendor, reviews on your products require a verified purchase. Use "💸 Mark Sale Paid" below for CashApp/Venmo sales — the buyer gets review access right away, subject to a proof review by Entre PRO Market within 3 business days.</p>
+        </HelpTip>
+      </div>
           )}
 
           {shopProducts.length === 0 ? <p style={{ color: "#888", textAlign: "center" }}>No products yet. Add your first product above!</p> : (
@@ -796,6 +852,7 @@ const handleSave = async () => {
                                   <PositionableProductImage
                                     src={item.src}
                                     onReplace={(file) => replaceEditProductImage(i, file)}
+                                onRestore={() => restoreEditProductImage(i)}
                                     position={item.position}
                                     onChange={(pos) => setEditProductImages(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
                                     badge={i === 0 && <div style={{ position: "absolute", bottom: 4, left: 6, backgroundColor: "#701890", color: "white", fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>MAIN</div>}
@@ -811,7 +868,10 @@ const handleSave = async () => {
                                 <div key={i} style={{ position: "relative" }}>
                                   <PositionableProductImage
                                     src={previewUrl(item.file)}
-                                    onReplace={(file) => setEditProductNewFiles(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 } } : it))}
+                                    onReplace={(file) => cropStaged(editProductNewFiles, setEditProductNewFiles, i, file, "vendor-portfolio")}
+                                onRestore={() => restoreStaged(setEditProductNewFiles, i)}
+                                canRestore={!!item.origFile}
+                                cropSrc={item.origFile ? previewUrl(item.origFile) : undefined}
                                     position={item.position}
                                     onChange={(pos) => setEditProductNewFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
                                   />
