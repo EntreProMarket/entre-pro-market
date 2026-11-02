@@ -35,12 +35,13 @@ function withPos(url, pos, zoom = 1) {
 function formatEpmUrl(v) { if (!v || !v.trim()) return ""; const s = v.trim(); return s.startsWith("https://") || s.startsWith("http://") ? s : `https://${s}`; }
 function formatEventTime(t) { if (!t) return ""; const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; }
 
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height, onReplace, onRestore, canRestore, cropSrc }) {
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height, onReplace, onRestore, canRestore, cropSrc, showAdjust = true }) {
   const ref = useRef(null);
   const dragState = useRef(null);
   const pinchState = useRef(null);
   const [adjusting, setAdjusting] = useState(false);
   const [cropping, setCropping] = useState(false);
+  const [natAspect, setNatAspect] = useState(null); // the photo's own shape, so the editor shows it exactly like the live page
   const shown = baseUrl(src);
   const origUrl = getOrigUrl(src);
   const cropFrom = cropSrc || origUrl || shown;
@@ -67,13 +68,13 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, as
     <div>
       <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
         onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-        style={{ width: "100%", height: height || undefined, aspectRatio: height ? undefined : (aspectRatio || undefined), borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
-        <img src={shown} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        style={{ width: "100%", height: height || undefined, aspectRatio: height ? undefined : (aspectRatio || natAspect || undefined), minHeight: (height || aspectRatio || natAspect) ? undefined : 140, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
+        <img src={shown} onLoad={(e) => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setNatAspect(el.naturalWidth / el.naturalHeight); }} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
         {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>{onZoomChange ? "Pinch to zoom, then drag" : "Drag to move"}</div>}
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
-        <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+        {showAdjust && <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>}
       </div>
       {restorable && <button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>}
       {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
@@ -276,7 +277,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
               src={epmFlyerFile ? previewUrl(epmFlyerFile) : parsePos(epmEventForm.flyer_url).src}
               position={epmFlyerFile ? epmFlyerPosition : parsePos(epmEventForm.flyer_url).position}
               onChange={pos => { setEpmFlyerPosition(pos); if (!epmFlyerFile) setEpmEventForm(prev => ({ ...prev, flyer_url: withPos(parsePos(prev.flyer_url).src, pos) })); }}
-              height={200}
+              showAdjust={false}
               onReplace={cropFlyer}
               onRestore={restoreFlyer}
               canRestore={!!(epmFlyerOrigFile || epmFlyerOrigUrl || getOrigUrl(epmEventForm.flyer_url))}
