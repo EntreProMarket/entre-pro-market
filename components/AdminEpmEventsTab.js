@@ -2,11 +2,22 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import useDragReorder from "./useDragReorder";
+import HelpTip from "./HelpTip";
+import CropModal from "./CropModal";
+import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
 
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
 const BLANK_EPM_EVENT = { event_name: "", event_date: "", event_end_date: "", event_start_time: "", event_end_time: "", venue: "", venue_address: "", event_type: "", category: "", description: "", info_url: "", flyer_url: "", price: "" };
 const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
+
+// One stable preview URL per file (a new one every render made photos reload while dragging).
+const previewUrlCache = new WeakMap();
+function previewUrl(file) {
+  let u = previewUrlCache.get(file);
+  if (!u) { u = URL.createObjectURL(file); previewUrlCache.set(file, u); }
+  return u;
+}
 
 function parsePos(url) {
   if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
@@ -17,29 +28,55 @@ function parsePos(url) {
 }
 function withPos(url, pos, zoom = 1) {
   if (!url) return url;
-  const base = url.split("#")[0];
+  const base = url.split("#pos=")[0];
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
 function formatEpmUrl(v) { if (!v || !v.trim()) return ""; const s = v.trim(); return s.startsWith("https://") || s.startsWith("http://") ? s : `https://${s}`; }
 function formatEventTime(t) { if (!t) return ""; const [h, m] = t.split(":").map(Number); return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`; }
 
-function PositionableImage({ src, position, onChange, height }) {
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height, onReplace, onRestore, canRestore, cropSrc }) {
   const ref = useRef(null);
   const dragState = useRef(null);
-  const handlePointerDown = (e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.target.setPointerCapture?.(e.pointerId); };
+  const pinchState = useRef(null);
+  const [adjusting, setAdjusting] = useState(false);
+  const [cropping, setCropping] = useState(false);
+  const shown = baseUrl(src);
+  const origUrl = getOrigUrl(src);
+  const cropFrom = cropSrc || origUrl || shown;
+  const restorable = !!onRestore && (canRestore !== undefined ? canRestore : !!origUrl);
+  const btn = { flex: 1, padding: "10px 4px", border: "none", borderRadius: 8, color: "white", fontSize: 13, fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.3)", whiteSpace: "nowrap" };
+  const handlePointerDown = (e) => { if (!adjusting) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } };
   const handlePointerMove = (e) => {
-    if (!dragState.current || !ref.current) return;
+    if (!adjusting || !dragState.current || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
     onChange({ x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)), y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)) });
   };
   const handlePointerUp = () => { dragState.current = null; };
+  const handleTouchStart = (e) => { if (adjusting && onZoomChange && e.touches.length === 2) { const [t0, t1] = e.touches; pinchState.current = { dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), startZoom: zoom }; } };
+  const handleTouchMove = (e) => {
+    if (adjusting && onZoomChange && e.touches.length === 2 && pinchState.current) {
+      const [t0, t1] = e.touches;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      onZoomChange(Math.min(3, Math.max(1, pinchState.current.startZoom * (dist / pinchState.current.dist))));
+    }
+  };
+  const handleTouchEnd = () => { pinchState.current = null; };
   return (
-    <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
-      style={{ width: "100%", height, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
-      <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, display: "block", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
+    <div>
+      <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+        style={{ width: "100%", height: height || undefined, aspectRatio: height ? undefined : (aspectRatio || undefined), borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
+        <img src={shown} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>{onZoomChange ? "Pinch to zoom, then drag" : "Drag to move"}</div>}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
+        <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+      </div>
+      {restorable && <button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>}
+      {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -65,6 +102,8 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
   const [showEpmFlyerPicker, setShowEpmFlyerPicker] = useState(false);
   const [epmFlyerFullscreen, setEpmFlyerFullscreen] = useState(false);
   const [epmFlyerPosition, setEpmFlyerPosition] = useState({ x: 50, y: 50 });
+  const [epmFlyerOrigFile, setEpmFlyerOrigFile] = useState(null);
+  const [epmFlyerOrigUrl, setEpmFlyerOrigUrl] = useState(undefined);
   const [message, setMessage] = useState("");
 
   useEffect(() => { loadEpmEvents(); }, []);
@@ -100,6 +139,35 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
     if (error) alert("Couldn't save the event order: " + error.message);
   };
 
+  // ✂️ Crop the flyer: the original is kept, so ↩ Restore original always brings it back.
+  const cropFlyer = async (file) => {
+    let origUrl = epmFlyerOrigUrl;
+    let origFile = epmFlyerOrigFile;
+    if (!origUrl) {
+      if (epmFlyerFile) {
+        origFile = epmFlyerOrigFile || epmFlyerFile;
+        setMessage("⏳ Saving the original flyer...");
+        origUrl = (await uploadFile(origFile, "organizer-portfolio")) || undefined;
+        setMessage("");
+      } else if (epmEventForm.flyer_url) {
+        origUrl = getOrigUrl(epmEventForm.flyer_url) || baseUrl(parsePos(epmEventForm.flyer_url).src);
+      }
+    }
+    setEpmFlyerOrigFile(origFile || null);
+    setEpmFlyerOrigUrl(origUrl);
+    setEpmFlyerFile(file);
+    setEpmFlyerPosition({ x: 50, y: 50 });
+  };
+  const restoreFlyer = () => {
+    const tagged = getOrigUrl(epmEventForm.flyer_url);
+    if (epmFlyerOrigFile) { setEpmFlyerFile(epmFlyerOrigFile); }
+    else if (epmFlyerOrigUrl) { setEpmFlyerFile(null); setEpmEventForm(prev => ({ ...prev, flyer_url: epmFlyerOrigUrl })); }
+    else if (!epmFlyerFile && tagged) { setEpmEventForm(prev => ({ ...prev, flyer_url: tagged })); }
+    setEpmFlyerOrigFile(null);
+    setEpmFlyerOrigUrl(undefined);
+    setEpmFlyerPosition({ x: 50, y: 50 });
+  };
+
   const uploadFile = async (file, bucket, attempt = 1) => {
     const fileName = `${Date.now()}-${file.name}`;
     try {
@@ -128,7 +196,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
     if (epmFlyerFile) {
       const up = await uploadFile(epmFlyerFile, "organizer-portfolio");
       if (!up) { setSavingEpmEvent(false); return; }
-      flyerUrl = withPos(up, epmFlyerPosition);
+      flyerUrl = withPos(tagOrig(up, epmFlyerOrigUrl), epmFlyerPosition);
     }
     const eventData = {
       event_name: epmEventForm.event_name, event_date: epmEventForm.event_date || null,
@@ -147,7 +215,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
         if (error) throw error;
         if (data) setEpmEvents([...epmEvents, data]);
       }
-      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); clearFormDraft();
+      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); clearFormDraft();
       setMessage("✅ EPM Event saved!");
     } catch (err) {
       setMessage("❌ Error saving EPM event: " + err.message);
@@ -194,31 +262,39 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
         <textarea placeholder="Event Description" value={epmEventForm.description} onChange={e => setEpmEventForm({ ...epmEventForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
         <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
         <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={epmEventForm.price || ""} onChange={e => setEpmEventForm({ ...epmEventForm, price: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-        <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#701890" }}>💳 Add an Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — not limited to Eventbrite.</div>
+        <div style={{ marginBottom: 14 }}>
+        <HelpTip title="Ticket payments">
+          <p style={{ margin: 0 }}>💳 Add an Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — not limited to Eventbrite.</p>
+        </HelpTip>
+      </div>
         <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
         <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={epmEventForm.info_url} onChange={e => setEpmEventForm({ ...epmEventForm, info_url: e.target.value })} style={inputStyle} />
         <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span></label>
         {(epmFlyerFile || epmEventForm.flyer_url) ? (
           <div style={{ marginBottom: 10, maxWidth: 300 }}>
             <PositionableImage
-              src={epmFlyerFile ? URL.createObjectURL(epmFlyerFile) : parsePos(epmEventForm.flyer_url).src}
+              src={epmFlyerFile ? previewUrl(epmFlyerFile) : parsePos(epmEventForm.flyer_url).src}
               position={epmFlyerFile ? epmFlyerPosition : parsePos(epmEventForm.flyer_url).position}
               onChange={pos => { setEpmFlyerPosition(pos); if (!epmFlyerFile) setEpmEventForm(prev => ({ ...prev, flyer_url: withPos(parsePos(prev.flyer_url).src, pos) })); }}
               height={200}
+              onReplace={cropFlyer}
+              onRestore={restoreFlyer}
+              canRestore={!!(epmFlyerOrigFile || epmFlyerOrigUrl || getOrigUrl(epmEventForm.flyer_url))}
+              cropSrc={epmFlyerOrigFile ? previewUrl(epmFlyerOrigFile) : (epmFlyerOrigUrl || undefined)}
             />
-            <button onClick={() => { setEpmFlyerFile(null); setEpmEventForm({ ...epmEventForm, flyer_url: "" }); setEpmFlyerPosition({ x: 50, y: 50 }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
+            <button onClick={() => { setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmEventForm({ ...epmEventForm, flyer_url: "" }); setEpmFlyerPosition({ x: 50, y: 50 }); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove flyer</button>
           </div>
         ) : (
           <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
             <p style={{ margin: 0, fontSize: 13, color: "#991b1b", fontWeight: "bold" }}>⚠️ A flyer image is required.</p>
           </div>
         )}
-        <input type="file" accept="image/*" onChange={e => { setEpmFlyerFile(e.target.files[0]); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
+        <input type="file" accept="image/*" onChange={e => { setEpmFlyerFile(e.target.files[0]); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); }} style={{ display: "block", marginBottom: 10 }} />
         <button onClick={() => setShowEpmFlyerPicker(!showEpmFlyerPicker)} style={{ padding: "4px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, marginBottom: 8 }}>{showEpmFlyerPicker ? "Hide" : "Browse Placeholders"}</button>
         {showEpmFlyerPicker && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 14, padding: 12, backgroundColor: "#f9f9f9", borderRadius: 8 }}>
             {FLYER_PLACEHOLDERS.map((src, i) => (
-              <div key={i} onClick={() => { setEpmEventForm({ ...epmEventForm, flyer_url: src }); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); }}
+              <div key={i} onClick={() => { setEpmEventForm({ ...epmEventForm, flyer_url: src }); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); }}
                 style={{ height: 80, borderRadius: 8, overflow: "hidden", cursor: "pointer", border: epmEventForm.flyer_url === src ? "3px solid #701890" : "2px solid transparent" }}>
                 <img src={src} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               </div>
@@ -226,12 +302,12 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
           </div>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          {editingEpmEvent && <button onClick={() => { setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setShowEpmFlyerPicker(false); clearFormDraft(); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+          {editingEpmEvent && <button onClick={() => { setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setShowEpmFlyerPicker(false); clearFormDraft(); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
           <button onClick={saveEpmEvent} disabled={savingEpmEvent} style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEpmEvent ? "Saving..." : editingEpmEvent ? "Update Event" : "Add Event"}</button>
         </div>
       </div>
 
-      {epmEvents.length > 0 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 upcoming events are pinned to the top of the homepage's Upcoming Events; the rest stay in date order.</p>}
+      {epmEvents.length > 0 && <div style={{ margin: "0 0 12px" }}><HelpTip title="Reordering"><p style={{ margin: 0 }}>Hold and drag the ⠿ handle to reorder. The first 4 upcoming events are pinned to the top of the homepage's Upcoming Events; the rest stay in date order.</p></HelpTip></div>}
       {epmEvents.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {orderedEpmEvents.map((ev, eIdx) => (
@@ -247,7 +323,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button onClick={() => { setEditingEpmEvent(ev.id); setEpmEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setEpmFlyerFile(null); setEpmFlyerPosition({ x: 50, y: 50 }); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                <button onClick={() => { setEditingEpmEvent(ev.id); setEpmEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmFlyerPosition({ x: 50, y: 50 }); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                 <button onClick={() => deleteEpmEvent(ev.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
               </div>
             </div>
