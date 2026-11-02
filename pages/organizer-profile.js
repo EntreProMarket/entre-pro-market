@@ -7,6 +7,8 @@ import ImageEditor from "../components/ImageEditor";
 import useDragReorder from "../components/useDragReorder";
 import OrganizerShopTab from "../components/OrganizerShopTab";
 import CropModal from "../components/CropModal";
+import { getOrigUrl, baseUrl, tagOrig } from "../components/cropTags";
+import HelpTip from "../components/HelpTip";
 
 // One stable preview URL per file. (Making a new one on every render made photos reload and
 // "stick" while you dragged them.)
@@ -97,11 +99,15 @@ function parsePortfolioPos(url) {
 }
 function withPortfolioPos(url, pos, zoom = 1) {
   if (!url) return url;
-  const base = url.split("#")[0];
+  const base = url.split("#pos=")[0];
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
-function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange, onReplace }) {
+function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChange, onReplace, onRestore, canRestore, cropSrc }) {
+  const shown = baseUrl(src);
+  const origUrl = getOrigUrl(src);
+  const cropFrom = cropSrc || origUrl || shown;
+  const restorable = !!onRestore && (canRestore !== undefined ? canRestore : !!origUrl);
   const [aspect, setAspect] = useState(1);
   const [adjusting, setAdjusting] = useState(false);
   const [cropping, setCropping] = useState(false);
@@ -134,14 +140,15 @@ function PositionablePortfolioImage({ src, position, zoom, onChange, onZoomChang
       <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
         onWheel={handleWheel} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
         style={{ width: "100%", aspectRatio: aspect, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #AABB23", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
-        <img src={src} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        <img src={shown} onLoad={handleImgLoad} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
         {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>Pinch to zoom, then drag</div>}
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
         <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
       </div>
-      {cropping && <CropModal src={src} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
+      {restorable && (<button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>)}
+      {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -325,7 +332,7 @@ export default function OrganizerProfile() {
         const remaining = (imageLimits[accountType] ?? 10) - updatedPortfolio.length;
         for (const item of portfolioFiles.slice(0, remaining)) {
           const url = await uploadFile(item.file, "organizer-portfolio");
-          if (url) updatedPortfolio.push(withPortfolioPos(url, item.position, item.zoom));
+          if (url) updatedPortfolio.push(withPortfolioPos(tagOrig(url, item.origUrl), item.position, item.zoom));
         }
       }
       let finalVideoUrls = [...videoUrls];
@@ -413,12 +420,35 @@ export default function OrganizerProfile() {
   // ── ✂️ Crop: the cropped photo replaces the original in the same slot ──
   const replaceSavedPortfolioImage = async (i, file) => {
     setMessage("⏳ Uploading cropped photo...");
-    const url = await uploadFile(file, "organizer-portfolio");
-    if (!url) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    const uploaded = await uploadFile(file, "organizer-portfolio");
+    if (!uploaded) { setMessage("❌ Couldn't upload the cropped photo."); return; }
+    const url = tagOrig(uploaded, getOrigUrl(portfolioImages[i]) || baseUrl(portfolioImages[i]));
     setPortfolioImages(prev => prev.map((u, idx) => (idx === i ? url : u)));
     setPortfolioPositions(prev => prev.map((p, idx) => (idx === i ? { position: { x: 50, y: 50 }, zoom: 1 } : p)));
     setMessage("✅ Photo cropped — tap Save Profile to keep it.");
   };
+
+  const restoreSavedPortfolioImage = (i) => {
+    const orig = getOrigUrl(portfolioImages[i]);
+    if (!orig) return;
+    setPortfolioImages(prev => prev.map((u, idx) => (idx === i ? orig : u)));
+    setPortfolioPositions(prev => prev.map((p, idx) => (idx === i ? { position: { x: 50, y: 50 }, zoom: 1 } : p)));
+    setMessage("↩ Original photo restored — tap Save Profile to keep it.");
+  };
+  // ── ✂️ Crop on a NEW (not yet saved) photo: the original is kept too, so it can be restored
+  // before AND after saving. ──
+  const cropStaged = async (list, setList, i, file, bucket) => {
+    const cur = list[i];
+    const origFile = cur.origFile || cur.file;
+    let origUrl = cur.origUrl;
+    if (!origUrl) {
+      setMessage("⏳ Saving the original photo...");
+      origUrl = (await uploadFile(origFile, bucket)) || undefined;
+      setMessage("");
+    }
+    setList(prev => prev.map((it, idx) => (idx === i ? { ...it, file, origFile, origUrl, position: { x: 50, y: 50 }, ...(it.zoom !== undefined ? { zoom: 1 } : {}) } : it)));
+  };
+  const restoreStaged = (setList, i) => setList(prev => prev.map((it, idx) => (idx === i && it.origFile ? { ...it, file: it.origFile, origFile: undefined, origUrl: undefined, position: { x: 50, y: 50 }, ...(it.zoom !== undefined ? { zoom: 1 } : {}) } : it)));
 
   const removePortfolioImage = async (idx) => {
     const url = portfolioImages[idx];
@@ -535,13 +565,15 @@ export default function OrganizerProfile() {
       <div style={{ marginTop: 20, marginBottom: 8 }}>
         <label style={lS}>Portfolio</label>
         <p style={{ fontSize: 12, color: atLimit ? "#cc0000" : "#888", marginBottom: 8 }}>{portfolioImages.length}/{imageLimit} images{atLimit && " — Remove some before adding more"}</p>
-        <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "10px 12px", marginBottom: 10, fontSize: 12, color: "#856404", lineHeight: 1.6 }}>
-              <div>⚠️ JPG, PNG, WebP only. No HEIC. If your images don't appear, use your Gallery app (not Google Photos).</div>
-              <div style={{ marginTop: 6 }}><strong>✂️ Crop</strong> — tap the purple button under a photo to cut it down to the part you want.</div>
-              <div><strong>✋ Adjust</strong> — tap the green button, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</div>
-              <div><strong>⠿ Number</strong> — hold and drag the number on a photo to move it. The first {FEATURED_COUNT} photos are pinned at the top of your page.</div>
-              <div>Then tap <strong>Save Profile</strong> at the bottom to keep your changes.</div>
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+            <HelpTip title="Portfolio photos">
+              <p style={{ margin: "0 0 8px" }}>⚠️ JPG, PNG or WebP only — no HEIC. If a photo won't show, pick it from your Gallery app (not Google Photos).</p>
+              <p style={{ margin: "0 0 8px" }}><strong>✂️ Crop</strong> — tap the purple button under a photo to cut it down. Changed your mind? Tap <strong>↩ Restore original</strong> to undo the crop, any time.</p>
+              <p style={{ margin: "0 0 8px" }}><strong>✋ Adjust</strong> — tap the green button, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</p>
+              <p style={{ margin: "0 0 8px" }}><strong>⠿ Number</strong> — hold and drag the number on a photo to move it. The first {FEATURED_COUNT} photos are pinned at the top of your page.</p>
+              <p style={{ margin: 0 }}>Then tap <strong>Save Profile</strong> at the bottom to keep your changes.</p>
+            </HelpTip>
+          </div>
         {portfolioImages.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
             {portfolioImages.map((img, i) => (
@@ -549,6 +581,7 @@ export default function OrganizerProfile() {
                 <PositionablePortfolioImage
                   src={img}
                   onReplace={(file) => replaceSavedPortfolioImage(i, file)}
+                  onRestore={() => restoreSavedPortfolioImage(i)}
                   position={portfolioPositions[i]?.position || { x: 50, y: 50 }}
                   zoom={portfolioPositions[i]?.zoom || 1}
                   onChange={(pos) => setPortfolioPositions(prev => prev.map((p, idx) => idx === i ? { ...p, position: pos } : p))}
@@ -566,15 +599,21 @@ export default function OrganizerProfile() {
         )}
         {portfolioFiles.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ backgroundColor: "#fff8e1", border: "1px solid #f0c040", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#856404" }}>
-              📥 {portfolioFiles.length} new photo{portfolioFiles.length > 1 ? "s" : ""} ready — tap <strong>✂️ Crop</strong> to cut it or <strong>✋ Adjust</strong> to move/zoom it, then click <strong>Save Profile</strong> below.
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <HelpTip title="New photos">
+                <p style={{ margin: "0 0 8px" }}>Your new photos upload when you tap <strong>Save Profile</strong> at the bottom.</p>
+                <p style={{ margin: "0 0 8px" }}><strong>✂️ Crop</strong> cuts a photo down (you can restore the original later). <strong>✋ Adjust</strong> lets you pinch to zoom and drag to move it.</p>
+              </HelpTip>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
               {portfolioFiles.map((item, i) => (
                 <div key={i} style={{ position: "relative" }}>
                   <PositionablePortfolioImage
                     src={previewUrl(item.file)}
-                    onReplace={(file) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, file, position: { x: 50, y: 50 }, zoom: 1 } : it))}
+                    onReplace={(file) => cropStaged(portfolioFiles, setPortfolioFiles, i, file, "organizer-portfolio")}
+                  onRestore={() => restoreStaged(setPortfolioFiles, i)}
+                  canRestore={!!item.origFile}
+                  cropSrc={item.origFile ? previewUrl(item.origFile) : undefined}
                     position={item.position}
                     zoom={item.zoom}
                     onChange={(pos) => setPortfolioFiles(prev => prev.map((it, idx) => idx === i ? { ...it, position: pos } : it))}
@@ -681,7 +720,11 @@ export default function OrganizerProfile() {
             <textarea placeholder="Event Description" value={eventForm.description} onChange={e => fEvent("description")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
             <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => fEvent("price")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
-            <div style={{ backgroundColor: "#f3e8ff", border: "1px solid #701890", borderRadius: 6, padding: "8px 12px", marginBottom: 8, fontSize: 12, color: "#701890" }}>💳 Add your Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — you're not limited to Eventbrite. Use this to promote and sell tickets straight through the app.</div>
+            <div style={{ marginBottom: 14 }}>
+        <HelpTip title="Ticket payments">
+          <p style={{ margin: 0 }}>💳 Add your Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — you're not limited to Eventbrite. Use this to promote and sell tickets straight through the app.</p>
+        </HelpTip>
+      </div>
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>🎟️ Tickets / Info URL</label>
             <input placeholder="e.g. eventbrite.com/your-event, cash.app/$you, venmo.com/you" value={eventForm.info_url} onChange={e => fEvent("info_url")(e.target.value)} style={iS} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>📸 Event Flyer <span style={{ color: "#cc0000" }}>*</span></label>
