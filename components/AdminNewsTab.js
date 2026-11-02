@@ -32,12 +32,13 @@ function withPos(url, pos, zoom = 1) {
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
 
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height, onReplace, onRestore, canRestore, cropSrc }) {
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height, onReplace, onRestore, canRestore, cropSrc, showAdjust = true }) {
   const ref = useRef(null);
   const dragState = useRef(null);
   const pinchState = useRef(null);
   const [adjusting, setAdjusting] = useState(false);
   const [cropping, setCropping] = useState(false);
+  const [natAspect, setNatAspect] = useState(null); // the photo's own shape, so the editor shows it exactly like the live page
   const shown = baseUrl(src);
   const origUrl = getOrigUrl(src);
   const cropFrom = cropSrc || origUrl || shown;
@@ -64,13 +65,13 @@ function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, as
     <div>
       <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
         onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-        style={{ width: "100%", height: height || undefined, aspectRatio: height ? undefined : (aspectRatio || undefined), borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
-        <img src={shown} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        style={{ width: "100%", height: height || undefined, aspectRatio: height ? undefined : (aspectRatio || natAspect || undefined), minHeight: (height || aspectRatio || natAspect) ? undefined : 140, borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
+        <img src={shown} onLoad={(e) => { const el = e.target; if (el.naturalWidth && el.naturalHeight) setNatAspect(el.naturalWidth / el.naturalHeight); }} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
         {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>{onZoomChange ? "Pinch to zoom, then drag" : "Drag to move"}</div>}
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
-        <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+        {showAdjust && <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>}
       </div>
       {restorable && <button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>}
       {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
@@ -224,7 +225,7 @@ export default function AdminNewsTab() {
         if (!up) { setSavingArticle(false); return; }
         coverUrl = tagOrig(up, articleCoverOrigUrl);
       }
-      coverUrl = coverUrl ? withPos(coverUrl.split("#pos=")[0], articleCoverPosition, articleCoverZoom) : "";
+      coverUrl = coverUrl ? withPos(coverUrl.split("#pos=")[0], { x: 50, y: 50 }, 1) : "";
 
       const finalBlocks = [];
       for (const block of articleBlocks) {
@@ -298,15 +299,14 @@ export default function AdminNewsTab() {
                 src={articleCoverFile ? previewUrl(articleCoverFile) : articleCoverUrl}
                 position={articleCoverPosition}
                 onChange={setArticleCoverPosition}
-                zoom={articleCoverZoom}
-                onZoomChange={setArticleCoverZoom}
-                aspectRatio={COVER_ASPECT_RATIO}
+                zoom={1}
+                showAdjust={false}
                 onReplace={cropCover}
                 onRestore={restoreCover}
                 canRestore={!!(articleCoverOrigFile || articleCoverOrigUrl || getOrigUrl(articleCoverUrl))}
                 cropSrc={articleCoverOrigFile ? previewUrl(articleCoverOrigFile) : (articleCoverOrigUrl || undefined)}
               />
-              <div style={{ marginTop: 8 }}><HelpTip title="Cover image" size={26}><p style={{ margin: "0 0 8px" }}>This exact framing is what shows on the homepage card and the article header.</p><p style={{ margin: "0 0 8px" }}><strong>✂️ Crop</strong> cuts the photo down. <strong>↩ Restore original</strong> undoes a crop, any time.</p><p style={{ margin: 0 }}><strong>✋ Adjust</strong> — tap it, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</p></HelpTip></div>
+              <div style={{ marginTop: 8 }}><HelpTip title="Cover image" size={26}><p style={{ margin: "0 0 8px" }}>The cover above is shown exactly the way it will look on the homepage card and at the top of the article.</p><p style={{ margin: 0 }}><strong>✂️ Crop</strong> cuts the photo down to the part you want. Changed your mind? <strong>↩ Restore original</strong> undoes a crop, any time.</p></HelpTip></div>
               <button onClick={() => { setArticleCoverFile(null); setArticleCoverUrl(""); setArticleCoverOrigFile(null); setArticleCoverOrigUrl(undefined); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove cover</button>
             </div>
           ) : (
