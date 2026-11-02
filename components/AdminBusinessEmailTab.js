@@ -95,9 +95,9 @@ export default function AdminBusinessEmailTab({ adminId }) {
       {composeOpen && (
         <div style={{ backgroundColor: "white", border: "2px solid #701890", borderRadius: 10, padding: 20, marginBottom: 20 }}>
           <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 14 }}>{composeReplyId ? "↩️ Reply" : "✏️ New Email"} — from {activeMailbox}@entrepromarket.com</p>
-          <input placeholder="To (email address)" value={composeTo} onChange={e => setComposeTo(e.target.value)} style={inputStyle} />
-          <input placeholder="Subject" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} style={inputStyle} />
-          <textarea placeholder="Message" value={composeBody} onChange={e => setComposeBody(e.target.value)} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
+          <input placeholder="To — the email address you are writing to (e.g. name@email.com)" value={composeTo} onChange={e => setComposeTo(e.target.value)} style={inputStyle} />
+          <input placeholder="Subject — what this email is about" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} style={inputStyle} />
+          <textarea placeholder="Write your email message here..." value={composeBody} onChange={e => setComposeBody(e.target.value)} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button onClick={() => { setComposeOpen(false); setComposeReplyId(null); }} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
             <button onClick={sendBusinessEmail} disabled={sendingBusinessEmail} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{sendingBusinessEmail ? "Sending..." : "📨 Send"}</button>
