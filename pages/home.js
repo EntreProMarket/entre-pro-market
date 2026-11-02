@@ -7,6 +7,7 @@ import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
 import ZoomableLightbox from "../components/ZoomableLightbox";
+import JustifiedGrid from "../components/JustifiedGrid";
 
 function formatTime(t) {
   if (!t) return "";
@@ -111,6 +112,30 @@ export default function HomePage() {
   }, []);
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
+
+  // Cards show just the picture and the title — tapping one opens the full details.
+  const cardTitleStyle = (size) => ({ margin: 0, fontSize: 14, lineHeight: 1.3, minHeight: size ? "2.6em" : undefined, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" });
+  const cardImgStyle = (size) => (size ? { width: size.width - 2, height: size.imgHeight, objectFit: "cover", display: "block" } : { width: "100%", height: "auto", display: "block" });
+  const cardPlaceholder = (size, label) => <div style={{ width: "100%", height: size ? size.imgHeight : 150, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>{label}</div>;
+  const renderEventCard = (it, size) => {
+    const event = it.event;
+    return (
+      <div key={it.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ width: size ? size.width : "100%", flexShrink: 0, boxSizing: "border-box", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
+        {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
+        {it.src ? <img src={it.src} alt={event.event_name} style={cardImgStyle(size)} /> : cardPlaceholder(size, "No Flyer")}
+        <div style={{ padding: "10px 12px" }}><h3 style={cardTitleStyle(size)}>{event.event_name}</h3></div>
+      </div>
+    );
+  };
+  const renderNewsCard = (it, size) => {
+    const article = it.article;
+    return (
+      <div key={it.id} onClick={() => setSelectedArticle(article)} style={{ width: size ? size.width : "100%", flexShrink: 0, boxSizing: "border-box", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
+        {it.src ? <img src={it.src} alt={article.title} style={cardImgStyle(size)} /> : cardPlaceholder(size, "📰")}
+        <div style={{ padding: "10px 12px" }}><h3 style={cardTitleStyle(size)}>{article.title}</h3></div>
+      </div>
+    );
+  };
 
   const visibleEvents = upcomingEvents.slice(0, 6);
 
@@ -239,21 +264,7 @@ export default function HomePage() {
             {upcomingEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
           </div>
           {visibleEvents.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, alignItems: "start" }}>
-              {visibleEvents.map(event => (
-                <div key={`${event._source}-${event.id}`} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
-                  {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
-                  {event.flyer_url ? (() => { const p = parsePos(event.flyer_url); return <img src={p.src} alt={event.event_name} style={{ width: "100%", height: "auto", display: "block" }} />; })() : <div style={{ width: "100%", height: 150, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>No Flyer</div>}
-                  <div style={{ padding: 12 }}>
-                    <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>{event.event_name}</h3>
-                    {event.category && <p style={{ margin: "0 0 2px", fontSize: 11, color: "#AABB23", fontWeight: "bold" }}>{event.category}</p>}
-                    <p style={{ margin: "0 0 2px", fontSize: 12, color: "#701890", fontWeight: "bold" }}>📅 {event.event_date ? new Date(event.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD"}</p>
-                    {event.venue && <p style={{ margin: 0, color: "#888", fontSize: 12, whiteSpace: "pre-line" }}>📍 {event.venue}{event.venue_address ? `\n${event.venue_address}` : ""}</p>}
-                    {event.price && <p style={{ margin: "2px 0 0", color: "#AABB23", fontSize: 12, fontWeight: "bold", whiteSpace: "pre-line" }}>💵 {event.price}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <JustifiedGrid items={visibleEvents.map(event => ({ id: `${event._source}-${event.id}`, src: event.flyer_url ? parsePos(event.flyer_url).src.split("#")[0] : null, event }))} renderItem={renderEventCard} />
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
               <p style={{ fontSize: 14, margin: 0 }}>Elite Organizer and Entre PRO Market events will appear here. 🎪 Coming soon!</p>
@@ -264,21 +275,7 @@ export default function HomePage() {
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           {newsArticles.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, alignItems: "start" }}>
-              {newsArticles.map(article => {
-                const cover = parsePos(article.cover_image_url || "");
-                const firstParagraph = article.content_blocks?.find(b => b.type === "paragraph")?.text || "";
-                return (
-                  <div key={article.id} onClick={() => setSelectedArticle(article)} style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
-                    {cover.src ? <img src={cover.src} alt={article.title} style={{ width: "100%", height: "auto", display: "block" }} /> : <div style={{ width: "100%", height: 150, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>📰</div>}
-                    <div style={{ padding: 12 }}>
-                      <h3 style={{ margin: "0 0 6px", fontSize: 14 }}>{article.title}</h3>
-                      {firstParagraph && <p style={{ margin: 0, fontSize: 12, color: "#888", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{firstParagraph}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <JustifiedGrid items={newsArticles.map(article => ({ id: article.id, src: article.cover_image_url ? parsePos(article.cover_image_url).src.split("#")[0] : null, article }))} renderItem={renderNewsCard} />
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
               <p style={{ fontSize: 14, margin: 0 }}>Community news and event highlights coming soon! 🎉</p>
