@@ -9,6 +9,7 @@ import OrganizerShopTab from "../components/OrganizerShopTab";
 import CropModal from "../components/CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "../components/cropTags";
 import HelpTip from "../components/HelpTip";
+import { adjustOvernight } from "../components/eventDates";
 
 // One stable preview URL per file. (Making a new one on every render made photos reload and
 // "stick" while you dragged them.)
@@ -183,6 +184,7 @@ export default function OrganizerProfile() {
   const [portfolioPositions, setPortfolioPositions] = useState([]); // [{position, zoom}] parallel to portfolioImages
   const portfolioDrag = useDragReorder((from, to) => movePortfolioImage(from, to));
   const [activeTab, setActiveTab] = useState("profile");
+  const endDateAuto = useRef(false); // true while the End Date was moved to the next day automatically
   const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
   const [videoUrls, setVideoUrls] = useState(["","","","",""]);
   const [videoFiles, setVideoFiles] = useState([null, null, null, null, null]);
@@ -374,6 +376,14 @@ export default function OrganizerProfile() {
   };
 
   const fEvent = (field) => (value) => { setEventForm(prev => { const next = { ...prev, [field]: value }; saveDraft(`event_${field}`, value); return next; }); };
+  // An end time earlier than the start time (10:00 PM -> 2:00 AM) means the event ends the NEXT day,
+  // so the End Date moves to the next day for you.
+  const onEventDateTimeChange = (field, value) => {
+    const res = adjustOvernight({ ...eventForm, [field]: value }, field, endDateAuto.current);
+    endDateAuto.current = res.auto;
+    fEvent(field)(value);
+    if (field !== "event_end_date" && res.form.event_end_date !== eventForm.event_end_date) fEvent("event_end_date")(res.form.event_end_date);
+  };
 
   const saveEvent = async () => {
     if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
@@ -402,7 +412,7 @@ export default function OrganizerProfile() {
         if (error) throw error;
         if (data) setEvents([...events, data]);
       }
-      setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false);
+      setEditingEvent(null); setEventForm(BLANK_EVENT); endDateAuto.current = false; setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); setShowFlyerPicker(false);
       clearDrafts(EVENT_DRAFT_KEYS.map(k => `event_${k}`));
       setMessage("✅ Event saved!");
     } catch (err) {
@@ -707,12 +717,12 @@ export default function OrganizerProfile() {
               {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Date</label><input type="date" value={eventForm.event_date} onChange={e => fEvent("event_date")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date</label><input type="date" value={eventForm.event_end_date} onChange={e => fEvent("event_end_date")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Date</label><input type="date" value={eventForm.event_date} onChange={e => onEventDateTimeChange("event_date", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Date</label><input type="date" value={eventForm.event_end_date} onChange={e => onEventDateTimeChange("event_end_date", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => fEvent("event_start_time")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
-              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => fEvent("event_end_time")(e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => onEventDateTimeChange("event_start_time", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => onEventDateTimeChange("event_end_time", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
             <input placeholder="Venue Name" value={eventForm.venue} onChange={e => fEvent("venue")(e.target.value)} style={iS} />
             <textarea placeholder="Address (street, city, state)" value={eventForm.venue_address || ""} onChange={e => fEvent("venue_address")(e.target.value)} rows={2} style={{ ...iS, resize: "vertical" }} />
@@ -765,7 +775,7 @@ export default function OrganizerProfile() {
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); clearDrafts(EVENT_DRAFT_KEYS.map(k => `event_${k}`)); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+              {editingEvent && <button onClick={() => { setEditingEvent(null); setEventForm(BLANK_EVENT); endDateAuto.current = false; setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); clearDrafts(EVENT_DRAFT_KEYS.map(k => `event_${k}`)); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
               <button onClick={saveEvent} disabled={savingEvent} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEvent ? "Saving..." : editingEvent ? "Update Event" : "Add Event"}</button>
             </div>
           </div>
@@ -784,7 +794,7 @@ export default function OrganizerProfile() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => { setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
+                    <button onClick={() => { endDateAuto.current = false; setEditingEvent(ev.id); setEventForm({ event_name: ev.event_name, event_date: ev.event_date || "", event_end_date: ev.event_end_date || "", event_start_time: ev.event_start_time || "", event_end_time: ev.event_end_time || "", venue: ev.venue || "", venue_address: ev.venue_address || "", event_type: ev.event_type || "", category: ev.category || "", description: ev.description || "", info_url: ev.info_url || "", flyer_url: ev.flyer_url || "", price: ev.price || "" }); setFlyerFile(null); setFlyerFilePreview(null); setFlyerEditSrc(null); }} style={{ padding: "6px 12px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Edit</button>
                     <button onClick={() => deleteEvent(ev.id)} style={{ padding: "6px 12px", backgroundColor: "#cc0000", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: "bold" }}>Delete</button>
                   </div>
                 </div>
