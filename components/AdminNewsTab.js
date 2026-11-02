@@ -2,10 +2,21 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import useDragReorder from "./useDragReorder";
+import HelpTip from "./HelpTip";
+import CropModal from "./CropModal";
+import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
 
 const COVER_ASPECT_RATIO = "8 / 5";
 const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
 const BLANK_ARTICLE_BLOCKS = [{ type: "paragraph", text: "" }];
+
+// One stable preview URL per file (a new one every render made photos reload while dragging).
+const previewUrlCache = new WeakMap();
+function previewUrl(file) {
+  let u = previewUrlCache.get(file);
+  if (!u) { u = URL.createObjectURL(file); previewUrlCache.set(file, u); }
+  return u;
+}
 
 function parsePos(url) {
   if (!url) return { src: url, position: { x: 50, y: 50 }, zoom: 1 };
@@ -16,36 +27,53 @@ function parsePos(url) {
 }
 function withPos(url, pos, zoom = 1) {
   if (!url) return url;
-  const base = url.split("#")[0];
+  const base = url.split("#pos=")[0];
   if (!pos) return base;
   return `${base}#pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${zoom.toFixed(2)}`;
 }
 
-function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio }) {
+function PositionableImage({ src, position, zoom = 1, onChange, onZoomChange, aspectRatio, height, onReplace, onRestore, canRestore, cropSrc }) {
   const ref = useRef(null);
   const dragState = useRef(null);
-  const handlePointerDown = (e) => { dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; e.target.setPointerCapture?.(e.pointerId); };
+  const pinchState = useRef(null);
+  const [adjusting, setAdjusting] = useState(false);
+  const [cropping, setCropping] = useState(false);
+  const shown = baseUrl(src);
+  const origUrl = getOrigUrl(src);
+  const cropFrom = cropSrc || origUrl || shown;
+  const restorable = !!onRestore && (canRestore !== undefined ? canRestore : !!origUrl);
+  const btn = { flex: 1, padding: "10px 4px", border: "none", borderRadius: 8, color: "white", fontSize: 13, fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.3)", whiteSpace: "nowrap" };
+  const handlePointerDown = (e) => { if (!adjusting) return; dragState.current = { x: e.clientX, y: e.clientY, posX: position.x, posY: position.y }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } };
   const handlePointerMove = (e) => {
-    if (!dragState.current || !ref.current) return;
+    if (!adjusting || !dragState.current || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const dx = e.clientX - dragState.current.x, dy = e.clientY - dragState.current.y;
     onChange({ x: Math.min(100, Math.max(0, dragState.current.posX - (dx / rect.width) * 100)), y: Math.min(100, Math.max(0, dragState.current.posY - (dy / rect.height) * 100)) });
   };
   const handlePointerUp = () => { dragState.current = null; };
+  const handleTouchStart = (e) => { if (adjusting && onZoomChange && e.touches.length === 2) { const [t0, t1] = e.touches; pinchState.current = { dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY), startZoom: zoom }; } };
+  const handleTouchMove = (e) => {
+    if (adjusting && onZoomChange && e.touches.length === 2 && pinchState.current) {
+      const [t0, t1] = e.touches;
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      onZoomChange(Math.min(3, Math.max(1, pinchState.current.startZoom * (dist / pinchState.current.dist))));
+    }
+  };
+  const handleTouchEnd = () => { pinchState.current = null; };
   return (
     <div>
-      <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}
-        style={{ width: "100%", aspectRatio: aspectRatio || undefined, borderRadius: 8, overflow: "hidden", border: "2px solid #701890", cursor: "grab", touchAction: "none", position: "relative", backgroundColor: "#eee" }}>
-        <img src={src} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: 6, right: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "white", fontSize: 10, padding: "3px 8px", borderRadius: 10 }}>✋ Drag to reposition</div>
+      <div ref={ref} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
+        onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+        style={{ width: "100%", height: height || undefined, aspectRatio: height ? undefined : (aspectRatio || undefined), borderRadius: 8, overflow: "hidden", border: adjusting ? "3px solid #701890" : "2px solid #701890", cursor: adjusting ? "grab" : "default", touchAction: adjusting ? "none" : "pan-y", position: "relative", backgroundColor: "#eee" }}>
+        <img src={shown} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${position.x}% ${position.y}%`, transform: `scale(${zoom})`, transformOrigin: "center", display: "block", pointerEvents: "none" }} />
+        {adjusting && <div style={{ position: "absolute", bottom: 6, left: 6, right: 6, textAlign: "center", backgroundColor: "rgba(112,24,144,0.9)", color: "white", fontSize: 11, fontWeight: "bold", padding: "4px 6px", borderRadius: 8, pointerEvents: "none" }}>{onZoomChange ? "Pinch to zoom, then drag" : "Drag to move"}</div>}
       </div>
-      {onZoomChange && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ fontSize: 16 }}>🔍</span>
-          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={e => onZoomChange(parseFloat(e.target.value))} style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: "#888", minWidth: 32, textAlign: "right" }}>{zoom.toFixed(1)}x</span>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        {onReplace && <button type="button" onClick={() => setCropping(true)} style={{ ...btn, backgroundColor: "#701890" }}>✂️ Crop</button>}
+        <button type="button" onClick={() => setAdjusting((a) => !a)} style={{ ...btn, backgroundColor: adjusting ? "#222" : "#8a9a10" }}>{adjusting ? `✓ Done${zoom > 1 ? ` ${zoom.toFixed(1)}x` : ""}` : "✋ Adjust"}</button>
+      </div>
+      {restorable && <button type="button" onClick={onRestore} style={{ width: "100%", marginTop: 6, padding: "9px 4px", border: "2px solid #701890", borderRadius: 8, backgroundColor: "white", color: "#701890", fontSize: 12, fontWeight: "bold", cursor: "pointer" }}>↩ Restore original</button>}
+      {cropping && <CropModal src={cropFrom} onCancel={() => setCropping(false)} onDone={(file) => { setCropping(false); if (onReplace) onReplace(file); }} />}
     </div>
   );
 }
@@ -59,6 +87,8 @@ export default function AdminNewsTab() {
   const [articleCoverFile, setArticleCoverFile] = useState(null);
   const [articleCoverPosition, setArticleCoverPosition] = useState({ x: 50, y: 50 });
   const [articleCoverZoom, setArticleCoverZoom] = useState(1);
+  const [articleCoverOrigFile, setArticleCoverOrigFile] = useState(null);
+  const [articleCoverOrigUrl, setArticleCoverOrigUrl] = useState(undefined);
   const [articleBlocks, setArticleBlocks] = useState(BLANK_ARTICLE_BLOCKS);
   const [savingArticle, setSavingArticle] = useState(false);
   const [composingArticle, setComposingArticle] = useState(false);
@@ -121,7 +151,7 @@ export default function AdminNewsTab() {
   };
 
   const resetArticleForm = () => {
-    setEditingArticleId(null); setArticleTitle(""); setArticleCoverUrl(""); setArticleCoverFile(null);
+    setEditingArticleId(null); setArticleTitle(""); setArticleCoverUrl(""); setArticleCoverFile(null); setArticleCoverOrigFile(null); setArticleCoverOrigUrl(undefined);
     setArticleCoverPosition({ x: 50, y: 50 }); setArticleCoverZoom(1); setArticleBlocks(BLANK_ARTICLE_BLOCKS); setComposingArticle(false);
   };
 
@@ -151,6 +181,37 @@ export default function AdminNewsTab() {
     setArticleBlocks(copy);
   };
 
+  // ✂️ Crop the cover: the original is kept, so ↩ Restore original always brings it back.
+  const cropCover = async (file) => {
+    let origUrl = articleCoverOrigUrl;
+    let origFile = articleCoverOrigFile;
+    if (!origUrl) {
+      if (articleCoverFile) {
+        origFile = articleCoverOrigFile || articleCoverFile;
+        setMessage("⏳ Saving the original photo...");
+        origUrl = (await uploadFile(origFile, "organizer-portfolio")) || undefined;
+        setMessage("");
+      } else if (articleCoverUrl) {
+        origUrl = getOrigUrl(articleCoverUrl) || baseUrl(articleCoverUrl);
+      }
+    }
+    setArticleCoverOrigFile(origFile || null);
+    setArticleCoverOrigUrl(origUrl);
+    setArticleCoverFile(file);
+    setArticleCoverPosition({ x: 50, y: 50 });
+    setArticleCoverZoom(1);
+  };
+  const restoreCover = () => {
+    const tagged = getOrigUrl(articleCoverUrl);
+    if (articleCoverOrigFile) { setArticleCoverFile(articleCoverOrigFile); }
+    else if (articleCoverOrigUrl) { setArticleCoverFile(null); setArticleCoverUrl(articleCoverOrigUrl); }
+    else if (!articleCoverFile && tagged) { setArticleCoverUrl(tagged); }
+    setArticleCoverOrigFile(null);
+    setArticleCoverOrigUrl(undefined);
+    setArticleCoverPosition({ x: 50, y: 50 });
+    setArticleCoverZoom(1);
+  };
+
   const saveArticle = async () => {
     if (!articleTitle.trim()) { setMessage("⚠️ Article title is required."); return; }
     const hasContent = articleBlocks.some(b => (b.type === "paragraph" && b.text.trim()) || (b.type === "image" && (b.url || b.file)));
@@ -161,9 +222,9 @@ export default function AdminNewsTab() {
       if (articleCoverFile) {
         const up = await uploadFile(articleCoverFile, "organizer-portfolio");
         if (!up) { setSavingArticle(false); return; }
-        coverUrl = up;
+        coverUrl = tagOrig(up, articleCoverOrigUrl);
       }
-      coverUrl = coverUrl ? withPos(coverUrl.split("#")[0], articleCoverPosition, articleCoverZoom) : "";
+      coverUrl = coverUrl ? withPos(coverUrl.split("#pos=")[0], articleCoverPosition, articleCoverZoom) : "";
 
       const finalBlocks = [];
       for (const block of articleBlocks) {
@@ -234,18 +295,22 @@ export default function AdminNewsTab() {
           {(articleCoverFile || articleCoverUrl) ? (
             <div style={{ marginBottom: 10, maxWidth: 320 }}>
               <PositionableImage
-                src={articleCoverFile ? URL.createObjectURL(articleCoverFile) : articleCoverUrl}
+                src={articleCoverFile ? previewUrl(articleCoverFile) : articleCoverUrl}
                 position={articleCoverPosition}
                 onChange={setArticleCoverPosition}
                 zoom={articleCoverZoom}
                 onZoomChange={setArticleCoverZoom}
                 aspectRatio={COVER_ASPECT_RATIO}
+                onReplace={cropCover}
+                onRestore={restoreCover}
+                canRestore={!!(articleCoverOrigFile || articleCoverOrigUrl || getOrigUrl(articleCoverUrl))}
+                cropSrc={articleCoverOrigFile ? previewUrl(articleCoverOrigFile) : (articleCoverOrigUrl || undefined)}
               />
-              <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>This exact crop is what shows on the homepage card and article header — drag to reposition, use the slider to zoom in.</p>
-              <button onClick={() => { setArticleCoverFile(null); setArticleCoverUrl(""); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove cover</button>
+              <div style={{ marginTop: 8 }}><HelpTip title="Cover image" size={26}><p style={{ margin: "0 0 8px" }}>This exact framing is what shows on the homepage card and the article header.</p><p style={{ margin: "0 0 8px" }}><strong>✂️ Crop</strong> cuts the photo down. <strong>↩ Restore original</strong> undoes a crop, any time.</p><p style={{ margin: 0 }}><strong>✋ Adjust</strong> — tap it, then pinch to zoom and drag to move the photo. Tap <strong>✓ Done</strong> when finished.</p></HelpTip></div>
+              <button onClick={() => { setArticleCoverFile(null); setArticleCoverUrl(""); setArticleCoverOrigFile(null); setArticleCoverOrigUrl(undefined); }} style={{ fontSize: 12, color: "#cc0000", background: "none", border: "none", cursor: "pointer", marginTop: 6 }}>✕ Remove cover</button>
             </div>
           ) : (
-            <input type="file" accept="image/*" onChange={e => { setArticleCoverFile(e.target.files[0]); setArticleCoverPosition({ x: 50, y: 50 }); }} style={{ display: "block", marginBottom: 16 }} />
+            <input type="file" accept="image/*" onChange={e => { setArticleCoverFile(e.target.files[0]); setArticleCoverPosition({ x: 50, y: 50 }); setArticleCoverOrigFile(null); setArticleCoverOrigUrl(undefined); }} style={{ display: "block", marginBottom: 16 }} />
           )}
 
           <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 8, display: "block", marginTop: 8 }}>Story Content</label>
@@ -293,7 +358,7 @@ export default function AdminNewsTab() {
         </div>
       )}
 
-      {newsArticles.length > 0 && <p style={{ fontSize: 12, color: "#701890", margin: "0 0 12px" }}>Hold and drag the ⠿ handle to reorder. The first 4 published articles are pinned to the top of Community News; the rest stay newest-first.</p>}
+      {newsArticles.length > 0 && <div style={{ margin: "0 0 12px" }}><HelpTip title="Reordering"><p style={{ margin: 0 }}>Hold and drag the ⠿ handle to reorder. The first 4 published articles are pinned to the top of Community News; the rest stay newest-first.</p></HelpTip></div>}
       {loadingNews ? <p style={{ color: "#888" }}>Loading...</p> : newsArticles.length === 0 ? (
         <p style={{ color: "#888", fontSize: 13 }}>No articles yet. Write your first one above!</p>
       ) : (
