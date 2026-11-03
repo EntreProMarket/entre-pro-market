@@ -290,7 +290,7 @@ export default function AdminNewsTab() {
       {composingArticle && (
         <div style={{ backgroundColor: "white", border: "2px solid #701890", borderRadius: 10, padding: 20, marginBottom: 24 }}>
           <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>{editingArticleId ? "✏️ Edit Article" : "📝 New Article"}</p>
-          <input placeholder="Article Title *" value={articleTitle} onChange={e => setArticleTitle(e.target.value)} style={inputStyle} />
+          <input placeholder="Article headline * (e.g. Welcome to Entre PRO Market!)" value={articleTitle} onChange={e => setArticleTitle(e.target.value)} style={inputStyle} />
 
           <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>Cover Image</label>
           {(articleCoverFile || articleCoverUrl) ? (
@@ -326,7 +326,7 @@ export default function AdminNewsTab() {
                   </div>
                 </div>
                 {block.type === "paragraph" ? (
-                  <textarea value={block.text} onChange={e => updateBlock(i, { text: e.target.value })} placeholder="Write a paragraph..." rows={4} style={{ ...inputStyle, marginBottom: 0, resize: "vertical" }} />
+                  <textarea value={block.text} onChange={e => updateBlock(i, { text: e.target.value })} placeholder="Write this paragraph of your story here..." rows={4} style={{ ...inputStyle, marginBottom: 0, resize: "vertical" }} />
                 ) : (
                   <div>
                     {(block.file || block.url || block._displaySrc) ? (
@@ -341,7 +341,7 @@ export default function AdminNewsTab() {
                     ) : (
                       <input type="file" accept="image/*" onChange={e => updateBlock(i, { file: e.target.files[0], position: { x: 50, y: 50 } })} style={{ display: "block", marginBottom: 8 }} />
                     )}
-                    <input placeholder="Caption (optional)" value={block.caption || ""} onChange={e => updateBlock(i, { caption: e.target.value })} style={{ ...inputStyle, marginBottom: 0, fontSize: 13 }} />
+                    <input placeholder="Caption under this photo (optional)" value={block.caption || ""} onChange={e => updateBlock(i, { caption: e.target.value })} style={{ ...inputStyle, marginBottom: 0, fontSize: 13 }} />
                   </div>
                 )}
               </div>
