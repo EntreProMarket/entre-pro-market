@@ -123,7 +123,10 @@ export default function HomePage() {
       <div key={it.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ width: size ? size.width : "100%", flexShrink: 0, boxSizing: "border-box", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
         {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
         {it.src ? <img src={it.src} alt={event.event_name} style={cardImgStyle(size)} /> : cardPlaceholder(size, "No Flyer")}
-        <div style={{ padding: "10px 12px" }}><h3 style={cardTitleStyle(size)}>{event.event_name}</h3></div>
+        <div style={{ padding: "10px 12px" }}>
+          <h3 style={cardTitleStyle(size)}>{event.event_name}</h3>
+          <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: "bold", color: "#8a9a10", minHeight: 15 }}>{event.category || ""}</p>
+        </div>
       </div>
     );
   };
