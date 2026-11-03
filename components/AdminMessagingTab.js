@@ -103,7 +103,7 @@ export default function AdminMessagingTab({ adminId, users }) {
               </div>
             ))}
           </div>
-          <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write your message..." rows={4} style={{ ...inputStyle, resize: "vertical" }} />
+          <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write the message that will be sent to everyone selected above..." rows={4} style={{ ...inputStyle, resize: "vertical" }} />
           <button onClick={sendBroadcastMessage} disabled={sendingBroadcast} style={{ padding: "12px 24px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: "bold", fontSize: 14 }}>
             {sendingBroadcast ? "Sending..." : `📨 Send to ${selectedRecipients.length} Recipient${selectedRecipients.length !== 1 ? "s" : ""}`}
           </button>
