@@ -608,26 +608,26 @@ const handleSave = async () => {
 
       {activeTab === "profile" && (
         <>
-          <input placeholder="Business Name" value={businessName} onChange={e => fBusinessName(e.target.value)} style={iS} />
+          <input placeholder="Business name * — shown at the top of your page (e.g. Sweet Treats Bakery)" value={businessName} onChange={e => fBusinessName(e.target.value)} style={iS} />
           <div style={{ marginBottom: 12 }}>
-            <input placeholder="Handle (e.g. MyBakery)" value={handle} onChange={e => fHandle(e.target.value)} style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
+            <input placeholder="Page link name — letters & numbers only (e.g. SweetTreats)" value={handle} onChange={e => fHandle(e.target.value)} style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
             {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/vendor/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your URL: app.entrepromarket.com/vendor/YourHandle</p>}
           </div>
           <select value={category} onChange={e => fCategory(e.target.value)} style={iS}>
             <option value="">Select a Category...</option>
             {["DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <input placeholder="City" value={city} onChange={e => fCity(e.target.value)} style={iS} />
-          <input placeholder="State" value={state} onChange={e => fState(e.target.value)} style={iS} />
-          <textarea placeholder="Description" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
-          <input placeholder="Tags (comma separated)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
+          <input placeholder="City where you are based (e.g. Atlanta)" value={city} onChange={e => fCity(e.target.value)} style={iS} />
+          <input placeholder="State (e.g. Georgia)" value={state} onChange={e => fState(e.target.value)} style={iS} />
+          <textarea placeholder="Tell shoppers about your business — what you sell and what makes you special" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+          <input placeholder="Search tags, separated by commas (e.g. candles, handmade, gifts)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
           <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>⚠️ Links must be public or they may not open correctly.</div>
-          <input placeholder="Website" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
-          <input placeholder="Instagram" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
-          <input placeholder="Facebook" value={facebook} onChange={e => fFacebook(e.target.value)} style={iS} />
-          <input placeholder="TikTok" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
-          <input placeholder="YouTube" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
-          <input placeholder="X / Twitter" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
+          <input placeholder="Your website link (e.g. https://yourwebsite.com)" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
+          <input placeholder="Your Instagram link (or @username)" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
+          <input placeholder="Your Facebook page link" value={facebook} onChange={e => fFacebook(e.target.value)} style={iS} />
+          <input placeholder="Your TikTok link (or @username)" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
+          <input placeholder="Your YouTube channel link" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
+          <input placeholder="Your X / Twitter link (or @username)" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
 
               <div style={{ marginTop: 16, marginBottom: 8 }}>
             <label style={lS}>Logo <span style={{ color: "#cc0000" }}>*</span></label>
@@ -746,7 +746,7 @@ const handleSave = async () => {
           {videoLimit > 0 && (
             <div style={{ marginBottom: 20 }}>
               <label style={lS}>🎬 Video Links (up to {videoLimit}) — YouTube, Instagram or TikTok</label>
-              {Array.from({ length: videoLimit }).map((_, i) => <input key={i} value={videoUrls[i] || ""} onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }} placeholder={`Video ${i + 1}`} style={iS} />)}
+              {Array.from({ length: videoLimit }).map((_, i) => <input key={i} value={videoUrls[i] || ""} onChange={e => { const u = [...videoUrls]; u[i] = e.target.value; setVideoUrls(u); }} placeholder={`Video ${i + 1} — paste a YouTube, Instagram or TikTok link`} style={iS} />)}
             </div>
           )}
 
@@ -763,8 +763,8 @@ const handleSave = async () => {
           <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
             <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Your Payment Handles</label>
             <p style={{ fontSize: 12, color: "#888", marginBottom: 10, marginTop: -4 }}>Buyers send payments directly to these accounts.</p>
-            <input placeholder="CashApp (e.g. $YourHandle)" value={cashappHandle} onChange={e => setCashappHandle(e.target.value)} style={iS} />
-            <input placeholder="Venmo (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
+            <input placeholder="CashApp $cashtag buyers pay (e.g. $YourHandle)" value={cashappHandle} onChange={e => setCashappHandle(e.target.value)} style={iS} />
+            <input placeholder="Venmo username buyers pay (e.g. @YourHandle)" value={venmoHandle} onChange={e => setVenmoHandle(e.target.value)} style={iS} />
             <button onClick={async () => { setSaving(true); await supabase.from("profiles").update({ cashapp_handle: cashappHandle.replace(/^\$/, "").trim(), venmo_handle: venmoHandle.replace(/^@/, "").trim() }).eq("id", userId); setSaving(false); setMessage("✅ Payment handles saved!"); }} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>{saving ? "Saving..." : "Save Handles"}</button>
           </div>
 
@@ -780,9 +780,9 @@ const handleSave = async () => {
           {shopProducts.length < productLimit && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
-              <input placeholder="Product Title *" value={newProduct.title} onChange={e => fNewProductTitle(e.target.value)} style={iS} />
-              <textarea placeholder="Description" value={newProduct.description} onChange={e => fNewProductDescription(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
-              <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={e => fNewProductPrice(e.target.value)} style={iS} />
+              <input placeholder="Product name * (e.g. Vanilla Soy Candle)" value={newProduct.title} onChange={e => fNewProductTitle(e.target.value)} style={iS} />
+              <textarea placeholder="Describe your product — size, materials, colors, how it is used" value={newProduct.description} onChange={e => fNewProductDescription(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
+              <input type="number" step="0.01" placeholder="Price in USD * (e.g. 19.99)" value={newProduct.price} onChange={e => fNewProductPrice(e.target.value)} style={iS} />
               <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main. Tap ✂️ Crop to cut a photo, or ✋ Adjust to move it)</span></label>
               {newProductImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
@@ -842,9 +842,9 @@ const handleSave = async () => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {editingProduct === p.id ? (
                         <>
-                          <input value={editForm.title} onChange={e => fEditTitle(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
-                          <textarea value={editForm.description} onChange={e => fEditDescription(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
-                          <input type="number" step="0.01" value={editForm.price} onChange={e => fEditPrice(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
+                          <input value={editForm.title} placeholder="Product name (e.g. Vanilla Soy Candle)" onChange={e => fEditTitle(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
+                          <textarea value={editForm.description} placeholder="Describe your product — size, materials, colors, how it is used" onChange={e => fEditDescription(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
+                          <input type="number" step="0.01" value={editForm.price} placeholder="Price in USD (e.g. 19.99)" onChange={e => fEditPrice(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
                           {editProductImages.length > 0 && (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
                               {editProductImages.map((item, i) => (
@@ -911,7 +911,7 @@ const handleSave = async () => {
                                 <button onClick={() => setMarkSaleMethod("cashapp")} style={{ flex: 1, padding: "6px 10px", backgroundColor: markSaleMethod === "cashapp" ? "#00D632" : "#eee", color: markSaleMethod === "cashapp" ? "white" : "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>CashApp</button>
                                 <button onClick={() => setMarkSaleMethod("venmo")} style={{ flex: 1, padding: "6px 10px", backgroundColor: markSaleMethod === "venmo" ? "#008CFF" : "#eee", color: markSaleMethod === "venmo" ? "white" : "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Venmo</button>
                               </div>
-                              <input placeholder="Buyer's email (their EPM account email)" value={markSaleEmail} onChange={e => setMarkSaleEmail(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
+                              <input placeholder="Buyer's email — the email on their Entre PRO Market account" value={markSaleEmail} onChange={e => setMarkSaleEmail(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
                               <label style={{ fontSize: 12, fontWeight: "bold", color: "#555", display: "block", marginBottom: 4 }}>Screenshot proof of payment *</label>
                               {markSaleProofFile ? (
                                 <div style={{ marginBottom: 8, position: "relative", maxWidth: 200 }}>
