@@ -2,61 +2,85 @@ import "cropperjs/dist/cropper.css";
 // pages/_app.js
 // Global 30-minute auto-logout for ALL pages and account types.
 import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
 const INACTIVITY_MS = 30 * 60 * 1000;
 const LAST_ACTIVITY_KEY = "epm_last_activity";
-const CHECK_INTERVAL_MS = 30 * 1000;
+const CHECK_INTERVAL_MS = 15 * 1000;
+const WRITE_THROTTLE_MS = 5 * 1000;
 
+// Logs everyone out after 30 minutes without activity — on Android, iPad, iPhone and desktop.
+//
+// Why Apple devices slipped through before:
+//  1. iPads freeze a page's timers while the app is in the background. When you came back, the
+//     very first touch / scroll / mouse event refreshed the "last activity" clock BEFORE anything
+//     checked it, so the expired session was silently renewed.
+//  2. Every page load re-started the clock without checking whether it had already expired.
+//  3. The logout only ran if a network call succeeded, which often fails right after waking up.
+// Now the clock is always CHECKED FIRST (on every touch, on load, on resume, every 15 seconds) and
+// the device is signed out locally even if the network is down.
 function AutoLogout() {
-  const router = useRouter();
-
   useEffect(() => {
-    const recordActivity = () => {
-      localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+    let loggingOut = false;
+    let lastWrite = 0;
+
+    const readLast = () => parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
+    const isExpired = () => { const last = readLast(); return !!last && Date.now() - last >= INACTIVITY_MS; };
+    const stamp = () => { lastWrite = Date.now(); localStorage.setItem(LAST_ACTIVITY_KEY, String(lastWrite)); };
+
+    const forceLogout = async () => {
+      if (loggingOut) return;
+      loggingOut = true;
+      try { await supabase.auth.signOut({ scope: "local" }); } catch (e) { /* still continue */ }
+      try { localStorage.removeItem(LAST_ACTIVITY_KEY); } catch (e) { /* ignore */ }
+      window.location.replace("/?timeout=1"); // a full reload wipes any account page still on screen
     };
 
-    // Only ever READS the timestamp and logs out if expired. It must never
-    // write to LAST_ACTIVITY_KEY itself — previously the "not yet expired"
-    // branch called recordActivity(), which meant every 30-second interval
-    // tick reset the clock even with zero real user interaction, so the
-    // timeout could never actually be reached while the tab stayed open.
-    // Real activity is recorded only by the genuine input listeners below.
-    const checkAndLogoutIfExpired = async () => {
-      const last = parseInt(localStorage.getItem(LAST_ACTIVITY_KEY) || "0", 10);
-      const now = Date.now();
-      if (last && now - last >= INACTIVITY_MS) {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          await supabase.auth.signOut();
-          router.replace("/?timeout=1");
-        }
-      }
+    // Returns true if it logged the user out.
+    const checkExpired = async () => {
+      if (!isExpired()) return false;
+      let loggedIn = false;
+      try { const { data } = await supabase.auth.getSession(); loggedIn = !!data?.session; } catch (e) { loggedIn = true; }
+      if (loggedIn) { await forceLogout(); return true; }
+      stamp(); // nobody is logged in, so just restart the clock
+      return false;
     };
 
-    // Establish a baseline on mount so a fresh page load starts its own
-    // 30-minute countdown even before any interaction happens.
-    recordActivity();
-
-    const events = ["mousemove", "keydown", "touchstart", "click", "scroll"];
-    events.forEach(e => window.addEventListener(e, recordActivity, { passive: true }));
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") checkAndLogoutIfExpired();
+    // Real activity: check the clock FIRST, only refresh it if the session is still valid.
+    const onActivity = () => {
+      if (isExpired()) { checkExpired(); return; }
+      if (Date.now() - lastWrite > WRITE_THROTTLE_MS) stamp();
     };
-    document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("focus", checkAndLogoutIfExpired);
 
-    const interval = setInterval(checkAndLogoutIfExpired, CHECK_INTERVAL_MS);
+    // On load: check first, then start a fresh clock.
+    (async () => {
+      if (await checkExpired()) return;
+      stamp();
+    })();
+
+    const activityEvents = ["pointerdown", "mousemove", "keydown", "touchstart", "click", "scroll"];
+    activityEvents.forEach((e) => window.addEventListener(e, onActivity, { passive: true, capture: true }));
+
+    const onResume = () => { if (document.visibilityState === "visible") checkExpired(); };
+    const onPageShow = () => { checkExpired(); };
+    const onCheckRequest = () => { checkExpired(); };
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onResume);
+    window.addEventListener("epm-check-session", onCheckRequest);
+    const interval = setInterval(checkExpired, CHECK_INTERVAL_MS);
 
     return () => {
-      events.forEach(e => window.removeEventListener(e, recordActivity));
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("focus", checkAndLogoutIfExpired);
+      activityEvents.forEach((e) => window.removeEventListener(e, onActivity, { capture: true }));
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("epm-check-session", onCheckRequest);
       clearInterval(interval);
     };
-  }, [router]);
+  }, []);
 
   return null;
 }
@@ -155,6 +179,7 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <AutoLogout />
+      <BfcacheGuard />
       <Component {...pageProps} />
       <InstallBanner />
     </>
