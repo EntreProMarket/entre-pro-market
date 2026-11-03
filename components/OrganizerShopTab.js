@@ -324,8 +324,8 @@ export default function OrganizerShopTab({ userId }) {
       <div style={{ backgroundColor: "#f9ffe8", border: "1px solid #AABB23", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
         <label style={{ ...lS, color: "#888B00", marginBottom: 10 }}>💸 Your Payment Handles</label>
         <p style={{ fontSize: 12, color: "#888", marginBottom: 10, marginTop: -4 }}>Buyers send payments directly to these accounts.</p>
-        <input placeholder="CashApp (e.g. $YourHandle)" value={cashappHandle} onChange={(e) => setCashappHandle(e.target.value)} style={iS} />
-        <input placeholder="Venmo (e.g. @YourHandle)" value={venmoHandle} onChange={(e) => setVenmoHandle(e.target.value)} style={iS} />
+        <input placeholder="CashApp $cashtag buyers pay (e.g. $YourHandle)" value={cashappHandle} onChange={(e) => setCashappHandle(e.target.value)} style={iS} />
+        <input placeholder="Venmo username buyers pay (e.g. @YourHandle)" value={venmoHandle} onChange={(e) => setVenmoHandle(e.target.value)} style={iS} />
         <button onClick={saveHandles} disabled={busy} style={{ padding: "8px 20px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 6, fontWeight: "bold", cursor: "pointer", fontSize: 13 }}>{busy ? "Saving..." : "Save Handles"}</button>
       </div>
 
@@ -343,9 +343,9 @@ export default function OrganizerShopTab({ userId }) {
       {!limitReached && (
         <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
           <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
-          <input placeholder="Product Title *" value={newProduct.title} onChange={(e) => setNewField("title")(e.target.value)} style={iS} />
-          <textarea placeholder="Description" value={newProduct.description} onChange={(e) => setNewField("description")(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
-          <input type="number" step="0.01" placeholder="Price in USD *" value={newProduct.price} onChange={(e) => setNewField("price")(e.target.value)} style={iS} />
+          <input placeholder="Product name * (e.g. Event Tote Bag)" value={newProduct.title} onChange={(e) => setNewField("title")(e.target.value)} style={iS} />
+          <textarea placeholder="Describe your product — size, materials, colors, how it is used" value={newProduct.description} onChange={(e) => setNewField("description")(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
+          <input type="number" step="0.01" placeholder="Price in USD * (e.g. 19.99)" value={newProduct.price} onChange={(e) => setNewField("price")(e.target.value)} style={iS} />
           <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {PRODUCT_IMAGE_LIMIT} — first is main. Tap ✂️ Crop to cut a photo, or ✋ Adjust to move it)</span></label>
           {newImages.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 12 }}>
@@ -404,9 +404,9 @@ export default function OrganizerShopTab({ userId }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {isEditing ? (
                     <>
-                      <input value={editForm.title} onChange={(e) => setEditField("title")(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
-                      <textarea value={editForm.description} onChange={(e) => setEditField("description")(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
-                      <input type="number" step="0.01" value={editForm.price} onChange={(e) => setEditField("price")(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
+                      <input value={editForm.title} placeholder="Product name (e.g. Event Tote Bag)" onChange={(e) => setEditField("title")(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
+                      <textarea value={editForm.description} placeholder="Describe your product — size, materials, colors, how it is used" onChange={(e) => setEditField("description")(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
+                      <input type="number" step="0.01" value={editForm.price} placeholder="Price in USD (e.g. 19.99)" onChange={(e) => setEditField("price")(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
                       {editImages.length > 0 && (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
                           {editImages.map((item, i) => (
@@ -473,7 +473,7 @@ export default function OrganizerShopTab({ userId }) {
                             <button onClick={() => setMarkSaleMethod("cashapp")} style={{ flex: 1, padding: "6px 10px", backgroundColor: markSaleMethod === "cashapp" ? "#00D632" : "#eee", color: markSaleMethod === "cashapp" ? "white" : "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>CashApp</button>
                             <button onClick={() => setMarkSaleMethod("venmo")} style={{ flex: 1, padding: "6px 10px", backgroundColor: markSaleMethod === "venmo" ? "#008CFF" : "#eee", color: markSaleMethod === "venmo" ? "white" : "#555", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: "bold" }}>Venmo</button>
                           </div>
-                          <input placeholder="Buyer's email (their EPM account email)" value={markSaleEmail} onChange={(e) => setMarkSaleEmail(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
+                          <input placeholder="Buyer's email — the email on their Entre PRO Market account" value={markSaleEmail} onChange={(e) => setMarkSaleEmail(e.target.value)} style={{ ...iS, marginBottom: 8, fontSize: 13 }} />
                           <label style={{ fontSize: 12, fontWeight: "bold", color: "#555", display: "block", marginBottom: 4 }}>Screenshot proof of payment *</label>
                           {markSaleProofFile ? (
                             <div style={{ marginBottom: 8, position: "relative", maxWidth: 200 }}>
