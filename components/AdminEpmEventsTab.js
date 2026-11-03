@@ -92,14 +92,26 @@ export default function AdminEpmEventsTab() {
   
 // ── DRAFT SAVING — auto-saves this form as one blob and restores it if
 // left unsaved. Cleared on successful save or explicit Cancel/Reset. ──
-const DRAFT_KEY_EPM = "draft_key_epm";
+const DRAFT_KEY_EPM = "draft_key_epm_v2";
 function loadFormDraft(fallback) {
   if (typeof window === "undefined") return fallback;
   try { const v = window.localStorage.getItem(DRAFT_KEY_EPM); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
 function clearFormDraft() { if (typeof window !== "undefined") window.localStorage.removeItem(DRAFT_KEY_EPM); }
   const [epmEventForm, setEpmEventForm] = useState(() => loadFormDraft(BLANK_EPM_EVENT));
-  useEffect(() => { if (typeof window !== "undefined") window.localStorage.setItem(DRAFT_KEY_EPM, JSON.stringify(epmEventForm)); }, [epmEventForm]);
+  const [restoredDraft, setRestoredDraft] = useState(() => {
+    const d = loadFormDraft(null);
+    return !!d && JSON.stringify(d) !== JSON.stringify(BLANK_EPM_EVENT);
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || editingEpmEvent) return;
+    if (JSON.stringify(epmEventForm) === JSON.stringify(BLANK_EPM_EVENT)) window.localStorage.removeItem(DRAFT_KEY_EPM);
+    else window.localStorage.setItem(DRAFT_KEY_EPM, JSON.stringify(epmEventForm));
+  }, [epmEventForm, editingEpmEvent]);
+  const startFreshEvent = () => {
+    setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined);
+    setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); clearFormDraft(); endDateAuto.current = false; setRestoredDraft(false); setRestoredDraft(false);
+  };
   const [savingEpmEvent, setSavingEpmEvent] = useState(false);
   const [epmFlyerFile, setEpmFlyerFile] = useState(null);
   const [showEpmFlyerPicker, setShowEpmFlyerPicker] = useState(false);
@@ -201,6 +213,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
 
   const saveEpmEvent = async () => {
     if (!epmEventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
+    if (!epmEventForm.category) { setMessage("⚠️ Please choose an Event Category."); return; }
     if (!epmEventForm.flyer_url && !epmFlyerFile) { setMessage("⚠️ A flyer image is required."); return; }
     setSavingEpmEvent(true); setMessage("");
     let flyerUrl = epmEventForm.flyer_url || "";
@@ -226,7 +239,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
         if (error) throw error;
         if (data) setEpmEvents([...epmEvents, data]);
       }
-      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); clearFormDraft(); endDateAuto.current = false;
+      setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setEpmFlyerPosition({ x: 50, y: 50 }); setShowEpmFlyerPicker(false); clearFormDraft(); endDateAuto.current = false; setRestoredDraft(false);
       setMessage("✅ EPM Event saved!");
     } catch (err) {
       setMessage("❌ Error saving EPM event: " + err.message);
@@ -253,8 +266,11 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
 
       <div style={{ backgroundColor: "white", borderRadius: 10, padding: 20, marginBottom: 20, border: "1px solid #eee" }}>
         <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>{editingEpmEvent ? "✏️ Edit EPM Event" : "➕ Add New EPM Event"}</p>
-        <input placeholder="Event Name *" value={epmEventForm.event_name} onChange={e => setEpmEventForm({ ...epmEventForm, event_name: e.target.value })} style={inputStyle} />
-        <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category</label>
+        {restoredDraft && !editingEpmEvent && (
+          <p style={{ margin: "-4px 0 12px", fontSize: 12, color: "#701890" }}>📝 Your unfinished event was restored. <button type="button" onClick={startFreshEvent} style={{ background: "none", border: "none", padding: 0, color: "#701890", fontWeight: "bold", textDecoration: "underline", cursor: "pointer", fontSize: 12 }}>Start fresh</button></p>
+        )}
+        <input placeholder="Event name * (e.g. Summer Night Market)" value={epmEventForm.event_name} onChange={e => setEpmEventForm({ ...epmEventForm, event_name: e.target.value })} style={inputStyle} />
+        <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category <span style={{ color: "#cc0000" }}>*</span></label>
         <select value={epmEventForm.category} onChange={e => setEpmEventForm({ ...epmEventForm, category: e.target.value })} style={inputStyle}>
           <option value="">Select a Category...</option>
           {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -267,10 +283,10 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
           <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={epmEventForm.event_start_time} onChange={e => onEpmDateTimeChange("event_start_time", e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} /></div>
           <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={epmEventForm.event_end_time} onChange={e => onEpmDateTimeChange("event_end_time", e.target.value)} style={{ ...inputStyle, marginBottom: 0 }} /></div>
         </div>
-        <input placeholder="Venue Name" value={epmEventForm.venue} onChange={e => setEpmEventForm({ ...epmEventForm, venue: e.target.value })} style={inputStyle} />
-        <textarea placeholder="Address (street, city, state)" value={epmEventForm.venue_address || ""} onChange={e => setEpmEventForm({ ...epmEventForm, venue_address: e.target.value })} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
-        <input placeholder="Event Type" value={epmEventForm.event_type} onChange={e => setEpmEventForm({ ...epmEventForm, event_type: e.target.value })} style={inputStyle} />
-        <textarea placeholder="Event Description" value={epmEventForm.description} onChange={e => setEpmEventForm({ ...epmEventForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+        <input placeholder="Venue name (e.g. Convention Center, Hall B)" value={epmEventForm.venue} onChange={e => setEpmEventForm({ ...epmEventForm, venue: e.target.value })} style={inputStyle} />
+        <textarea placeholder="Street address, city, state and ZIP" value={epmEventForm.venue_address || ""} onChange={e => setEpmEventForm({ ...epmEventForm, venue_address: e.target.value })} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
+        <input placeholder="Event type or theme (e.g. Sports & Christmas Party)" value={epmEventForm.event_type} onChange={e => setEpmEventForm({ ...epmEventForm, event_type: e.target.value })} style={inputStyle} />
+        <textarea placeholder="Describe the event — what to expect, who it is for, parking, rules" value={epmEventForm.description} onChange={e => setEpmEventForm({ ...epmEventForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
         <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
         <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={epmEventForm.price || ""} onChange={e => setEpmEventForm({ ...epmEventForm, price: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
         <div style={{ marginBottom: 14 }}>
@@ -313,7 +329,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
           </div>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          {editingEpmEvent && <button onClick={() => { setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setShowEpmFlyerPicker(false); clearFormDraft(); endDateAuto.current = false; }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
+          {editingEpmEvent && <button onClick={() => { setEditingEpmEvent(null); setEpmEventForm(BLANK_EPM_EVENT); setEpmFlyerFile(null); setEpmFlyerOrigFile(null); setEpmFlyerOrigUrl(undefined); setShowEpmFlyerPicker(false); clearFormDraft(); endDateAuto.current = false; setRestoredDraft(false); }} style={{ padding: "8px 16px", backgroundColor: "#ccc", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>}
           <button onClick={saveEpmEvent} disabled={savingEpmEvent} style={{ padding: "8px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold" }}>{savingEpmEvent ? "Saving..." : editingEpmEvent ? "Update Event" : "Add Event"}</button>
         </div>
       </div>
