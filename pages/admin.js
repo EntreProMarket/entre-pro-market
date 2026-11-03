@@ -347,13 +347,13 @@ export default function AdminDashboard() {
                       <strong style={{ fontSize: 16 }}>{plan.name}</strong>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                      <div><label style={labelStyle}>Plan Name</label><input value={plan.name || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, name: e.target.value } : p))} style={inputStyle} /></div>
-                      <div><label style={labelStyle}>Price ($/month)</label><input type="number" value={plan.price || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, price: e.target.value } : p))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Plan Name</label><input value={plan.name || ""} placeholder="Plan name (e.g. Premium)" onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, name: e.target.value } : p))} style={inputStyle} /></div>
+                      <div><label style={labelStyle}>Price ($/month)</label><input type="number" value={plan.price || ""} placeholder="Monthly price in USD (e.g. 9.99)" onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, price: e.target.value } : p))} style={inputStyle} /></div>
                     </div>
                     <label style={labelStyle}>Description</label>
-                    <input value={plan.description || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, description: e.target.value } : p))} style={inputStyle} />
+                    <input value={plan.description || ""} placeholder="Short description shown under the plan name" onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, description: e.target.value } : p))} style={inputStyle} />
                     <label style={labelStyle}>Features (one per line)</label>
-                    <textarea value={Array.isArray(plan.features) ? plan.features.join("\n") : plan.features || ""} onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, features: e.target.value.split("\n") } : p))} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
+                    <textarea value={Array.isArray(plan.features) ? plan.features.join("\n") : plan.features || ""} placeholder="Plan features — type one per line" onChange={e => setPlans(plans.map((p, idx) => idx === i ? { ...p, features: e.target.value.split("\n") } : p))} rows={6} style={{ ...inputStyle, resize: "vertical" }} />
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
                       <button onClick={() => savePlan(plan)} disabled={saving} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>{saving ? "Saving..." : "Save Plan"}</button>
                     </div>
@@ -562,9 +562,9 @@ export default function AdminDashboard() {
                       <strong>Ad Slot: {ad.slot || `#${i + 1}`}</strong>
                       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><input type="checkbox" checked={ad.active || false} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, active: e.target.checked } : a))} />Active</label>
                     </div>
-                    <label style={labelStyle}>Headline</label><input value={ad.title || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, title: e.target.value } : a))} style={inputStyle} />
-                    <label style={labelStyle}>Body Text</label><input value={ad.body || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, body: e.target.value } : a))} style={inputStyle} />
-                    <label style={labelStyle}>Link URL</label><input value={ad.link || ""} onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, link: e.target.value } : a))} style={inputStyle} />
+                    <label style={labelStyle}>Headline</label><input value={ad.title || ""} placeholder="Ad headline (e.g. Grand Opening Sale!)" onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, title: e.target.value } : a))} style={inputStyle} />
+                    <label style={labelStyle}>Body Text</label><input value={ad.body || ""} placeholder="Short ad text visitors will read" onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, body: e.target.value } : a))} style={inputStyle} />
+                    <label style={labelStyle}>Link URL</label><input value={ad.link || ""} placeholder="Link people go to when they tap the ad (https://...)" onChange={e => setAds(ads.map((a, idx) => idx === i ? { ...a, link: e.target.value } : a))} style={inputStyle} />
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
                       <button onClick={() => saveAd(ad)} disabled={saving} style={{ padding: "10px 20px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>{saving ? "Saving..." : "Save Ad"}</button>
                     </div>
@@ -653,13 +653,13 @@ export default function AdminDashboard() {
               <h4 style={{ color: "#701890", marginBottom: 12, marginTop: 16 }}>💜 Vendor Limits</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
                 {[{ key: "vendor_free_photos", label: "Free Photos" }, { key: "vendor_premium_photos", label: "Premium Photos" }, { key: "vendor_featured_photos", label: "Featured Photos" }, { key: "vendor_free_videos", label: "Free Videos" }, { key: "vendor_premium_videos", label: "Premium Videos" }, { key: "vendor_featured_videos", label: "Featured Videos" }].map(({ key, label }) => (
-                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
+                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} placeholder="How many are allowed (e.g. 10)" onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
                 ))}
               </div>
               <h4 style={{ color: "#AABB23", marginBottom: 12, marginTop: 0 }}>🏆 Organizer Limits</h4>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
                 {[{ key: "organizer_basic_photos", label: "Basic Photos" }, { key: "organizer_pro_photos", label: "Pro Photos" }, { key: "organizer_elite_photos", label: "Elite Photos" }].map(({ key, label }) => (
-                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
+                  <div key={key}><label style={labelStyle}>{label}</label><input type="number" min="0" value={limits[key]} placeholder="How many are allowed (e.g. 10)" onChange={e => setLimits(prev => ({ ...prev, [key]: e.target.value }))} style={inputStyle} /></div>
                 ))}
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
