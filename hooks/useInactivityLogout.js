@@ -1,8 +1,10 @@
 // hooks/useInactivityLogout.js
-// DEPRECATED: auto-logout is now handled globally in pages/_app.js for every
-// page. This hook is kept as a no-op so any remaining import doesn't break
-// the build — remove the import + call from pages once you've confirmed
-// they don't need it, then this file can be deleted entirely.
+import { useEffect } from "react";
+
+// The 30-minute auto-logout now lives in ONE place (pages/_app.js) so it behaves the same on every
+// page and every device. Pages that call this hook just ask it to check right now.
 export default function useInactivityLogout() {
-  return;
+  useEffect(() => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("epm-check-session"));
+  }, []);
 }
