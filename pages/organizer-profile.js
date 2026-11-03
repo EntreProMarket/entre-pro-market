@@ -321,6 +321,7 @@ export default function OrganizerProfile() {
     const { data: authData } = await supabase.auth.getUser();
     if (!authData?.user?.email) { setMessage("❌ Your account doesn't have an email address. Please update your email in Settings before saving."); return; }
     if (!logoUrl && !logoFile) { setMessage("⚠️ Please upload a logo or choose a placeholder before saving."); return; }
+    if (!organizerName.trim()) { setMessage("❌ Please enter your business / organizer name — it is shown as your page and shop name."); return; }
     if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
     if (!isValidHandle(handle)) { setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces."); return; }
     if (!user) return;
@@ -387,6 +388,7 @@ export default function OrganizerProfile() {
 
   const saveEvent = async () => {
     if (!eventForm.event_name.trim()) { setMessage("⚠️ Event name is required."); return; }
+    if (!eventForm.category) { setMessage("⚠️ Please choose an Event Category."); return; }
     if (!eventForm.flyer_url && !flyerFile) { setMessage("⚠️ A flyer image is required."); return; }
     setSavingEvent(true); setMessage("");
     let flyerUrl = eventForm.flyer_url || "";
@@ -507,10 +509,10 @@ export default function OrganizerProfile() {
       {(accountType !== "elite" || activeTab === "profile") && (
       <>
 
-      <input placeholder="Organizer Name" value={organizerName} onChange={e => fOrganizerName(e.target.value)} style={iS} />
+      <input placeholder="Business / organizer name * — shown as your page and shop name" value={organizerName} onChange={e => fOrganizerName(e.target.value)} style={iS} />
 
       <div style={{ marginBottom: 12 }}>
-        <input placeholder="Handle (e.g. MyEvents)" value={handle} onChange={e => fHandle(e.target.value)}
+        <input placeholder="Page link name — letters & numbers only (e.g. VegasNightEvents)" value={handle} onChange={e => fHandle(e.target.value)}
           style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
         {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
       </div>
@@ -519,17 +521,17 @@ export default function OrganizerProfile() {
         <option value="">Select a Category...</option>
         {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
-      <input placeholder="City" value={city} onChange={e => fCity(e.target.value)} style={iS} />
-      <input placeholder="State" value={stateVal} onChange={e => fStateVal(e.target.value)} style={iS} />
-      <textarea placeholder="Description" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+      <input placeholder="City where you are based (e.g. Las Vegas)" value={city} onChange={e => fCity(e.target.value)} style={iS} />
+      <input placeholder="State (e.g. Nevada)" value={stateVal} onChange={e => fStateVal(e.target.value)} style={iS} />
+      <textarea placeholder="Tell vendors about your events — what you host and who should apply" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>⚠️ Links must be public or they may not open correctly.</div>
-      <input placeholder="Website" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
-      <input placeholder="Instagram" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
-      <input placeholder="Facebook" value={facebook} onChange={e => fFacebook(e.target.value)} style={iS} />
-      <input placeholder="TikTok" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
-      <input placeholder="YouTube" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
-      <input placeholder="X / Twitter" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
-      <input placeholder="Tags (comma separated)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
+      <input placeholder="Your website link (e.g. https://yourwebsite.com)" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
+      <input placeholder="Your Instagram link (or @username)" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
+      <input placeholder="Your Facebook page link" value={facebook} onChange={e => fFacebook(e.target.value)} style={iS} />
+      <input placeholder="Your TikTok link (or @username)" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
+      <input placeholder="Your YouTube channel link" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
+      <input placeholder="Your X / Twitter link (or @username)" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
+      <input placeholder="Search tags, separated by commas (e.g. markets, expos, pop-ups)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
 
           {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
@@ -710,8 +712,8 @@ export default function OrganizerProfile() {
           <label style={{ ...lS, color: "#888B00" }}>👑 Events (Elite — Create & Manage)</label>
           <div style={{ backgroundColor: "white", borderRadius: 8, padding: 16, marginBottom: 16, border: "1px solid #eee" }}>
             <p style={{ fontWeight: "bold", marginBottom: 10, fontSize: 14 }}>{editingEvent ? "✏️ Edit Event" : "➕ Add New Event"}</p>
-            <input placeholder="Event Name *" value={eventForm.event_name} onChange={e => fEvent("event_name")(e.target.value)} style={iS} />
-            <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category</label>
+            <input placeholder="Event name * (e.g. Summer Night Market)" value={eventForm.event_name} onChange={e => fEvent("event_name")(e.target.value)} style={iS} />
+            <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category <span style={{ color: "#cc0000" }}>*</span></label>
             <select value={eventForm.category} onChange={e => fEvent("category")(e.target.value)} style={iS}>
               <option value="">Select a Category...</option>
               {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -724,10 +726,10 @@ export default function OrganizerProfile() {
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => onEventDateTimeChange("event_start_time", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => onEventDateTimeChange("event_end_time", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
-            <input placeholder="Venue Name" value={eventForm.venue} onChange={e => fEvent("venue")(e.target.value)} style={iS} />
-            <textarea placeholder="Address (street, city, state)" value={eventForm.venue_address || ""} onChange={e => fEvent("venue_address")(e.target.value)} rows={2} style={{ ...iS, resize: "vertical" }} />
-            <input placeholder="Event Type" value={eventForm.event_type} onChange={e => fEvent("event_type")(e.target.value)} style={iS} />
-            <textarea placeholder="Event Description" value={eventForm.description} onChange={e => fEvent("description")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Venue name (e.g. Convention Center, Hall B)" value={eventForm.venue} onChange={e => fEvent("venue")(e.target.value)} style={iS} />
+            <textarea placeholder="Street address, city, state and ZIP" value={eventForm.venue_address || ""} onChange={e => fEvent("venue_address")(e.target.value)} rows={2} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Event type or theme (e.g. Sports & Christmas Party)" value={eventForm.event_type} onChange={e => fEvent("event_type")(e.target.value)} style={iS} />
+            <textarea placeholder="Describe the event — what to expect, who it is for, parking, rules" value={eventForm.description} onChange={e => fEvent("description")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
             <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => fEvent("price")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
             <div style={{ marginBottom: 14 }}>
