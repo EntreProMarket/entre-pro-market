@@ -7,7 +7,6 @@ import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
 import ZoomableLightbox from "../components/ZoomableLightbox";
-import JustifiedGrid from "../components/JustifiedGrid";
 
 function formatTime(t) {
   if (!t) return "";
@@ -113,29 +112,37 @@ export default function HomePage() {
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
 
-  // Cards show just the picture and the title — tapping one opens the full details.
-  const cardTitleStyle = (size) => ({ margin: 0, fontSize: 14, lineHeight: 1.3, minHeight: size ? "2.6em" : undefined, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" });
-  const cardImgStyle = (size) => (size ? { width: size.width - 2, height: size.imgHeight, objectFit: "cover", display: "block" } : { width: "100%", height: "auto", display: "block" });
-  const cardPlaceholder = (size, label) => <div style={{ width: "100%", height: size ? size.imgHeight : 150, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 }}>{label}</div>;
-  const renderEventCard = (it, size) => {
+  // Every card is the same size: a big thumbnail + the title (and the category for events).
+  // Tapping a card opens the full, uncropped flyer / article.
+  const thumbBox = { position: "relative", width: "100%", aspectRatio: "4 / 5", backgroundColor: "#f5f5f5", overflow: "hidden" };
+  const thumbImg = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" };
+  const thumbNone = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 };
+  const thumbTitle = { margin: 0, fontSize: 14, lineHeight: 1.3, minHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
+  const renderEventCard = (it) => {
     const event = it.event;
     return (
-      <div key={it.id} onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }} style={{ width: size ? size.width : "100%", flexShrink: 0, boxSizing: "border-box", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white", position: "relative" }}>
-        {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
-        {it.src ? <img src={it.src} alt={event.event_name} style={cardImgStyle(size)} /> : cardPlaceholder(size, "No Flyer")}
+      <div key={it.id} className="thumb-card" onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }}>
+        <div style={thumbBox}>
+          {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
+          {it.src ? <img src={it.src} alt={event.event_name} style={thumbImg} /> : <div style={thumbNone}>No Flyer</div>}
+        </div>
         <div style={{ padding: "10px 12px" }}>
-          <h3 style={cardTitleStyle(size)}>{event.event_name}</h3>
+          <h3 style={thumbTitle}>{event.event_name}</h3>
           <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: "bold", color: "#8a9a10", minHeight: 15 }}>{event.category || ""}</p>
         </div>
       </div>
     );
   };
-  const renderNewsCard = (it, size) => {
+  const renderNewsCard = (it) => {
     const article = it.article;
     return (
-      <div key={it.id} onClick={() => setSelectedArticle(article)} style={{ width: size ? size.width : "100%", flexShrink: 0, boxSizing: "border-box", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", cursor: "pointer", backgroundColor: "white" }}>
-        {it.src ? <img src={it.src} alt={article.title} style={cardImgStyle(size)} /> : cardPlaceholder(size, "📰")}
-        <div style={{ padding: "10px 12px" }}><h3 style={cardTitleStyle(size)}>{article.title}</h3></div>
+      <div key={it.id} className="thumb-card" onClick={() => setSelectedArticle(article)}>
+        <div style={thumbBox}>
+          {it.src ? <img src={it.src} alt={article.title} style={thumbImg} /> : <div style={thumbNone}>📰</div>}
+        </div>
+        <div style={{ padding: "10px 12px" }}>
+          <h3 style={thumbTitle}>{article.title}</h3>
+        </div>
       </div>
     );
   };
@@ -153,6 +160,11 @@ export default function HomePage() {
         .home-shell { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
         .home-shell-main { flex: 1 0 auto; width: 100%; }
         /* EPM Shop badge: far right on phones, centered on iPads / tablets / desktops */
+        /* Homepage thumbnails: every card the same size — 2 per row on phones, 3 on tablets, 4 on iPad landscape / desktop */
+        .thumb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        @media (min-width: 600px) { .thumb-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+        @media (min-width: 1000px) { .thumb-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; } }
+        .thumb-card { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; cursor: pointer; background: white; box-sizing: border-box; min-width: 0; }
         .epm-badge-row { display: flex; justify-content: flex-end; margin-bottom: 10px; padding: 8px 6px; }
         @media (min-width: 700px) { .epm-badge-row { justify-content: center; } }
         .epm-badge-btn { animation: epmGlow 3.4s ease-in-out infinite; }
@@ -267,7 +279,7 @@ export default function HomePage() {
             {upcomingEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
           </div>
           {visibleEvents.length > 0 ? (
-            <JustifiedGrid items={visibleEvents.map(event => ({ id: `${event._source}-${event.id}`, src: event.flyer_url ? parsePos(event.flyer_url).src.split("#")[0] : null, event }))} renderItem={renderEventCard} />
+            <div className="thumb-grid">{visibleEvents.map(event => renderEventCard({ id: `${event._source}-${event.id}`, src: event.flyer_url ? parsePos(event.flyer_url).src.split("#")[0] : null, event }))}</div>
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
               <p style={{ fontSize: 14, margin: 0 }}>Elite Organizer and Entre PRO Market events will appear here. 🎪 Coming soon!</p>
@@ -278,7 +290,7 @@ export default function HomePage() {
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           {newsArticles.length > 0 ? (
-            <JustifiedGrid items={newsArticles.map(article => ({ id: article.id, src: article.cover_image_url ? parsePos(article.cover_image_url).src.split("#")[0] : null, article }))} renderItem={renderNewsCard} />
+            <div className="thumb-grid">{newsArticles.map(article => renderNewsCard({ id: article.id, src: article.cover_image_url ? parsePos(article.cover_image_url).src.split("#")[0] : null, article }))}</div>
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
               <p style={{ fontSize: 14, margin: 0 }}>Community news and event highlights coming soon! 🎉</p>
