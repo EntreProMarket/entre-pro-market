@@ -3,6 +3,10 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import DashboardLayout from "../components/DashboardLayout";
+import LinkedText from "../components/LinkedText";
+import AddLinkButton, { LinksInfoTip } from "../components/AddLinkButton";
+import HelpTip from "../components/HelpTip";
+import { canShareContactInfo, stripLinksAndPhones, countLinks, markdownToPlain, isPaidAccount, PURCHASE_CONTACT_DAYS } from "../lib/linkRules";
 
 function getMessagingRules(role, tier) {
   if (role === "vendor") {
@@ -23,6 +27,7 @@ export default function Messages() {
   const router = useRouter();
   const { to, from: fromPage } = router.query;
   const messagesEndRef = useRef(null);
+  const composerRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [rules, setRules] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -35,8 +40,12 @@ export default function Messages() {
   const [reportModal, setReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportMsgId, setReportMsgId] = useState(null);
+  // Contacts used this month = messages sent + every link inside them (each link counts as 1 contact)
   const [vendorContactCount, setVendorContactCount] = useState(0);
   const [deletedMsgIds, setDeletedMsgIds] = useState(new Set());
+  // true when the buyer and seller have a paid order between them in the last 30 days
+  const [purchaseOk, setPurchaseOk] = useState(false);
+  const [composeNotice, setComposeNotice] = useState("");
 
   useEffect(() => { loadProfile(); }, []);
   useEffect(() => { if (activeConvo) { loadMessages(activeConvo); loadPartner(activeConvo); } }, [activeConvo]);
@@ -53,13 +62,17 @@ export default function Messages() {
     setRules(msgRules);
     if (msgRules.canMessage) {
       await loadConversations(user.id);
-      if (profileData?.role === "organizer" && msgRules.vendorLimit) {
-        const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-        const { count } = await supabase.from("messages").select("*", { count: "exact", head: true }).eq("sender_id", user.id).gte("created_at", startOfMonth.toISOString());
-        setVendorContactCount(count || 0);
-      }
+      if (profileData?.role === "organizer" && msgRules.vendorLimit) await loadContactUsage(user.id);
     }
     setLoading(false);
+  };
+
+  const loadContactUsage = async (userId) => {
+    const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+    const { data } = await supabase.from("messages").select("content").eq("sender_id", userId).gte("created_at", startOfMonth.toISOString());
+    const rows = data || [];
+    const linkCount = rows.reduce((n, m) => n + countLinks(m.content || ""), 0);
+    setVendorContactCount(rows.length + linkCount);
   };
 
   const loadConversations = async (userId) => {
@@ -96,6 +109,17 @@ export default function Messages() {
   const loadPartner = async (partnerId) => {
     const { data } = await supabase.from("profiles").select("*").eq("id", partnerId).single();
     setActivePartner(data);
+    // A paid order between the two of them (either direction) in the last 30 days lets them share
+    // links and phone numbers with each other for the order.
+    setPurchaseOk(false);
+    const { data: ud } = await supabase.auth.getUser();
+    const uid = ud?.user?.id;
+    if (uid) {
+      const since = new Date(Date.now() - PURCHASE_CONTACT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      const { data: orders } = await supabase.from("orders").select("id").eq("status", "paid").gte("created_at", since)
+        .or(`and(buyer_id.eq.${uid},vendor_id.eq.${partnerId}),and(buyer_id.eq.${partnerId},vendor_id.eq.${uid})`).limit(1);
+      setPurchaseOk(!!(orders && orders.length));
+    }
   };
 
   const canMessagePartner = (partner) => {
@@ -108,27 +132,56 @@ export default function Messages() {
     return false;
   };
 
+  // Can links and phone numbers go between ME and the person I'm talking to right now?
+  const shareOk = canShareContactInfo(profile, activePartner, purchaseOk);
+
+  const updateComposer = (value) => {
+    setNewMessage(value);
+    // ── Save draft ──
+    if (activeConvo) localStorage.setItem(`draft_${activeConvo}`, value);
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !activeConvo || !canMessagePartner(activePartner)) return;
+    let text = newMessage.trim();
+    if (!shareOk) text = stripLinksAndPhones(text).trim(); // safety net: never send them to / from a free account
+    if (!text) {
+      alert("Your message only had a link or phone number. Those can't be sent to or from a free account.");
+      return;
+    }
+    const linksInMessage = shareOk ? countLinks(text) : 0;
+    const contactsThisMessage = 1 + linksInMessage;
+    if (rules?.vendorLimit && vendorContactCount + contactsThisMessage > rules.vendorLimit) {
+      const left = Math.max(0, rules.vendorLimit - vendorContactCount);
+      alert(`This message uses ${contactsThisMessage} contact${contactsThisMessage > 1 ? "s" : ""} (1 for the message${linksInMessage ? ` + ${linksInMessage} for the link${linksInMessage > 1 ? "s" : ""}` : ""}), but you only have ${left} left this month. Remove a link or upgrade your plan.`);
+      return;
+    }
     setSending(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id;
-    const { error } = await supabase.from("messages").insert([{ sender_id: userId, recipient_id: activeConvo, content: newMessage.trim(), read: false }]);
+    const { error } = await supabase.from("messages").insert([{ sender_id: userId, recipient_id: activeConvo, content: text, read: false }]);
     if (!error) {
       // ── Clear draft on send ──
       localStorage.removeItem(`draft_${activeConvo}`);
       setNewMessage("");
       await loadMessages(activeConvo);
       await loadConversations(userId);
-      if (profile?.role === "organizer") setVendorContactCount(c => c + 1);
+      if (profile?.role === "organizer" && rules?.vendorLimit) setVendorContactCount(c => c + contactsThisMessage);
     }
     setSending(false);
   };
 
   const handleMessageChange = (e) => {
-    setNewMessage(e.target.value);
-    // ── Save draft ──
-    if (activeConvo) localStorage.setItem(`draft_${activeConvo}`, e.target.value);
+    let value = e.target.value;
+    if (!shareOk) {
+      const cleaned = stripLinksAndPhones(value);
+      if (cleaned !== value) {
+        value = cleaned;
+        setComposeNotice("Links and phone numbers can't be sent to or from a free account, so they were removed.");
+        setTimeout(() => setComposeNotice(""), 5000);
+      }
+    }
+    updateComposer(value);
   };
 
   const handleKeyDown = (e) => {
@@ -148,6 +201,21 @@ export default function Messages() {
   };
 
   const getName = (p) => p?.business_name || p?.organizer_name || "Unknown";
+
+  // How a message is shown. Links / phone numbers only appear when BOTH accounts are paid (or the sender
+  // is the admin, or there is a recent purchase between them). Nothing is deleted — if an account is
+  // upgraded later, the links show again.
+  const renderMessageContent = (msg, isMine) => {
+    const senderP = isMine ? profile : activePartner;
+    const recipientP = isMine ? activePartner : profile;
+    const ok = canShareContactInfo(senderP, recipientP, purchaseOk);
+    return <LinkedText text={msg.content} allowLinks={ok} linkStyle={{ color: isMine ? "#ffffff" : "#701890" }} />;
+  };
+
+  const previewText = (content) => {
+    const plain = markdownToPlain(content || "");
+    return isPaidAccount(profile) ? plain : stripLinksAndPhones(plain);
+  };
 
   if (loading) return <DashboardLayout><div style={{ padding: 20 }}>Loading...</div></DashboardLayout>;
 
@@ -174,8 +242,14 @@ export default function Messages() {
             <h1 style={{ margin: 0 }}>✉️ Messages</h1>
           </div>
           {rules.vendorLimit && (
-            <div style={{ backgroundColor: vendorContactCount >= rules.vendorLimit ? "#fef2f2" : "#f0fdf4", border: `1px solid ${vendorContactCount >= rules.vendorLimit ? "#fca5a5" : "#86efac"}`, borderRadius: 20, padding: "6px 14px", fontSize: 12, fontWeight: "bold", color: vendorContactCount >= rules.vendorLimit ? "#991b1b" : "#166534" }}>
-              {vendorContactCount}/{rules.vendorLimit} vendor contacts this month
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ backgroundColor: vendorContactCount >= rules.vendorLimit ? "#fef2f2" : "#f0fdf4", border: `1px solid ${vendorContactCount >= rules.vendorLimit ? "#fca5a5" : "#86efac"}`, borderRadius: 20, padding: "6px 14px", fontSize: 12, fontWeight: "bold", color: vendorContactCount >= rules.vendorLimit ? "#991b1b" : "#166534" }}>
+                {vendorContactCount}/{rules.vendorLimit} vendor contacts this month
+              </div>
+              <HelpTip title="How contacts are counted" size={26}>
+                <p style={{ margin: "0 0 8px" }}>Every message you send uses 1 contact.</p>
+                <p style={{ margin: 0 }}>Every link inside a message uses 1 more contact, so a message with 2 links uses 3 contacts. Your count starts over on the 1st of each month.</p>
+              </HelpTip>
             </div>
           )}
         </div>
@@ -200,7 +274,7 @@ export default function Messages() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontWeight: hasUnread ? "900" : "bold", fontSize: 14, color: hasUnread ? "#701890" : "#222" }}>{getName(convo.partner)}</p>
                         <p style={{ margin: 0, fontSize: 12, color: hasDraft ? "#701890" : hasUnread ? "#333" : "#888", fontWeight: hasUnread ? "bold" : "normal", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontStyle: hasDraft ? "italic" : "normal" }}>
-                          {hasDraft ? `✏️ Draft: ${localStorage.getItem(`draft_${convo.partnerId}`)}` : convo.lastMessage?.content}
+                          {hasDraft ? `✏️ Draft: ${localStorage.getItem(`draft_${convo.partnerId}`)}` : previewText(convo.lastMessage?.content)}
                         </p>
                       </div>
                       {hasUnread && <div style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: "#701890", flexShrink: 0 }} />}
@@ -254,7 +328,7 @@ export default function Messages() {
                   return (
                     <div key={msg.id} style={{ display: "flex", justifyContent: isMine ? "flex-end" : "flex-start", alignItems: "flex-end", gap: 6 }}>
                       <div style={{ maxWidth: "75%", padding: "10px 14px", borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", backgroundColor: isMine ? "#701890" : "#f0f0f0", color: isMine ? "white" : "#333", fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {msg.content}
+                        {renderMessageContent(msg, isMine)}
                         <p style={{ margin: "4px 0 0", fontSize: 10, color: isMine ? "rgba(255,255,255,0.7)" : "#999", textAlign: "right" }}>
                           {new Date(msg.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                         </p>
@@ -280,6 +354,7 @@ export default function Messages() {
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
                   {/* ── TEXTAREA: Enter=new line, Shift+Enter=send ── */}
                   <textarea
+                    ref={composerRef}
                     value={newMessage}
                     onChange={handleMessageChange}
                     onKeyDown={handleKeyDown}
@@ -290,6 +365,14 @@ export default function Messages() {
                   <button onClick={sendMessage} disabled={sending || !newMessage.trim()} style={{ padding: "10px 18px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13, opacity: !newMessage.trim() ? 0.5 : 1, flexShrink: 0 }}>
                     {sending ? "..." : "Send"}
                   </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+                  {shareOk ? (
+                    <AddLinkButton textareaRef={composerRef} value={newMessage} onChange={updateComposer} infoMode="message-ok" />
+                  ) : (
+                    <LinksInfoTip mode="message-blocked" />
+                  )}
+                  {composeNotice && <span style={{ fontSize: 12, color: "#cc0000" }}>{composeNotice}</span>}
                 </div>
               </div>
             ) : (
@@ -324,4 +407,3 @@ export default function Messages() {
     </DashboardLayout>
   );
 }
-
