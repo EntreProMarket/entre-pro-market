@@ -10,7 +10,7 @@ export default function LinkedText({ text, allowLinks = false, linkStyle, style 
     <span style={style}>
       {segs.map((s, i) =>
         s.type === "link" ? (
-          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()} style={{ color: "#701890", textDecoration: "underline", wordBreak: "break-word", ...linkStyle }}>{s.text}</a>
+          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()} style={{ color: "#701890", fontWeight: "bold", textDecoration: "underline", wordBreak: "break-word", ...linkStyle }}>{s.text}</a>
         ) : (
           <span key={i}>{s.text}</span>
         )
