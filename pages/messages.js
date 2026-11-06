@@ -6,6 +6,7 @@ import DashboardLayout from "../components/DashboardLayout";
 import LinkedText from "../components/LinkedText";
 import AddLinkButton, { LinksInfoTip } from "../components/AddLinkButton";
 import HelpTip from "../components/HelpTip";
+import SelectedLinkChip from "../components/SelectedLinkChip";
 import { canShareContactInfo, stripLinksAndPhones, countLinks, markdownToPlain, isPaidAccount, PURCHASE_CONTACT_DAYS } from "../lib/linkRules";
 
 function getMessagingRules(role, tier) {
@@ -209,7 +210,7 @@ export default function Messages() {
     const senderP = isMine ? profile : activePartner;
     const recipientP = isMine ? activePartner : profile;
     const ok = canShareContactInfo(senderP, recipientP, purchaseOk);
-    return <LinkedText text={msg.content} allowLinks={ok} linkStyle={{ color: isMine ? "#ffffff" : "#701890" }} />;
+    return <LinkedText text={msg.content} allowLinks={ok} linkStyle={{ color: isMine ? "#d9ff3d" : "#701890" }} />;
   };
 
   const previewText = (content) => {
@@ -368,7 +369,10 @@ export default function Messages() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
                   {shareOk ? (
-                    <AddLinkButton textareaRef={composerRef} value={newMessage} onChange={updateComposer} infoMode="message-ok" />
+                    <>
+                      <AddLinkButton textareaRef={composerRef} value={newMessage} onChange={updateComposer} infoMode="message-ok" />
+                      <SelectedLinkChip textareaRef={composerRef} value={newMessage} onChange={updateComposer} />
+                    </>
                   ) : (
                     <LinksInfoTip mode="message-blocked" />
                   )}
