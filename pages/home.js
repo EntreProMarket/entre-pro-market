@@ -7,6 +7,7 @@ import AnnouncementBanner from "../components/AnnouncementBanner";
 import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
 import ZoomableLightbox from "../components/ZoomableLightbox";
+import LinkedText from "../components/LinkedText";
 
 function formatTime(t) {
   if (!t) return "";
@@ -114,8 +115,10 @@ export default function HomePage() {
 
   // Every card is the same size: a big thumbnail + the title (and the category for events).
   // Tapping a card opens the full, uncropped flyer / article.
-  const thumbBox = { position: "relative", width: "100%", aspectRatio: "4 / 5", backgroundColor: "#f5f5f5", overflow: "hidden" };
-  const thumbImg = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" };
+  const thumbBox = { position: "relative", width: "100%", aspectRatio: "4 / 5", backgroundColor: "#1a1a1a", overflow: "hidden" };
+  const thumbImg = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain", display: "block" };
+  const thumbBlur = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(18px) brightness(0.8)", transform: "scale(1.2)", display: "block" };
+  const thumbPicture = (src, alt) => (<><img src={src} alt="" aria-hidden="true" style={thumbBlur} /><img src={src} alt={alt} style={thumbImg} /></>);
   const thumbNone = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 };
   const thumbTitle = { margin: 0, fontSize: 14, lineHeight: 1.3, minHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
   const renderEventCard = (it) => {
@@ -124,7 +127,7 @@ export default function HomePage() {
       <div key={it.id} className="thumb-card" onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }}>
         <div style={thumbBox}>
           {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
-          {it.src ? <img src={it.src} alt={event.event_name} style={thumbImg} /> : <div style={thumbNone}>No Flyer</div>}
+          {it.src ? thumbPicture(it.src, event.event_name) : <div style={thumbNone}>No Flyer</div>}
         </div>
         <div style={{ padding: "10px 12px" }}>
           <h3 style={thumbTitle}>{event.event_name}</h3>
@@ -138,7 +141,7 @@ export default function HomePage() {
     return (
       <div key={it.id} className="thumb-card" onClick={() => setSelectedArticle(article)}>
         <div style={thumbBox}>
-          {it.src ? <img src={it.src} alt={article.title} style={thumbImg} /> : <div style={thumbNone}>📰</div>}
+          {it.src ? thumbPicture(it.src, article.title) : <div style={thumbNone}>📰</div>}
         </div>
         <div style={{ padding: "10px 12px" }}>
           <h3 style={thumbTitle}>{article.title}</h3>
@@ -161,6 +164,8 @@ export default function HomePage() {
         .home-shell-main { flex: 1 0 auto; width: 100%; }
         /* EPM Shop badge: far right on phones, centered on iPads / tablets / desktops */
         /* Homepage thumbnails: every card the same size — 2 per row on phones, 3 on tablets, 4 on iPad landscape / desktop */
+        .home-nav-btns { display: flex; flex-direction: column; gap: 10px; }
+        @media (min-width: 700px) { .home-nav-btns { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; } }
         .thumb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
         @media (min-width: 600px) { .thumb-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
         @media (min-width: 1000px) { .thumb-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; } }
@@ -182,7 +187,7 @@ export default function HomePage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #eee", backgroundColor: "white", position: "sticky", top: 0, zIndex: 10 }}>
         <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: "50%", flexShrink: 0 }} />
         <div style={{ display: "flex", flex: 1, marginLeft: 24, alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="home-nav-btns">
             <button onClick={() => router.push("/marketplace")} style={{ padding: "8px 16px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>🛒 Marketplace</button>
             {profile?.role === "vendor" && <button onClick={() => router.push("/vendor-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
             {profile?.role === "organizer" && <button onClick={() => router.push("/organizer-dashboard")} style={{ padding: "8px 16px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 20, cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>📊 Dashboard</button>}
@@ -323,7 +328,7 @@ export default function HomePage() {
               <p style={{ margin: "0 0 6px", fontSize: 14, color: "#701890", fontWeight: "bold" }}>📅 {selectedEvent.event_date ? new Date(selectedEvent.event_date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
               {selectedEvent.venue && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#444", whiteSpace: "pre-line" }}>📍 {selectedEvent.venue}{selectedEvent.venue_address ? `\n${selectedEvent.venue_address}` : ""}</p>}
               {selectedEvent.price && <p style={{ margin: "0 0 8px", fontSize: 14, color: "#701890", fontWeight: "bold", whiteSpace: "pre-line" }}>💵 {selectedEvent.price}</p>}
-              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedEvent.description}</p>}
+              {selectedEvent.description && <p style={{ margin: "0 0 20px", fontSize: 14, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}><LinkedText text={selectedEvent.description} allowLinks /></p>}
               {selectedEvent.info_url && <a href={selectedEvent.info_url.startsWith("http") ? selectedEvent.info_url : `https://${selectedEvent.info_url}`} target="_blank" rel="noreferrer" style={{ display: "block", padding: "13px 20px", backgroundColor: "#AABB23", color: "white", borderRadius: 30, fontWeight: "bold", fontSize: 15, textDecoration: "none", textAlign: "center", marginBottom: 16 }}>🎟️ Get Tickets / More Info</a>}
               {selectedEvent._source === "epm" ? (
                 <p style={{ margin: 0, fontSize: 13, color: "#888", textAlign: "center" }}>Hosted by <span style={{ color: "#701890", fontWeight: "bold" }}>Entre PRO Market</span></p>
