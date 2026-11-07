@@ -1,5 +1,5 @@
 // pages/home.js
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import useForceLogoutIfExpired from "../hooks/useForceLogoutIfExpired";
@@ -8,6 +8,47 @@ import FooterBar from "../components/FooterBar";
 import PageFooter from "../components/PageFooter";
 import ZoomableLightbox from "../components/ZoomableLightbox";
 import LinkedText from "../components/LinkedText";
+
+// Equal-width columns where every picture shows COMPLETELY at its own proportions — nothing cropped and no
+// empty bars. This is how Pinterest and photo feeds (Facebook, Instagram, X) show pictures of mixed shapes.
+function ThumbMasonry({ items, renderItem }) {
+  const [cols, setCols] = useState(2);
+  const [aspects, setAspects] = useState({});
+  const requested = useRef(new Set());
+  useEffect(() => {
+    const update = () => { const w = window.innerWidth; setCols(w >= 1000 ? 4 : w >= 600 ? 3 : 2); };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  useEffect(() => {
+    items.forEach((it) => {
+      if (!it.src || requested.current.has(it.src)) return;
+      requested.current.add(it.src);
+      const img = new Image();
+      img.onload = () => { if (img.naturalWidth && img.naturalHeight) setAspects((p) => ({ ...p, [it.src]: img.naturalWidth / img.naturalHeight })); };
+      img.src = it.src;
+    });
+  });
+  const heights = Array(cols).fill(0);
+  const columns = Array.from({ length: cols }, () => []);
+  items.forEach((it) => {
+    const h = (it.src ? 1 / (aspects[it.src] || 0.8) : 1.25) + 0.45; // picture + title, measured in column widths
+    let c = 0;
+    for (let i = 1; i < cols; i++) if (heights[i] < heights[c]) c = i;
+    columns[c].push(it);
+    heights[c] += h;
+  });
+  return (
+    <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+      {columns.map((col, ci) => (
+        <div key={ci} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+          {col.map((it) => renderItem(it))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function formatTime(t) {
   if (!t) return "";
@@ -113,25 +154,22 @@ export default function HomePage() {
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}>Loading...</div>;
 
-  // Every card is the same size: a big thumbnail + the title (and the category for events).
-  // Tapping a card opens the full, uncropped flyer / article.
-  const thumbBox = { position: "relative", width: "100%", aspectRatio: "4 / 5", backgroundColor: "#1a1a1a", overflow: "hidden" };
-  const thumbImg = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "contain", display: "block" };
-  const thumbBlur = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(18px) brightness(0.8)", transform: "scale(1.2)", display: "block" };
-  const thumbPicture = (src, alt) => (<><img src={src} alt="" aria-hidden="true" style={thumbBlur} /><img src={src} alt={alt} style={thumbImg} /></>);
-  const thumbNone = { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 };
-  const thumbTitle = { margin: 0, fontSize: 14, lineHeight: 1.3, minHeight: "2.6em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
+  // Homepage cards: the whole picture at its own proportions (never cropped, no bars) + the title
+  // (and the category for events). Tapping a card opens the full details.
+  const thumbImg = { width: "100%", height: "auto", display: "block" };
+  const thumbNone = { width: "100%", aspectRatio: "4 / 5", backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 13 };
+  const thumbTitle = { margin: 0, fontSize: 14, lineHeight: 1.3 };
   const renderEventCard = (it) => {
     const event = it.event;
     return (
       <div key={it.id} className="thumb-card" onClick={() => { setSelectedEvent(event); setFlyerFullscreen(false); }}>
-        <div style={thumbBox}>
+        <div style={{ position: "relative" }}>
           {event._source === "epm" && <div style={{ position: "absolute", top: 8, left: 8, backgroundColor: "#111", color: "white", fontSize: 10, fontWeight: "bold", padding: "3px 8px", borderRadius: 10, zIndex: 1 }}>🏢 EPM</div>}
-          {it.src ? thumbPicture(it.src, event.event_name) : <div style={thumbNone}>No Flyer</div>}
+          {it.src ? <img src={it.src} alt={event.event_name} style={thumbImg} /> : <div style={thumbNone}>No Flyer</div>}
         </div>
         <div style={{ padding: "10px 12px" }}>
           <h3 style={thumbTitle}>{event.event_name}</h3>
-          <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: "bold", color: "#8a9a10", minHeight: 15 }}>{event.category || ""}</p>
+          {event.category && <p style={{ margin: "4px 0 0", fontSize: 11, fontWeight: "bold", color: "#8a9a10" }}>{event.category}</p>}
         </div>
       </div>
     );
@@ -140,9 +178,7 @@ export default function HomePage() {
     const article = it.article;
     return (
       <div key={it.id} className="thumb-card" onClick={() => setSelectedArticle(article)}>
-        <div style={thumbBox}>
-          {it.src ? thumbPicture(it.src, article.title) : <div style={thumbNone}>📰</div>}
-        </div>
+        {it.src ? <img src={it.src} alt={article.title} style={thumbImg} /> : <div style={thumbNone}>📰</div>}
         <div style={{ padding: "10px 12px" }}>
           <h3 style={thumbTitle}>{article.title}</h3>
         </div>
@@ -284,7 +320,7 @@ export default function HomePage() {
             {upcomingEvents.length > 6 && <button onClick={() => router.push("/events")} style={{ background: "none", border: "none", color: "#701890", cursor: "pointer", fontWeight: "bold", fontSize: 13 }}>See all →</button>}
           </div>
           {visibleEvents.length > 0 ? (
-            <div className="thumb-grid">{visibleEvents.map(event => renderEventCard({ id: `${event._source}-${event.id}`, src: event.flyer_url ? parsePos(event.flyer_url).src.split("#")[0] : null, event }))}</div>
+            <ThumbMasonry items={visibleEvents.map(event => ({ id: `${event._source}-${event.id}`, src: event.flyer_url ? parsePos(event.flyer_url).src.split("#")[0] : null, event }))} renderItem={renderEventCard} />
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
               <p style={{ fontSize: 14, margin: 0 }}>Elite Organizer and Entre PRO Market events will appear here. 🎪 Coming soon!</p>
@@ -295,7 +331,7 @@ export default function HomePage() {
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ fontSize: 18, marginBottom: 14 }}>📰 Community & News</h2>
           {newsArticles.length > 0 ? (
-            <div className="thumb-grid">{newsArticles.map(article => renderNewsCard({ id: article.id, src: article.cover_image_url ? parsePos(article.cover_image_url).src.split("#")[0] : null, article }))}</div>
+            <ThumbMasonry items={newsArticles.map(article => ({ id: article.id, src: article.cover_image_url ? parsePos(article.cover_image_url).src.split("#")[0] : null, article }))} renderItem={renderNewsCard} />
           ) : (
             <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 24, textAlign: "center", color: "#aaa" }}>
               <p style={{ fontSize: 14, margin: 0 }}>Community news and event highlights coming soon! 🎉</p>
