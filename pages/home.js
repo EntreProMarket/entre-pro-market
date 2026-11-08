@@ -395,7 +395,7 @@ export default function HomePage() {
               </div>
               <h2 style={{ margin: "0 0 16px", fontSize: 20 }}>{selectedArticle.title}</h2>
               {(selectedArticle.content_blocks || []).map((block, i) => block.type === "paragraph" ? (
-                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7, whiteSpace: "pre-line" }}>{linkify(block.text)}</p>
+                <p key={i} style={{ margin: "0 0 16px", fontSize: 14, color: "#333", lineHeight: 1.7, whiteSpace: "pre-line" }}><LinkedText text={block.text} allowLinks /></p>
               ) : (() => {
                 const img = parsePos(block.url);
                 return (
