@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
+import LinkedText from "../components/LinkedText";
+import { isPaidAccount } from "../lib/linkRules";
 
 // Rotates display order on each page visit (Fisher-Yates) — same idea as
 // vendor listing rotation, applied to Portfolio and Shop product order.
@@ -237,7 +239,7 @@ export default function VendorPublicProfile() {
           <div style={{ marginTop: 16 }}>
             <p><strong>Category:</strong> {vendor.category || "N/A"}</p>
             <p><strong>Location:</strong> {vendor.city}{vendor.state ? `, ${vendor.state}` : ""}</p>
-            {vendor.description && <p style={{ marginTop: 16, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{vendor.description}</p>}
+            {vendor.description && <p style={{ marginTop: 16, lineHeight: 1.6, whiteSpace: "pre-wrap" }}><LinkedText text={vendor.description} allowLinks={isPaidAccount(vendor)} /></p>}
             <div style={{ marginTop: 12 }}>
               {vendor.tags?.map(tag => <span key={tag} style={{ display: "inline-block", marginRight: 8, marginBottom: 8, padding: "4px 10px", background: "#eee", borderRadius: 20, fontSize: 12 }}>{tag}</span>)}
             </div>
