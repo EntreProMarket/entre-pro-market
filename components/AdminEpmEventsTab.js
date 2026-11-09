@@ -6,6 +6,7 @@ import HelpTip from "./HelpTip";
 import CropModal from "./CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
 import { adjustOvernight } from "./eventDates";
+import RichTextArea from "./RichTextArea";
 
 const EVENT_CATEGORIES = ["Music Event","Pop Up Shop","Business Expo","Fashion Show","Spoken Word","Meet & Greet","Art Show","Dance Event","Party","Classes","Paint & Sip","Festival","Corporate Event","Wedding","Birthday","Fundraiser","Community Event","Sports Event","Recording Studio","Venue","Other"];
 const FLYER_PLACEHOLDERS = ["/default-logos/EPM-PH1.png", "/default-logos/EPM-PH2.png", "/default-logos/EPM-PH3.png"];
@@ -286,7 +287,7 @@ function clearFormDraft() { if (typeof window !== "undefined") window.localStora
         <input placeholder="Venue name (e.g. Convention Center, Hall B)" value={epmEventForm.venue} onChange={e => setEpmEventForm({ ...epmEventForm, venue: e.target.value })} style={inputStyle} />
         <textarea placeholder="Street address, city, state and ZIP" value={epmEventForm.venue_address || ""} onChange={e => setEpmEventForm({ ...epmEventForm, venue_address: e.target.value })} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
         <input placeholder="Event type or theme (e.g. Sports & Christmas Party)" value={epmEventForm.event_type} onChange={e => setEpmEventForm({ ...epmEventForm, event_type: e.target.value })} style={inputStyle} />
-        <textarea placeholder="Describe the event — what to expect, who it is for, parking, rules" value={epmEventForm.description} onChange={e => setEpmEventForm({ ...epmEventForm, description: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+        <RichTextArea value={epmEventForm.description} onChange={(v) => setEpmEventForm({ ...epmEventForm, description: v })} canLink placeholder="Describe the event — what to expect, who it is for, parking, rules" style={{ ...inputStyle, resize: "vertical" }} rows={3} />
         <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
         <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={epmEventForm.price || ""} onChange={e => setEpmEventForm({ ...epmEventForm, price: e.target.value })} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
         <div style={{ marginBottom: 14 }}>
