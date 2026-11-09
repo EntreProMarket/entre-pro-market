@@ -6,6 +6,7 @@ import useDragReorder from "./useDragReorder";
 import CropModal from "./CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
 import HelpTip from "./HelpTip";
+import RichTextArea from "./RichTextArea";
 
 const BUCKET = "organizer-portfolio";
 const PRODUCT_LIMIT = 30;
@@ -344,7 +345,7 @@ export default function OrganizerShopTab({ userId }) {
         <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
           <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
           <input placeholder="Product name * (e.g. Event Tote Bag)" value={newProduct.title} onChange={(e) => setNewField("title")(e.target.value)} style={iS} />
-          <textarea placeholder="Describe your product — size, materials, colors, how it is used" value={newProduct.description} onChange={(e) => setNewField("description")(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
+          <RichTextArea value={newProduct.description} onChange={(v) => setNewField("description")(v)} canLink placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...iS, height: 80, resize: "vertical" }} />
           <input type="number" step="0.01" placeholder="Price in USD * (e.g. 19.99)" value={newProduct.price} onChange={(e) => setNewField("price")(e.target.value)} style={iS} />
           <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {PRODUCT_IMAGE_LIMIT} — first is main. Tap ✂️ Crop to cut a photo, or ✋ Adjust to move it)</span></label>
           {newImages.length > 0 && (
@@ -405,7 +406,7 @@ export default function OrganizerShopTab({ userId }) {
                   {isEditing ? (
                     <>
                       <input value={editForm.title} placeholder="Product name (e.g. Event Tote Bag)" onChange={(e) => setEditField("title")(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
-                      <textarea value={editForm.description} placeholder="Describe your product — size, materials, colors, how it is used" onChange={(e) => setEditField("description")(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
+                      <RichTextArea value={editForm.description} onChange={(v) => setEditField("description")(v)} canLink placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
                       <input type="number" step="0.01" value={editForm.price} placeholder="Price in USD (e.g. 19.99)" onChange={(e) => setEditField("price")(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
                       {editImages.length > 0 && (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
