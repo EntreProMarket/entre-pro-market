@@ -6,6 +6,7 @@ import CropModal from "./CropModal";
 import useDragReorder from "./useDragReorder";
 import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
 import HelpTip from "./HelpTip";
+import RichTextArea from "./RichTextArea";
 
 // ── EPM Shop — admin-managed products, publicly listed at /epm-shop, no schema
 // changes needed: vendor_id just points at whichever admin profile added the item,
@@ -179,7 +180,7 @@ function saveDraft(key, value) {
       <div style={{ backgroundColor: "white", border: "1px solid #eee", borderRadius: 10, padding: 20, marginBottom: 24 }}>
         <p style={{ fontWeight: "bold", marginBottom: 12, fontSize: 15 }}>➕ Add New Product</p>
         <input placeholder="Product name * (e.g. EPM T-Shirt)" value={shopNewProduct.title} onChange={e => fShopTitle(e.target.value)} style={inputStyle} />
-        <textarea placeholder="Describe your product — size, materials, colors, how it is used" value={shopNewProduct.description} onChange={e => fShopDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+        <RichTextArea value={shopNewProduct.description} onChange={(v) => fShopDescription(v)} canLink placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...inputStyle, resize: "vertical" }} rows={3} />
         <input type="number" step="0.01" placeholder="Price in USD * (e.g. 25.00)" value={shopNewProduct.price} onChange={e => fShopPrice(e.target.value)} style={inputStyle} />
         <label style={labelStyle}>Product Images * <span style={{ fontWeight: "normal", color: "#888" }}>(up to {SHOP_PRODUCT_IMAGE_LIMIT} — first is main)</span></label>
         {shopNewProductImages.length > 0 && (
@@ -238,7 +239,7 @@ function saveDraft(key, value) {
                   {shopEditingProduct === p.id ? (
                     <>
                       <input value={shopEditForm.title} placeholder="Product name (e.g. EPM T-Shirt)" onChange={e => setShopEditForm({ ...shopEditForm, title: e.target.value })} style={{ ...inputStyle, marginBottom: 6 }} />
-                      <textarea value={shopEditForm.description} placeholder="Describe your product — size, materials, colors, how it is used" onChange={e => setShopEditForm({ ...shopEditForm, description: e.target.value })} style={{ ...inputStyle, height: 60, resize: "vertical", marginBottom: 6 }} />
+                      <RichTextArea value={shopEditForm.description} onChange={(v) => setShopEditForm({ ...shopEditForm, description: v })} canLink placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...inputStyle, height: 60, resize: "vertical", marginBottom: 6 }} />
                       <input type="number" step="0.01" value={shopEditForm.price} placeholder="Price in USD (e.g. 25.00)" onChange={e => setShopEditForm({ ...shopEditForm, price: e.target.value })} style={{ ...inputStyle, marginBottom: 8 }} />
                       {shopEditProductImages.length > 0 && (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 8 }}>
