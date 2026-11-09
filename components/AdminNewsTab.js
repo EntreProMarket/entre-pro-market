@@ -5,6 +5,7 @@ import useDragReorder from "./useDragReorder";
 import HelpTip from "./HelpTip";
 import CropModal from "./CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
+import RichTextArea from "./RichTextArea";
 
 const COVER_ASPECT_RATIO = "8 / 5";
 const inputStyle = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, marginBottom: 12, boxSizing: "border-box" };
@@ -326,7 +327,7 @@ export default function AdminNewsTab() {
                   </div>
                 </div>
                 {block.type === "paragraph" ? (
-                  <textarea value={block.text} onChange={e => updateBlock(i, { text: e.target.value })} placeholder="Write this paragraph of your story here..." rows={4} style={{ ...inputStyle, marginBottom: 0, resize: "vertical" }} />
+                  <RichTextArea value={block.text} onChange={(v) => updateBlock(i, { text: v })} canLink placeholder="Write this paragraph of your story here..." style={{ ...inputStyle, marginBottom: 0, resize: "vertical" }} rows={4} />
                 ) : (
                   <div>
                     {(block.file || block.url || block._displaySrc) ? (
