@@ -429,7 +429,7 @@ const handleSave = async () => {
       clearDrafts(PROFILE_DRAFT_KEYS);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/vendor/${handle}`), 1200);
-    } catch (err) { setMessage("❌ Error: " + err.message); }
+    } catch (err) { setMessage(/unique_handle|duplicate key/i.test(err.message || "") ? "❌ That page link name is already taken. Please choose a different one." : "❌ Error: " + err.message); }
     setSaving(false);
   };
 
@@ -586,6 +586,18 @@ const handleSave = async () => {
     return [...inOrder, ...shopProducts.filter(p => !seen.has(p.id))];
   })();
 
+  const [handleTaken, setHandleTaken] = useState(false);
+  useEffect(() => {
+    const me = userId;
+    if (!handle || !isValidHandle(handle) || !me) { setHandleTaken(false); return undefined; }
+    const timer = setTimeout(async () => {
+      const safe = handle.replace(/[\\%_]/g, "\\$&");
+      const { data } = await supabase.from("profiles").select("id").ilike("handle", safe).neq("id", me).limit(1);
+      setHandleTaken(!!(data && data.length));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [handle, userId]); // eslint-disable-line
+
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
@@ -611,7 +623,7 @@ const handleSave = async () => {
           <input placeholder="Business name * — shown at the top of your page (e.g. Sweet Treats Bakery)" value={businessName} onChange={e => fBusinessName(e.target.value)} style={iS} />
           <div style={{ marginBottom: 12 }}>
             <input placeholder="Page link name — letters & numbers only (e.g. SweetTreats)" value={handle} onChange={e => fHandle(e.target.value)} style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
-            {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/vendor/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your URL: app.entrepromarket.com/vendor/YourHandle</p>}
+            {handle ? (isValidHandle(handle) ? (handleTaken ? <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ That page link name is already taken. Please choose a different one.</p> : <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/vendor/{handle}</p>) : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your URL: app.entrepromarket.com/vendor/YourHandle</p>}
           </div>
           <select value={category} onChange={e => fCategory(e.target.value)} style={iS}>
             <option value="">Select a Category...</option>
