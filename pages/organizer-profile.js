@@ -323,6 +323,7 @@ export default function OrganizerProfile() {
     if (!logoUrl && !logoFile) { setMessage("⚠️ Please upload a logo or choose a placeholder before saving."); return; }
     if (!organizerName.trim()) { setMessage("❌ Please enter your business / organizer name — it is shown as your page and shop name."); return; }
     if (!handle) { setMessage("❌ Please enter a handle for your profile."); return; }
+    if (handleTaken) { setMessage("❌ That page link name is already taken. Please choose a different one."); return; }
     if (!isValidHandle(handle)) { setMessage("❌ Handle can only contain letters, numbers, hyphens (-) and underscores (_). No spaces."); return; }
     if (!user) return;
     setSaving(true); setMessage("");
@@ -372,7 +373,7 @@ export default function OrganizerProfile() {
       clearDrafts(PROFILE_DRAFT_KEYS);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/organizer/${handle}`), 1200);
-    } catch (err) { setMessage("❌ Error: " + err.message); }
+    } catch (err) { setMessage(/unique_handle|duplicate key/i.test(err.message || "") ? "❌ That page link name is already taken. Please choose a different one." : "❌ Error: " + err.message); }
     setSaving(false);
   };
 
@@ -482,6 +483,18 @@ export default function OrganizerProfile() {
   }, [flyerFile]);
   const flyerPreviewSrc = flyerFilePreview || eventForm.flyer_url;
 
+  const [handleTaken, setHandleTaken] = useState(false);
+  useEffect(() => {
+    const me = user?.id;
+    if (!handle || !isValidHandle(handle) || !me) { setHandleTaken(false); return undefined; }
+    const timer = setTimeout(async () => {
+      const safe = handle.replace(/[\\%_]/g, "\\$&");
+      const { data } = await supabase.from("profiles").select("id").ilike("handle", safe).neq("id", me).limit(1);
+      setHandleTaken(!!(data && data.length));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [handle, user?.id]); // eslint-disable-line
+
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
   return (
@@ -514,7 +527,7 @@ export default function OrganizerProfile() {
       <div style={{ marginBottom: 12 }}>
         <input placeholder="Page link name — letters & numbers only (e.g. VegasNightEvents)" value={handle} onChange={e => fHandle(e.target.value)}
           style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
-        {handle ? (isValidHandle(handle) ? <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p> : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
+        {handle ? (isValidHandle(handle) ? (handleTaken ? <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ That page link name is already taken. Please choose a different one.</p> : <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/organizer/{handle}</p>) : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your profile URL: app.entrepromarket.com/organizer/YourHandle</p>}
       </div>
 
       <select value={category} onChange={e => fCategory(e.target.value)} style={iS}>
