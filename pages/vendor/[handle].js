@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { SocialLinks } from "../../components/SocialIcons";
 import ZoomableLightbox from "../../components/ZoomableLightbox";
-import LinkedText from "../components/LinkedText";
-import { isPaidAccount } from "../lib/linkRules";
+import LinkedText from "../../components/LinkedText";
+import { isPaidAccount } from "../../lib/linkRules";
 
 // Rotates display order on each page visit (Fisher-Yates) — same idea as
 // vendor listing rotation, applied to Portfolio and Shop product order.
