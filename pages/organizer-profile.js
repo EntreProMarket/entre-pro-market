@@ -10,6 +10,7 @@ import CropModal from "../components/CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "../components/cropTags";
 import HelpTip from "../components/HelpTip";
 import { adjustOvernight } from "../components/eventDates";
+import { stripLinks, stripLinksAndPhones, isPaidAccount } from "../lib/linkRules";
 
 // One stable preview URL per file. (Making a new one on every render made photos reload and
 // "stick" while you dragged them.)
@@ -184,6 +185,9 @@ export default function OrganizerProfile() {
   const [portfolioPositions, setPortfolioPositions] = useState([]); // [{position, zoom}] parallel to portfolioImages
   const portfolioDrag = useDragReorder((from, to) => movePortfolioImage(from, to));
   const [activeTab, setActiveTab] = useState("profile");
+  const isPaidOrg = isPaidAccount({ account_type: accountType });
+  // Links (and, on free accounts, phone numbers) are only allowed in messages and shop product descriptions.
+  const noLinks = (t) => (isPaidOrg ? stripLinks(t || "") : stripLinksAndPhones(t || ""));
   const endDateAuto = useRef(false); // true while the End Date was moved to the next day automatically
   const [imageLimits, setImageLimits] = useState({ basic: 10, pro: 20, elite: 40 });
   const [videoUrls, setVideoUrls] = useState(["","","","",""]);
@@ -348,11 +352,11 @@ export default function OrganizerProfile() {
         }
       }
       const { error } = await supabase.from("profiles").upsert({
-        id: user.id, organizer_name: organizerName, handle, category, city, state: stateVal, description,
+        id: user.id, organizer_name: noLinks(organizerName), handle, category, city: noLinks(city), state: noLinks(stateVal), description: noLinks(description),
         website: formatSocialLink("website", website), instagram: formatSocialLink("instagram", instagram),
         facebook: formatSocialLink("facebook", facebook), tiktok: formatSocialLink("tiktok", tiktok),
         youtube: formatSocialLink("youtube", youtube), x_twitter: formatSocialLink("x_twitter", xTwitter),
-        tags: tags.split(",").map(t => t.trim()).filter(Boolean), logo_url: uploadedLogoUrl,
+        tags: noLinks(tags).split(",").map(t => t.trim()).filter(Boolean), logo_url: uploadedLogoUrl,
         portfolio_images: updatedPortfolio, pinned_portfolio: [],
         video_urls: accountType === "elite" ? finalVideoUrls.filter(v => v.trim()) : [],
         role: "organizer",
@@ -373,7 +377,7 @@ export default function OrganizerProfile() {
       clearDrafts(PROFILE_DRAFT_KEYS);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/organizer/${handle}`), 1200);
-    } catch (err) { setMessage(/unique_handle|duplicate key/i.test(err.message || "") ? "❌ That page link name is already taken. Please choose a different one." : "❌ Error: " + err.message); }
+    } catch (err) { setMessage(/unique_handle|handle_key|duplicate key/i.test(err.message || "") ? "❌ That page link name is already taken. Please choose a different one." : "❌ Error: " + err.message); }
     setSaving(false);
   };
 
@@ -399,11 +403,11 @@ export default function OrganizerProfile() {
       flyerUrl = up;
     }
     const eventData = {
-      event_name: eventForm.event_name, event_date: eventForm.event_date || null,
+      event_name: noLinks(eventForm.event_name), event_date: eventForm.event_date || null,
       event_end_date: eventForm.event_end_date || null, event_start_time: eventForm.event_start_time || null,
-      event_end_time: eventForm.event_end_time || null, venue: eventForm.venue, venue_address: eventForm.venue_address || "",
-      event_type: eventForm.event_type, category: eventForm.category, price: eventForm.price || "",
-      description: eventForm.description, info_url: formatUrl(eventForm.info_url), flyer_url: flyerUrl,
+      event_end_time: eventForm.event_end_time || null, venue: noLinks(eventForm.venue), venue_address: noLinks(eventForm.venue_address || ""),
+      event_type: noLinks(eventForm.event_type), category: eventForm.category, price: noLinks(eventForm.price || ""),
+      description: noLinks(eventForm.description), info_url: formatUrl(eventForm.info_url), flyer_url: flyerUrl,
     };
     try {
       if (editingEvent) {
@@ -489,8 +493,14 @@ export default function OrganizerProfile() {
     if (!handle || !isValidHandle(handle) || !me) { setHandleTaken(false); return undefined; }
     const timer = setTimeout(async () => {
       const safe = handle.replace(/[\\%_]/g, "\\$&");
-      const { data } = await supabase.from("profiles").select("id").ilike("handle", safe).neq("id", me).limit(1);
-      setHandleTaken(!!(data && data.length));
+      let taken = false;
+      const rpc = await supabase.rpc("handle_taken", { h: handle, me });
+      if (!rpc.error) taken = !!rpc.data;
+      else {
+        const { data } = await supabase.from("profiles").select("id").ilike("handle", safe).neq("id", me).limit(1);
+        taken = !!(data && data.length);
+      }
+      setHandleTaken(taken);
     }, 500);
     return () => clearTimeout(timer);
   }, [handle, user?.id]); // eslint-disable-line
@@ -522,7 +532,7 @@ export default function OrganizerProfile() {
       {(accountType !== "elite" || activeTab === "profile") && (
       <>
 
-      <input placeholder="Business / organizer name * — shown as your page and shop name" value={organizerName} onChange={e => fOrganizerName(e.target.value)} style={iS} />
+      <input placeholder="Business / organizer name * — shown as your page and shop name" value={organizerName} onChange={e => fOrganizerName(noLinks(e.target.value))} style={iS} />
 
       <div style={{ marginBottom: 12 }}>
         <input placeholder="Page link name — letters & numbers only (e.g. VegasNightEvents)" value={handle} onChange={e => fHandle(e.target.value)}
@@ -534,9 +544,9 @@ export default function OrganizerProfile() {
         <option value="">Select a Category...</option>
         {EVENT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
-      <input placeholder="City where you are based (e.g. Las Vegas)" value={city} onChange={e => fCity(e.target.value)} style={iS} />
-      <input placeholder="State (e.g. Nevada)" value={stateVal} onChange={e => fStateVal(e.target.value)} style={iS} />
-      <textarea placeholder="Tell vendors about your events — what you host and who should apply" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
+      <input placeholder="City where you are based (e.g. Las Vegas)" value={city} onChange={e => fCity(noLinks(e.target.value))} style={iS} />
+      <input placeholder="State (e.g. Nevada)" value={stateVal} onChange={e => fStateVal(noLinks(e.target.value))} style={iS} />
+      <RichTextArea value={description} onChange={(v) => fDescription(v)} canLink={false} blockedHere canPhone={isPaidOrg} placeholder="Tell vendors about your events — what you host and who should apply" style={{ ...iS, resize: "vertical" }} rows={4} />
       <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>⚠️ Links must be public or they may not open correctly.</div>
       <input placeholder="Your website link (e.g. https://yourwebsite.com)" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
       <input placeholder="Your Instagram link (or @username)" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
@@ -544,7 +554,7 @@ export default function OrganizerProfile() {
       <input placeholder="Your TikTok link (or @username)" value={tiktok} onChange={e => fTiktok(e.target.value)} style={iS} />
       <input placeholder="Your YouTube channel link" value={youtube} onChange={e => fYoutube(e.target.value)} style={iS} />
       <input placeholder="Your X / Twitter link (or @username)" value={xTwitter} onChange={e => fXTwitter(e.target.value)} style={iS} />
-      <input placeholder="Search tags, separated by commas (e.g. markets, expos, pop-ups)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
+      <input placeholder="Search tags, separated by commas (e.g. markets, expos, pop-ups)" value={tags} onChange={e => fTags(noLinks(e.target.value))} style={iS} />
 
           {/* LOGO */}
       <div style={{ marginTop: 16, marginBottom: 16 }}>
@@ -725,7 +735,7 @@ export default function OrganizerProfile() {
           <label style={{ ...lS, color: "#888B00" }}>👑 Events (Elite — Create & Manage)</label>
           <div style={{ backgroundColor: "white", borderRadius: 8, padding: 16, marginBottom: 16, border: "1px solid #eee" }}>
             <p style={{ fontWeight: "bold", marginBottom: 10, fontSize: 14 }}>{editingEvent ? "✏️ Edit Event" : "➕ Add New Event"}</p>
-            <input placeholder="Event name * (e.g. Summer Night Market)" value={eventForm.event_name} onChange={e => fEvent("event_name")(e.target.value)} style={iS} />
+            <input placeholder="Event name * (e.g. Summer Night Market)" value={eventForm.event_name} onChange={e => fEvent("event_name")(noLinks(e.target.value))} style={iS} />
             <label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Event Category <span style={{ color: "#cc0000" }}>*</span></label>
             <select value={eventForm.category} onChange={e => fEvent("category")(e.target.value)} style={iS}>
               <option value="">Select a Category...</option>
@@ -739,12 +749,12 @@ export default function OrganizerProfile() {
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>Start Time</label><input type="time" value={eventForm.event_start_time} onChange={e => onEventDateTimeChange("event_start_time", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
               <div><label style={{ fontSize: 12, fontWeight: "bold", display: "block", marginBottom: 4, color: "#555" }}>End Time</label><input type="time" value={eventForm.event_end_time} onChange={e => onEventDateTimeChange("event_end_time", e.target.value)} style={{ ...iS, marginBottom: 0 }} /></div>
             </div>
-            <input placeholder="Venue name (e.g. Convention Center, Hall B)" value={eventForm.venue} onChange={e => fEvent("venue")(e.target.value)} style={iS} />
-            <textarea placeholder="Street address, city, state and ZIP" value={eventForm.venue_address || ""} onChange={e => fEvent("venue_address")(e.target.value)} rows={2} style={{ ...iS, resize: "vertical" }} />
-            <input placeholder="Event type or theme (e.g. Sports & Christmas Party)" value={eventForm.event_type} onChange={e => fEvent("event_type")(e.target.value)} style={iS} />
-            <textarea placeholder="Describe the event — what to expect, who it is for, parking, rules" value={eventForm.description} onChange={e => fEvent("description")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Venue name (e.g. Convention Center, Hall B)" value={eventForm.venue} onChange={e => fEvent("venue")(noLinks(e.target.value))} style={iS} />
+            <textarea placeholder="Street address, city, state and ZIP" value={eventForm.venue_address || ""} onChange={e => fEvent("venue_address")(noLinks(e.target.value))} rows={2} style={{ ...iS, resize: "vertical" }} />
+            <input placeholder="Event type or theme (e.g. Sports & Christmas Party)" value={eventForm.event_type} onChange={e => fEvent("event_type")(noLinks(e.target.value))} style={iS} />
+            <RichTextArea value={eventForm.description} onChange={(v) => fEvent("description")(v)} canLink={false} blockedHere canPhone={isPaidOrg} placeholder="Describe the event — what to expect, who it is for, parking, rules" style={{ ...iS, resize: "vertical" }} rows={3} />
             <label style={{ fontSize: 13, fontWeight: "bold", marginBottom: 4, display: "block" }}>💵 Ticket Price</label>
-            <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => fEvent("price")(e.target.value)} rows={3} style={{ ...iS, resize: "vertical" }} />
+            <textarea placeholder={"One price per line, e.g.:\nGeneral: $25\nVIP: $50\nKids: Free"} value={eventForm.price || ""} onChange={e => fEvent("price")(noLinks(e.target.value))} rows={3} style={{ ...iS, resize: "vertical" }} />
             <div style={{ marginBottom: 14 }}>
         <HelpTip title="Ticket payments">
           <p style={{ margin: 0 }}>💳 Add your Eventbrite, CashApp, Venmo, Google Pay, or any payment link here to collect ticket payments — you're not limited to Eventbrite. Use this to promote and sell tickets straight through the app.</p>
