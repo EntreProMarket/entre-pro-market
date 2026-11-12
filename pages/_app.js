@@ -175,9 +175,56 @@ function BfcacheGuard() {
   return null;
 }
 
+// ── Unfinished-text drafts belong to ONE account ──
+// Drafts are saved on this device so typing is never lost. They are wiped whenever someone logs out or a
+// different account logs in, so one account's text can never show up inside another account's form (and
+// can never be saved into it). Because ownership is unknown the very first time, drafts are also cleared once.
+function purgeDrafts() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("draft_")) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch (e) { /* ignore */ }
+}
+function storedSessionUserId() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && /^sb-.*-auth-token$/.test(k)) {
+        const parsed = JSON.parse(localStorage.getItem(k) || "null");
+        const uid = parsed && (parsed.user?.id || parsed.currentSession?.user?.id);
+        if (uid) return uid;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+function DraftGuard() {
+  useEffect(() => {
+    const OWNER_KEY = "epm_draft_owner";
+    const apply = (uid) => {
+      try {
+        const owner = localStorage.getItem(OWNER_KEY);
+        if (!uid) { purgeDrafts(); localStorage.removeItem(OWNER_KEY); return; }
+        if (owner !== uid) { purgeDrafts(); localStorage.setItem(OWNER_KEY, uid); }
+      } catch (e) { /* ignore */ }
+    };
+    const early = storedSessionUserId();
+    if (early) apply(early); // runs immediately, before any page reads a draft
+    supabase.auth.getSession().then(({ data }) => apply(data?.session?.user?.id || null));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => apply(session?.user?.id || null));
+    return () => { if (sub && sub.subscription) sub.subscription.unsubscribe(); };
+  }, []);
+  return null;
+}
+
 export default function App({ Component, pageProps }) {
   return (
     <>
+      <DraftGuard />
       <AutoLogout />
       <BfcacheGuard />
       <Component {...pageProps} />
