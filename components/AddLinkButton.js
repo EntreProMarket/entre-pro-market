@@ -9,6 +9,12 @@ export function LinksInfoTip({ mode = "editor", size = 26 }) {
   const p = { margin: "0 0 8px" };
   return (
     <HelpTip title="Links & phone numbers" size={size}>
+      {mode === "notHere" && (
+        <>
+          <p style={p}>Links aren't allowed in this field. Anything that looks like a web link or email address is removed automatically and is never saved.</p>
+          <p style={{ margin: 0 }}>Links can only be used in messages and in shop product descriptions (on paid plans).</p>
+        </>
+      )}
       {mode === "free" && (
         <>
           <p style={p}>Free accounts can't use links or phone numbers in text fields. If you type one, it is erased automatically and is never saved.</p>
