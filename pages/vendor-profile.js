@@ -9,6 +9,8 @@ import { sharpenCanvas, useHighQualitySmoothing } from "../lib/imageQuality";
 import CropModal from "../components/CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "../components/cropTags";
 import HelpTip from "../components/HelpTip";
+import RichTextArea from "../components/RichTextArea";
+import { stripLinks, stripLinksAndPhones } from "../lib/linkRules";
 
 // One stable preview URL per file. (Making a new one on every render made photos reload and
 // "stick" while you dragged them.)
@@ -270,7 +272,10 @@ export default function VendorProfile() {
   const videoLimit = videoLimits[accountType] ?? videoLimits.free;
   const productLimit = PRODUCT_LIMITS[accountType] ?? PRODUCT_LIMITS.free;
   const productImageLimit = PRODUCT_IMAGE_LIMITS[accountType] ?? PRODUCT_IMAGE_LIMITS.free;
-  const canReorder = accountType !== "free"; // hold-and-drag ordering + top-4 pinning: Premium and Featured only
+  const canReorder = accountType !== "free";
+  const isPaidVendor = accountType !== "free"; // Premium / Featured
+  // Links (and, on free accounts, phone numbers) are only allowed in messages and shop product descriptions.
+  const noLinks = (t) => (isPaidVendor ? stripLinks(t || "") : stripLinksAndPhones(t || "")); // hold-and-drag ordering + top-4 pinning: Premium and Featured only
   const [shopProducts, setShopProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
     title: loadDraft("newProductTitle", ""),
@@ -400,10 +405,10 @@ const handleSave = async () => {
       if (portfolio.length > photoLimit) portfolio = portfolio.slice(0, photoLimit);
       setMessage("⏳ Saving profile...");
       const { error } = await supabase.from("profiles").update({
-        business_name: businessName, handle, category,
-        tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+        business_name: noLinks(businessName), handle, category,
+        tags: noLinks(tags).split(",").map(t => t.trim()).filter(Boolean),
         video_urls: videoUrls.filter(v => v.trim()),
-        city, state, description,
+        city: noLinks(city), state: noLinks(state), description: noLinks(description),
         website: formatSocialLink("website", website),
         instagram: formatSocialLink("instagram", instagram),
         facebook: formatSocialLink("facebook", facebook),
@@ -429,7 +434,7 @@ const handleSave = async () => {
       clearDrafts(PROFILE_DRAFT_KEYS);
       setMessage("✅ Profile saved!");
       setTimeout(() => router.replace(`/vendor/${handle}`), 1200);
-    } catch (err) { setMessage(/unique_handle|duplicate key/i.test(err.message || "") ? "❌ That page link name is already taken. Please choose a different one." : "❌ Error: " + err.message); }
+    } catch (err) { setMessage(/unique_handle|handle_key|duplicate key/i.test(err.message || "") ? "❌ That page link name is already taken. Please choose a different one." : "❌ Error: " + err.message); }
     setSaving(false);
   };
 
@@ -518,7 +523,7 @@ const handleSave = async () => {
       if (url) uploadedUrls.push(withProductPos(tagOrig(url, item.origUrl), item.position));
     }
     if (uploadedUrls.length === 0) return;
-    const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: newProduct.title, description: newProduct.description, price: Math.round(parseFloat(newProduct.price) * 100), image_url: uploadedUrls[0], images: uploadedUrls, is_active: true });
+    const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: noLinks(newProduct.title), description: isPaidVendor ? newProduct.description : noLinks(newProduct.description), price: Math.round(parseFloat(newProduct.price) * 100), image_url: uploadedUrls[0], images: uploadedUrls, is_active: true });
     if (error) { setMessage("❌ Error: " + error.message); return; }
     clearDrafts(["newProductTitle", "newProductDescription", "newProductPrice"]);
     setMessage("✅ Product added!");
@@ -540,7 +545,7 @@ const handleSave = async () => {
         if (url) updatedImages.push(withProductPos(tagOrig(url, item.origUrl), item.position));
       }
     }
-    const { error } = await supabase.from("vendor_products").update({ title: editForm.title, description: editForm.description, price: Math.round(parseFloat(editForm.price) * 100), image_url: updatedImages[0] || null, images: updatedImages }).eq("id", editingProduct);
+    const { error } = await supabase.from("vendor_products").update({ title: noLinks(editForm.title), description: isPaidVendor ? editForm.description : noLinks(editForm.description), price: Math.round(parseFloat(editForm.price) * 100), image_url: updatedImages[0] || null, images: updatedImages }).eq("id", editingProduct);
     if (error) { setMessage("❌ Error: " + error.message); return; }
     clearDrafts([`editProduct_${editingProduct}_title`, `editProduct_${editingProduct}_description`, `editProduct_${editingProduct}_price`]);
     setMessage("✅ Product updated!"); setEditingProduct(null);
@@ -592,8 +597,14 @@ const handleSave = async () => {
     if (!handle || !isValidHandle(handle) || !me) { setHandleTaken(false); return undefined; }
     const timer = setTimeout(async () => {
       const safe = handle.replace(/[\\%_]/g, "\\$&");
-      const { data } = await supabase.from("profiles").select("id").ilike("handle", safe).neq("id", me).limit(1);
-      setHandleTaken(!!(data && data.length));
+      let taken = false;
+      const rpc = await supabase.rpc("handle_taken", { h: handle, me });
+      if (!rpc.error) taken = !!rpc.data;
+      else {
+        const { data } = await supabase.from("profiles").select("id").ilike("handle", safe).neq("id", me).limit(1);
+        taken = !!(data && data.length);
+      }
+      setHandleTaken(taken);
     }, 500);
     return () => clearTimeout(timer);
   }, [handle, userId]); // eslint-disable-line
@@ -620,7 +631,7 @@ const handleSave = async () => {
 
       {activeTab === "profile" && (
         <>
-          <input placeholder="Business name * — shown at the top of your page (e.g. Sweet Treats Bakery)" value={businessName} onChange={e => fBusinessName(e.target.value)} style={iS} />
+          <input placeholder="Business name * — shown at the top of your page (e.g. Sweet Treats Bakery)" value={businessName} onChange={e => fBusinessName(noLinks(e.target.value))} style={iS} />
           <div style={{ marginBottom: 12 }}>
             <input placeholder="Page link name — letters & numbers only (e.g. SweetTreats)" value={handle} onChange={e => fHandle(e.target.value)} style={{ ...iS, marginBottom: 4, borderColor: handle && !isValidHandle(handle) ? "#cc0000" : "#d1d5db" }} />
             {handle ? (isValidHandle(handle) ? (handleTaken ? <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ That page link name is already taken. Please choose a different one.</p> : <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>✅ app.entrepromarket.com/vendor/{handle}</p>) : <p style={{ margin: 0, fontSize: 12, color: "#cc0000" }}>❌ Only letters, numbers, hyphens and underscores. No spaces.</p>) : <p style={{ margin: 0, fontSize: 12, color: "#888" }}>Your URL: app.entrepromarket.com/vendor/YourHandle</p>}
@@ -629,10 +640,10 @@ const handleSave = async () => {
             <option value="">Select a Category...</option>
             {["DJ","Photographer","Videographer","Caterer","Decorator","Florist","Hair & Makeup","Music","Bakery","Clothing & Apparel","Jewelry","Crafts & Art","Food & Beverage","Health & Wellness","Entertainment","Security","Transportation","Poetry & Literature","Performing Arts","Theater & Acting","Other"].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <input placeholder="City where you are based (e.g. Atlanta)" value={city} onChange={e => fCity(e.target.value)} style={iS} />
-          <input placeholder="State (e.g. Georgia)" value={state} onChange={e => fState(e.target.value)} style={iS} />
-          <textarea placeholder="Tell shoppers about your business — what you sell and what makes you special" value={description} onChange={e => fDescription(e.target.value)} rows={4} style={{ ...iS, resize: "vertical" }} />
-          <input placeholder="Search tags, separated by commas (e.g. candles, handmade, gifts)" value={tags} onChange={e => fTags(e.target.value)} style={iS} />
+          <input placeholder="City where you are based (e.g. Atlanta)" value={city} onChange={e => fCity(noLinks(e.target.value))} style={iS} />
+          <input placeholder="State (e.g. Georgia)" value={state} onChange={e => fState(noLinks(e.target.value))} style={iS} />
+          <RichTextArea value={description} onChange={(v) => fDescription(v)} canLink={false} blockedHere canPhone={isPaidVendor} placeholder="Tell shoppers about your business — what you sell and what makes you special" style={{ ...iS, resize: "vertical" }} rows={4} />
+          <input placeholder="Search tags, separated by commas (e.g. candles, handmade, gifts)" value={tags} onChange={e => fTags(noLinks(e.target.value))} style={iS} />
           <div style={{ backgroundColor: "#fff0f0", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#cc0000" }}>⚠️ Links must be public or they may not open correctly.</div>
           <input placeholder="Your website link (e.g. https://yourwebsite.com)" value={website} onChange={e => fWebsite(e.target.value)} style={iS} />
           <input placeholder="Your Instagram link (or @username)" value={instagram} onChange={e => fInstagram(e.target.value)} style={iS} />
@@ -792,8 +803,8 @@ const handleSave = async () => {
           {shopProducts.length < productLimit && (
             <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
-              <input placeholder="Product name * (e.g. Vanilla Soy Candle)" value={newProduct.title} onChange={e => fNewProductTitle(e.target.value)} style={iS} />
-              <textarea placeholder="Describe your product — size, materials, colors, how it is used" value={newProduct.description} onChange={e => fNewProductDescription(e.target.value)} style={{ ...iS, height: 80, resize: "vertical" }} />
+              <input placeholder="Product name * (e.g. Vanilla Soy Candle)" value={newProduct.title} onChange={e => fNewProductTitle(noLinks(e.target.value))} style={iS} />
+              <RichTextArea value={newProduct.description} onChange={(v) => fNewProductDescription(v)} canLink={isPaidVendor} placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...iS, height: 80, resize: "vertical" }} />
               <input type="number" step="0.01" placeholder="Price in USD * (e.g. 19.99)" value={newProduct.price} onChange={e => fNewProductPrice(e.target.value)} style={iS} />
               <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {productImageLimit} — first is main. Tap ✂️ Crop to cut a photo, or ✋ Adjust to move it)</span></label>
               {newProductImages.length > 0 && (
@@ -854,8 +865,8 @@ const handleSave = async () => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {editingProduct === p.id ? (
                         <>
-                          <input value={editForm.title} placeholder="Product name (e.g. Vanilla Soy Candle)" onChange={e => fEditTitle(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
-                          <textarea value={editForm.description} placeholder="Describe your product — size, materials, colors, how it is used" onChange={e => fEditDescription(e.target.value)} style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
+                          <input value={editForm.title} placeholder="Product name (e.g. Vanilla Soy Candle)" onChange={e => fEditTitle(noLinks(e.target.value))} style={{ ...iS, marginBottom: 6 }} />
+                          <RichTextArea value={editForm.description} onChange={(v) => fEditDescription(v)} canLink={isPaidVendor} placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
                           <input type="number" step="0.01" value={editForm.price} placeholder="Price in USD (e.g. 19.99)" onChange={e => fEditPrice(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
                           {editProductImages.length > 0 && (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 8 }}>
