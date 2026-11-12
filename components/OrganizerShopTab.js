@@ -7,6 +7,7 @@ import CropModal from "./CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "./cropTags";
 import HelpTip from "./HelpTip";
 import RichTextArea from "./RichTextArea";
+import { stripLinks } from "../lib/linkRules";
 
 const BUCKET = "organizer-portfolio";
 const PRODUCT_LIMIT = 30;
@@ -212,7 +213,7 @@ export default function OrganizerShopTab({ userId }) {
       if (url) urls.push(withProductPos(tagOrig(url, item.origUrl), item.position));
     }
     if (urls.length === 0) { setBusy(false); return; }
-    const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: newProduct.title, description: newProduct.description, price: Math.round(parseFloat(newProduct.price) * 100), image_url: urls[0], images: urls, is_active: true });
+    const { error } = await supabase.from("vendor_products").insert({ vendor_id: userId, title: stripLinks(newProduct.title), description: newProduct.description, price: Math.round(parseFloat(newProduct.price) * 100), image_url: urls[0], images: urls, is_active: true });
     setBusy(false);
     if (error) { setMessage("❌ Error: " + error.message); return; }
     setNewProduct({ title: "", description: "", price: "" });
@@ -247,7 +248,7 @@ export default function OrganizerShopTab({ userId }) {
         if (url) updated.push(withProductPos(tagOrig(url, item.origUrl), item.position));
       }
     }
-    const { error } = await supabase.from("vendor_products").update({ title: editForm.title, description: editForm.description, price: Math.round(parseFloat(editForm.price) * 100), image_url: updated[0] || null, images: updated }).eq("id", editingId);
+    const { error } = await supabase.from("vendor_products").update({ title: stripLinks(editForm.title), description: editForm.description, price: Math.round(parseFloat(editForm.price) * 100), image_url: updated[0] || null, images: updated }).eq("id", editingId);
     setBusy(false);
     if (error) { setMessage("❌ Error: " + error.message); return; }
     ["title", "description", "price"].forEach((k) => saveDraft(`edit_${editingId}_${k}`, ""));
@@ -344,7 +345,7 @@ export default function OrganizerShopTab({ userId }) {
       {!limitReached && (
         <div style={{ backgroundColor: "#f9f9f9", border: "1px solid #eee", borderRadius: 10, padding: 16, marginBottom: 24 }}>
           <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>➕ Add New Product</h3>
-          <input placeholder="Product name * (e.g. Event Tote Bag)" value={newProduct.title} onChange={(e) => setNewField("title")(e.target.value)} style={iS} />
+          <input placeholder="Product name * (e.g. Event Tote Bag)" value={newProduct.title} onChange={(e) => setNewField("title")(stripLinks(e.target.value))} style={iS} />
           <RichTextArea value={newProduct.description} onChange={(v) => setNewField("description")(v)} canLink placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...iS, height: 80, resize: "vertical" }} />
           <input type="number" step="0.01" placeholder="Price in USD * (e.g. 19.99)" value={newProduct.price} onChange={(e) => setNewField("price")(e.target.value)} style={iS} />
           <label style={lS}>Product Images * <span style={{ fontSize: 12, color: "#888", fontWeight: "normal" }}>(up to {PRODUCT_IMAGE_LIMIT} — first is main. Tap ✂️ Crop to cut a photo, or ✋ Adjust to move it)</span></label>
@@ -405,7 +406,7 @@ export default function OrganizerShopTab({ userId }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {isEditing ? (
                     <>
-                      <input value={editForm.title} placeholder="Product name (e.g. Event Tote Bag)" onChange={(e) => setEditField("title")(e.target.value)} style={{ ...iS, marginBottom: 6 }} />
+                      <input value={editForm.title} placeholder="Product name (e.g. Event Tote Bag)" onChange={(e) => setEditField("title")(stripLinks(e.target.value))} style={{ ...iS, marginBottom: 6 }} />
                       <RichTextArea value={editForm.description} onChange={(v) => setEditField("description")(v)} canLink placeholder="Describe your product — size, materials, colors, how it is used" style={{ ...iS, height: 60, resize: "vertical", marginBottom: 6 }} />
                       <input type="number" step="0.01" value={editForm.price} placeholder="Price in USD (e.g. 19.99)" onChange={(e) => setEditField("price")(e.target.value)} style={{ ...iS, marginBottom: 8 }} />
                       {editImages.length > 0 && (
