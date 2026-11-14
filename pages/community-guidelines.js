@@ -57,5 +57,5 @@ const SECTIONS = [
 ];
 
 export default function Page() {
-  return <LegalLayout title="Community Guidelines" intro=null sections={SECTIONS} />;
+  return <LegalLayout title={"Community Guidelines"} intro={null} sections={SECTIONS} />;
 }
