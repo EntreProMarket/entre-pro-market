@@ -10,6 +10,7 @@ import CropModal from "../components/CropModal";
 import { getOrigUrl, baseUrl, tagOrig } from "../components/cropTags";
 import HelpTip from "../components/HelpTip";
 import { adjustOvernight } from "../components/eventDates";
+import RichTextArea from "../components/RichTextArea";
 import { stripLinks, stripLinksAndPhones, isPaidAccount } from "../lib/linkRules";
 
 // One stable preview URL per file. (Making a new one on every render made photos reload and
