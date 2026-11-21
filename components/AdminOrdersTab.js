@@ -108,6 +108,9 @@ export default function AdminOrdersTab({ adminId }) {
                   <img src={o.proof_image_url} alt="proof" onClick={() => setOrderFullscreenImage(o.proof_image_url)} style={{ maxWidth: 220, borderRadius: 8, border: "1px solid #eee", cursor: "zoom-in", display: "block" }} />
                 </div>
               )}
+              {!o.proof_image_url && o.payment_method !== "stripe" && (
+                <p style={{ margin: "12px 0 0", padding: "8px 12px", backgroundColor: "#fff7ed", border: "1px solid #fdba74", borderRadius: 8, color: "#9a3412", fontSize: 13, fontWeight: "bold" }}>⚠️ No proof of payment was uploaded for this order.</p>
+              )}
 
               {o.payment_method !== "stripe" && (
                 <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
