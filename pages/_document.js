@@ -18,6 +18,11 @@ export default function Document() {
             touch-action: pan-x pan-y;
             -ms-touch-action: pan-x pan-y;
           }
+          /* Keep the bottom of every page clear of the purple bottom strip, so buttons at the end of a page
+             (like Back / Save Profile) can always be scrolled fully into view in in-app browsers. */
+          body {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+          }
         `}</style>
         <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no" />
         <link rel="manifest" href="/manifest.json" />
