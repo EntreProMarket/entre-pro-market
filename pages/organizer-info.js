@@ -10,11 +10,15 @@ export default function OrganizerInfo() {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [userTier, setUserTier] = useState(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [busyTier, setBusyTier] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
+      setLoggedIn(!!user);
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
@@ -43,8 +47,10 @@ export default function OrganizerInfo() {
     elite: "price_1TipMfIofgLPwGzF432mjiJB",
   };
 
+  // All three organizer plans are monthly prices in Stripe, so all three are subscriptions.
+  // (The server also checks the real price type, so this can never mismatch again.)
   const PRICE_MODES = {
-    basic: "payment",
+    basic: "subscription",
     pro:   "subscription",
     elite: "subscription",
   };
@@ -52,13 +58,14 @@ export default function OrganizerInfo() {
   const TIER_RANK = { basic: 1, pro: 2, elite: 3 };
 
   const handleChoosePlan = async (tier) => {
+    setErrorMsg("");
+
     if (userRole === "vendor") {
-      alert("You are already registered as a Vendor and cannot become an Organizer.");
+      setErrorMsg("You are already registered as a Vendor and cannot become an Organizer.");
       return;
     }
 
     if (userRole === "organizer" && userTier === tier) {
-      alert(`You are already on the ${tier} plan.`);
       router.push("/organizer-dashboard");
       return;
     }
@@ -73,10 +80,11 @@ export default function OrganizerInfo() {
 
     const priceId = PRICE_IDS[tier];
     if (!priceId) {
-      alert("Payment not configured yet. Please contact support.");
+      setErrorMsg("Payment is not set up for this plan yet. Please contact support.");
       return;
     }
 
+    setBusyTier(tier);
     try {
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
@@ -93,12 +101,21 @@ export default function OrganizerInfo() {
       const data = await response.json();
       if (data.url) {
         window.location.href = data.url;
-      } else {
-        alert("Error starting checkout: " + data.error);
+        return;
       }
+      setErrorMsg("Could not start checkout: " + (data.error || "unknown error"));
     } catch (err) {
-      alert("Checkout error: " + err.message);
+      setErrorMsg("Checkout error: " + err.message);
     }
+    setBusyTier(null);
+  };
+
+  // Back works even when there is no earlier page (for example after opening the email link)
+  const goBack = () => {
+    if (userRole === "organizer") router.push("/organizer-dashboard");
+    else if (userRole === "vendor") router.push("/vendor-dashboard");
+    else if (loggedIn) router.push("/marketplace");
+    else router.push("/");
   };
 
   const tierStyles = {
@@ -148,6 +165,12 @@ export default function OrganizerInfo() {
         💡 All plans include access to the vendor marketplace. Your plan determines how many vendors you can contact per month.
       </div>
 
+      {errorMsg && (
+        <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "12px 16px", marginBottom: 20, color: "#991b1b", fontSize: 14, fontWeight: "bold" }}>
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
       {loading ? (
         <p style={{ textAlign: "center", color: "#888" }}>Loading plans...</p>
       ) : (
@@ -156,6 +179,7 @@ export default function OrganizerInfo() {
             const style = tierStyles[plan.tier] || tierStyles.basic;
             const isCurrentPlan = userRole === "organizer" && userTier === plan.tier;
             const isUpgrade = userRole === "organizer" && (TIER_RANK[plan.tier] || 0) > (TIER_RANK[userTier] || 0);
+            const isBusy = busyTier === plan.tier;
 
             return (
               <div key={plan.id} style={{
@@ -196,20 +220,21 @@ export default function OrganizerInfo() {
 
                 <button
                   onClick={() => handleChoosePlan(plan.tier)}
-                  disabled={isCurrentPlan}
+                  disabled={isCurrentPlan || !!busyTier}
                   style={{
                     padding: "12px 20px",
                     backgroundColor: isCurrentPlan ? "#ccc" : style.badge,
                     color: "white",
                     border: "none",
                     borderRadius: 8,
-                    cursor: isCurrentPlan ? "default" : "pointer",
+                    cursor: isCurrentPlan || busyTier ? "default" : "pointer",
                     fontWeight: "bold",
                     fontSize: 14,
                     width: "100%",
+                    opacity: busyTier && !isBusy ? 0.6 : 1,
                   }}
                 >
-                  {isCurrentPlan ? "Current Plan" : isUpgrade ? `⬆️ Upgrade to ${plan.name}` : `Choose ${plan.name}`}
+                  {isBusy ? "Starting checkout..." : isCurrentPlan ? "Current Plan" : isUpgrade ? `⬆️ Upgrade to ${plan.name}` : `Choose ${plan.name}`}
                 </button>
               </div>
             );
@@ -218,7 +243,7 @@ export default function OrganizerInfo() {
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 40 }}>
-        <button onClick={() => router.back()} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
+        <button onClick={goBack} style={{ padding: "10px 20px", backgroundColor: "#ccc", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: "bold" }}>
           ← Back
         </button>
       </div>
