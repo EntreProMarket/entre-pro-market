@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import InstallSteps from "../components/InstallSteps";
+
+const INSTALL_KEY = "epm_install_invite";
 
 export default function Home() {
   const router = useRouter();
@@ -17,6 +20,9 @@ export default function Home() {
   const [intent, setIntent] = useState(null);
   // Set when a brand-new account has just been confirmed and needs to choose what to do next
   const [welcomeUser, setWelcomeUser] = useState(null);
+  // Shown right after the email link is confirmed: invites the person to install the app before anything else
+  const [installWelcomeUser, setInstallWelcomeUser] = useState(null);
+  const [installStep, setInstallStep] = useState("choose");
 
   // Sends a logged-in person to the right place. Also makes sure their profile row exists.
   const routeUser = async (user) => {
@@ -32,12 +38,19 @@ export default function Home() {
 
     // Brand-new account with no role yet — continue what they chose at signup
     const meta = user.user_metadata || {};
+    // The sign-up choice is used ONCE. After that it is forgotten, so later logins never reopen the plan pages:
+    // people who did not buy a paid plan simply land on the Marketplace every time until they do.
+    const forgetIntent = async () => {
+      try { await supabase.auth.updateUser({ data: { signup_intent: null, welcome_seen: true } }); } catch (e) {}
+    };
     if (meta.signup_intent === "vendor") {
-      await supabase.from("profiles").update({ role: "vendor", account_type: "free" }).eq("id", user.id);
+      const { error: roleError } = await supabase.from("profiles").update({ role: "vendor", account_type: "free" }).eq("id", user.id);
+      if (!roleError) await forgetIntent();
       router.replace("/vendor-profile");
       return;
     }
     if (meta.signup_intent === "organizer") {
+      await forgetIntent();
       router.replace("/organizer-info");
       return;
     }
@@ -54,6 +67,20 @@ export default function Home() {
     const checkSession = async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
+        // Arriving from the email confirmation link: offer the app install first (once per device)
+        const fromEmail = new URLSearchParams(window.location.search).get("welcome") === "1";
+        if (fromEmail) {
+          try { window.history.replaceState(null, "", window.location.pathname); } catch (e) {}
+          const installed = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+          let saved = null;
+          try { saved = JSON.parse(localStorage.getItem(INSTALL_KEY) || "null"); } catch (e) {}
+          const due = !saved || (saved.state === "later" && saved.t < Date.now() - 7 * 24 * 60 * 60 * 1000);
+          if (!installed && due) {
+            setInstallWelcomeUser(data.user);
+            setLoading(false);
+            return;
+          }
+        }
         await routeUser(data.user);
       } else {
         setLoading(false);
@@ -160,6 +187,36 @@ export default function Home() {
     }
   };
 
+  const saveInstallChoice = (state) => {
+    try { localStorage.setItem(INSTALL_KEY, JSON.stringify({ state, t: Date.now() })); } catch (e) {}
+  };
+
+  // "Install the App": use the browser's own install window when it has one, otherwise show the steps
+  const startInstall = async () => {
+    const p = typeof window !== "undefined" ? window.__epmInstallPrompt : null;
+    if (p) {
+      p.prompt();
+      const choice = await p.userChoice;
+      window.__epmInstallPrompt = null;
+      if (choice && choice.outcome === "accepted") {
+        saveInstallChoice("installed");
+        const u = installWelcomeUser;
+        setInstallWelcomeUser(null);
+        await routeUser(u);
+      }
+      return;
+    }
+    setInstallStep("steps");
+  };
+
+  // Either choice on the install screen carries on to the person's chosen destination (they are already logged in)
+  const continueFromInstallScreen = async (choiceState) => {
+    saveInstallChoice(choiceState);
+    const u = installWelcomeUser;
+    setInstallWelcomeUser(null);
+    await routeUser(u);
+  };
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "white", padding: "0" }}>
@@ -168,6 +225,53 @@ export default function Home() {
           alt="Entre PRO Market"
           style={{ width: "100%", maxWidth: 1500, height: "auto", objectFit: "contain" }}
         />
+      </div>
+    );
+  }
+
+  if (installWelcomeUser) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "sans-serif" }}>
+        <div style={{ backgroundColor: "white", borderRadius: 16, padding: "30px 24px", maxWidth: 480, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", textAlign: "center" }}>
+          <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 100, height: 100, objectFit: "contain", borderRadius: "50%", marginBottom: 10 }} />
+          <h1 style={{ margin: "0 0 6px", fontSize: 22, color: "#111" }}>🎉 Email confirmed — welcome!</h1>
+          <p style={{ margin: "0 0 16px", color: "#666", fontSize: 14 }}>Get the free Entre PRO Market app. It takes about 10 seconds and needs no app store.</p>
+
+          <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px", textAlign: "left" }}>
+            {[
+              "Opens in one tap, like any other app",
+              "Full screen — no browser bars in the way",
+              "Always up to date automatically",
+              "100% free",
+            ].map((t) => (
+              <li key={t} style={{ padding: "5px 0", fontSize: 14, color: "#333", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ color: "#AABB23", fontWeight: "bold" }}>✓</span>{t}
+              </li>
+            ))}
+          </ul>
+
+          {installStep === "choose" ? (
+            <>
+              <button onClick={startInstall}
+                style={{ display: "block", width: "100%", padding: "14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 12, fontWeight: "bold", fontSize: 16, cursor: "pointer", marginBottom: 10 }}>
+                📲 Install the App
+              </button>
+              <button onClick={() => continueFromInstallScreen("later")}
+                style={{ display: "block", width: "100%", padding: "12px", backgroundColor: "transparent", color: "#701890", border: "1px solid #701890", borderRadius: 12, fontWeight: "bold", fontSize: 14, cursor: "pointer" }}>
+                Continue without installing
+              </button>
+            </>
+          ) : (
+            <>
+              <InstallSteps />
+              <button onClick={() => continueFromInstallScreen("installed")}
+                style={{ display: "block", width: "100%", padding: "14px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 12, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 10 }}>
+                ✅ I've added it — continue
+              </button>
+              <span onClick={() => setInstallStep("choose")} style={{ color: "#701890", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>← Back</span>
+            </>
+          )}
+        </div>
       </div>
     );
   }
