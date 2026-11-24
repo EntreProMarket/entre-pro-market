@@ -47,7 +47,7 @@ export default function Home() {
       setLoading(false);
       return;
     }
-    router.replace("/home");
+    router.replace("/marketplace");
   };
 
   useEffect(() => {
@@ -67,6 +67,20 @@ export default function Home() {
     return () => listener?.subscription?.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // The email link can open in a different browser (like Gmail's own), where nobody is logged in yet.
+  // Tell the person their email is confirmed and to log in, instead of just showing a blank login page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.location.search + window.location.hash;
+    if (/error_code=|error=access_denied/.test(raw)) {
+      setMode("login");
+      setMessage("ℹ️ That confirmation link was already used or has expired. Try logging in below.");
+    } else if (/[?&#](code|access_token|token_hash)=/.test(raw) || /type=(signup|email)/.test(raw)) {
+      setMode("login");
+      setMessage("✅ Your email is confirmed! Log in below to continue.");
+    }
+  }, []);
 
   // Links like /?mode=signup&plan=vendor open the Sign Up tab already set to Vendor or Organizer
   useEffect(() => {
@@ -142,7 +156,7 @@ export default function Home() {
     } else if (where === "organizer") {
       router.replace("/organizer-info");
     } else {
-      router.replace("/home");
+      router.replace("/marketplace");
     }
   };
 
@@ -165,19 +179,21 @@ export default function Home() {
           <img src="/logo-circle.png" alt="EntreProMarket" style={{ width: 120, height: 120, objectFit: "contain", borderRadius: "50%", marginBottom: 12 }} />
           <h1 style={{ margin: "0 0 8px", fontSize: 22, color: "#111" }}>🎉 Your account is ready!</h1>
           <p style={{ margin: "0 0 24px", color: "#666", fontSize: 14 }}>
-            Your email is confirmed and your free account has been created. What would you like to do next?
+            Welcome! Your free account is ready. What would you like to do first?
           </p>
           <button onClick={() => finishWelcome("vendor")}
             style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 10 }}>
             🛒 Become a Vendor
           </button>
           <button onClick={() => finishWelcome("organizer")}
-            style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#222", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 20 }}>
+            style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#222", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 22 }}>
             🎪 Become an Organizer
           </button>
-          <span onClick={() => finishWelcome("browse")} style={{ color: "#701890", fontSize: 14, cursor: "pointer", textDecoration: "underline", fontWeight: "bold" }}>
-            Just browse the marketplace for now
-          </span>
+          <p style={{ margin: "0 0 10px", color: "#888", fontSize: 13 }}>Just here to shop?</p>
+          <button onClick={() => finishWelcome("browse")}
+            style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#701890", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer" }}>
+            🛍️ Enter Marketplace
+          </button>
         </div>
       </div>
     );
