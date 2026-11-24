@@ -143,12 +143,16 @@ function InstallBanner() {
       e.preventDefault();
       setDeferredPrompt(e);
       setVisible(true);
+      // Let the welcome screen after email confirmation use the same browser install window
+      window.__epmInstallPrompt = e;
+      window.dispatchEvent(new Event("epm-install-ready"));
     };
     const onInstalled = () => {
       saveChoice("installed");
       setInviteOpen(false);
       setVisible(false);
       setDeferredPrompt(null);
+      window.__epmInstallPrompt = null;
     };
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", onInstalled);
@@ -163,7 +167,8 @@ function InstallBanner() {
     let timer = null;
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const due = !saved || (saved.state === "later" && saved.t < weekAgo);
-    const skipPage = window.location.pathname.indexOf("/admin") === 0;
+    // Not on the admin pages, and not while the email-confirmation welcome screen is handling the install invitation
+    const skipPage = window.location.pathname.indexOf("/admin") === 0 || window.location.pathname.indexOf("/auth/") === 0 || /[?&]welcome=1/.test(window.location.search);
     if (due && !skipPage) timer = setTimeout(() => setInviteOpen(true), 1500);
 
     return () => {
