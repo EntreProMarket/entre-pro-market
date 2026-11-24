@@ -102,35 +102,87 @@ function isIosSafari() {
   return isIOS && isSafari && !isStandalone;
 }
 
+// ── "Get the app" invitation ──
+// First visit in a regular browser: a clear card that explains the benefits and shows exactly how to install on
+// this person's device. Once they pick "Maybe later" it comes back after 7 days; "Don't show again" and a finished
+// install silence it for good. It never shows inside the installed app.
+const INSTALL_KEY = "epm_install_invite";
+
+function detectInstallEnv() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return { standalone: false, platform: "desktop", inApp: false };
+  const ua = window.navigator.userAgent || "";
+  const standalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
+  const isAndroid = /Android/i.test(ua);
+  const inApp = /FBAN|FBAV|Instagram|Line\/|Snapchat|; wv\)|DuckDuckGo|GSA\//i.test(ua);
+  return { standalone, platform: isIOS ? "ios" : isAndroid ? "android" : "desktop", inApp };
+}
+
 function InstallBanner() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [visible, setVisible] = useState(false);
   const [showIosInstructions, setShowIosInstructions] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [env, setEnv] = useState({ standalone: false, platform: "desktop", inApp: false });
+
+  const saveChoice = (state) => {
+    try { localStorage.setItem(INSTALL_KEY, JSON.stringify({ state, t: Date.now() })); } catch (e) {}
+  };
 
   useEffect(() => {
+    const e0 = detectInstallEnv();
+    setEnv(e0);
+    if (e0.standalone) return undefined; // already installed — nothing to show
+
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(INSTALL_KEY) || "null"); } catch (e) {}
+    const muted = !!saved && (saved.state === "never" || saved.state === "installed");
+
     const handler = (e) => {
+      if (muted) return;
       e.preventDefault();
       setDeferredPrompt(e);
       setVisible(true);
     };
+    const onInstalled = () => {
+      saveChoice("installed");
+      setInviteOpen(false);
+      setVisible(false);
+      setDeferredPrompt(null);
+    };
     window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", onInstalled);
 
-    if (isIosSafari()) {
+    if (!muted && isIosSafari()) {
       const dismissedThisSession = sessionStorage.getItem("epm_ios_install_dismissed");
       if (!dismissedThisSession) {
         setShowIosInstructions(true);
       }
     }
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    let timer = null;
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const due = !saved || (saved.state === "later" && saved.t < weekAgo);
+    const skipPage = window.location.pathname.indexOf("/admin") === 0;
+    if (due && !skipPage) timer = setTimeout(() => setInviteOpen(true), 1500);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", onInstalled);
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
+    const choice = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
     setVisible(false);
+    if (choice && choice.outcome === "accepted") {
+      saveChoice("installed");
+      setInviteOpen(false);
+    }
   };
 
   const handleDismiss = () => setVisible(false);
@@ -139,6 +191,80 @@ function InstallBanner() {
     setShowIosInstructions(false);
     sessionStorage.setItem("epm_ios_install_dismissed", "true");
   };
+
+  const inviteLater = () => { saveChoice("later"); setInviteOpen(false); };
+  const inviteNever = () => { saveChoice("never"); setInviteOpen(false); setVisible(false); setShowIosInstructions(false); };
+
+  if (inviteOpen) {
+    const iosSafari = isIosSafari();
+    let steps = null;
+    let note = null;
+    if (!deferredPrompt) {
+      if (env.platform === "ios") {
+        steps = [
+          <span key="1">Tap the <strong>Share</strong> button <span style={{ fontSize: 16 }}>⬆️</span> in Safari</span>,
+          <span key="2">Scroll down and tap <strong>"Add to Home Screen"</strong></span>,
+          <span key="3">Tap <strong>"Add"</strong> — the app icon appears on your home screen</span>,
+        ];
+        if (!iosSafari) note = "Opened this from an email or another app? Tap the Safari (compass) icon to open this page in Safari first, then follow the steps.";
+      } else if (env.platform === "android") {
+        steps = [
+          <span key="1">Tap the <strong>⋮</strong> menu (top right of your browser)</span>,
+          <span key="2">Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong></span>,
+          <span key="3">Tap <strong>"Install"</strong> — the app icon appears on your home screen</span>,
+        ];
+        note = "Don't see it? You may be inside Gmail or another app's browser. Tap ⋮ then \"Open in Chrome\", and try again.";
+      } else {
+        steps = [
+          <span key="1">Look for the <strong>install icon</strong> at the right end of your browser's address bar</span>,
+          <span key="2">Click it, then click <strong>"Install"</strong> — the app opens in its own window</span>,
+        ];
+        note = "Using Chrome or Edge? You can also open the ⋮ menu and choose \"Install Entre PRO Market\".";
+      }
+    }
+    return (
+      <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: "sans-serif" }}>
+        <div style={{ position: "relative", backgroundColor: "white", borderRadius: 18, padding: "26px 22px 18px", maxWidth: 380, width: "100%", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.35)", textAlign: "center" }}>
+          <button onClick={inviteLater} aria-label="Close" style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", fontSize: 22, color: "#999", cursor: "pointer", lineHeight: 1 }}>✕</button>
+          <img src="/logo-circle.png" alt="Entre PRO Market" style={{ width: 84, height: 84, objectFit: "contain", borderRadius: "50%", marginBottom: 10 }} />
+          <h2 style={{ margin: "0 0 6px", fontSize: 21, color: "#111" }}>📲 Get the Entre PRO Market app</h2>
+          <p style={{ margin: "0 0 16px", color: "#666", fontSize: 14 }}>Put us on your home screen in about 10 seconds. It's free — no app store needed.</p>
+
+          <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px", textAlign: "left" }}>
+            {[
+              "Opens in one tap, like any other app",
+              "Full screen — no browser bars in the way",
+              "Always up to date automatically",
+              "100% free",
+            ].map((t) => (
+              <li key={t} style={{ padding: "6px 0", fontSize: 14, color: "#333", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ color: "#AABB23", fontWeight: "bold" }}>✓</span>{t}
+              </li>
+            ))}
+          </ul>
+
+          {deferredPrompt ? (
+            <button onClick={handleInstall} style={{ display: "block", width: "100%", padding: "14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 12, fontWeight: "bold", fontSize: 16, cursor: "pointer", marginBottom: 12 }}>
+              📲 Install the App
+            </button>
+          ) : (
+            <div style={{ textAlign: "left", backgroundColor: "#f3e8ff", border: "1px solid #d8b4fe", borderRadius: 12, padding: "14px 14px 10px", marginBottom: 12 }}>
+              <p style={{ margin: "0 0 8px", fontWeight: "bold", color: "#701890", fontSize: 14 }}>How to install:</p>
+              <ol style={{ margin: 0, paddingLeft: 20, color: "#333", fontSize: 14, lineHeight: 1.5 }}>
+                {steps.map((st, i) => <li key={i} style={{ marginBottom: 8 }}>{st}</li>)}
+              </ol>
+              {note && <p style={{ margin: "4px 0 4px", color: "#666", fontSize: 12, lineHeight: 1.4 }}>{note}</p>}
+            </div>
+          )}
+
+          <button onClick={inviteLater} style={{ display: "block", width: "100%", padding: "11px", backgroundColor: "transparent", color: "#701890", border: "1px solid #701890", borderRadius: 12, fontWeight: "bold", fontSize: 14, cursor: "pointer", marginBottom: 10 }}>
+            Maybe later
+          </button>
+          <span onClick={inviteNever} style={{ color: "#999", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>Don't show this again</span>
+        </div>
+      </div>
+    );
+  }
 
   if (showIosInstructions) {
     return (
