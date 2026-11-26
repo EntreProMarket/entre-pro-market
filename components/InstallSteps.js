@@ -45,6 +45,11 @@ export default function InstallSteps() {
       </ol>
       {note && <p style={{ margin: "4px 0 4px", color: "#666", fontSize: 12, lineHeight: 1.4 }}>{note}</p>}
       <p style={{ margin: "4px 0 4px", color: "#666", fontSize: 12, lineHeight: 1.4 }}>The first time you open the app from your home screen, you may be asked to log in once.</p>
+      <p style={{ margin: "6px 0 4px", color: "#444", fontSize: 12, lineHeight: 1.4 }}>
+        To reinstall the app after any deletion, you must first &quot;Delete Browsing Data&quot; from your device. Then go to:{" "}
+        <a href="https://app.entrepromarket.com" target="_blank" rel="noopener noreferrer" style={{ color: "#701890", fontWeight: "bold", wordBreak: "break-all" }}>https://app.entrepromarket.com</a>{" "}
+        for a fresh install.
+      </p>
     </div>
   );
 }
