@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import InstallSteps from "../components/InstallSteps";
+import LegalLinks from "../components/LegalLinks";
 
 const INSTALL_KEY = "epm_install_invite";
 
@@ -23,6 +24,8 @@ export default function Home() {
   // Shown right after the email link is confirmed: invites the person to install the app before anything else
   const [installWelcomeUser, setInstallWelcomeUser] = useState(null);
   const [installStep, setInstallStep] = useState("choose");
+  // Must be ticked before any account can be created
+  const [agreed, setAgreed] = useState(false);
 
   // Sends a logged-in person to the right place. Also makes sure their profile row exists.
   const routeUser = async (user) => {
@@ -133,11 +136,14 @@ export default function Home() {
     if (!email || !password) { setMessage("❌ Please enter your email and password."); return; }
     if (password !== confirmPassword) { setMessage("❌ Passwords don't match."); return; }
     if (password.length < 6) { setMessage("❌ Password must be at least 6 characters."); return; }
+    if (!agreed) { setMessage("❌ Please tick the box to agree to the Terms and policies first."); return; }
     setSubmitting(true); setMessage("");
+    // The date they agreed is saved with the account (and which version of the legal pages it was)
+    const accepted = { terms_accepted_at: new Date().toISOString(), legal_version: "2026-11" };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: useIntent ? { signup_intent: useIntent } : {} },
+      options: { data: useIntent ? { ...accepted, signup_intent: useIntent } : accepted },
     });
     if (error) { setMessage("❌ " + error.message); setSubmitting(false); return; }
 
@@ -172,7 +178,7 @@ export default function Home() {
     setIntent(which);
     setMode("signup");
     if (email && password && confirmPassword) { handleSignup(which); return; }
-    setMessage("ℹ️ Enter your email, password and confirm password, then tap " + (which === "vendor" ? "Become a Vendor" : "Become an Organizer") + " again.");
+    setMessage("ℹ️ Enter your email, password and confirm password, tick the agreement box, then tap " + (which === "vendor" ? "Become a Vendor" : "Become an Organizer") + " again.");
   };
 
   const finishWelcome = async (where) => {
@@ -254,7 +260,7 @@ export default function Home() {
             <>
               <button onClick={startInstall}
                 style={{ display: "block", width: "100%", padding: "14px", backgroundColor: "#AABB23", color: "white", border: "none", borderRadius: 12, fontWeight: "bold", fontSize: 16, cursor: "pointer", marginBottom: 10 }}>
-                📲 Install the App
+                📲 Add to Home Screen
               </button>
               <button onClick={() => continueFromInstallScreen("later")}
                 style={{ display: "block", width: "100%", padding: "12px", backgroundColor: "transparent", color: "#701890", border: "1px solid #701890", borderRadius: 12, fontWeight: "bold", fontSize: 14, cursor: "pointer" }}>
@@ -343,6 +349,19 @@ export default function Home() {
             style={{ display: "block", width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #ddd", fontSize: 15, marginBottom: 12, boxSizing: "border-box" }} />
         )}
 
+        {mode === "signup" && (
+          <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "0 0 14px", fontSize: 13, color: "#444", lineHeight: 1.4, cursor: "pointer" }}>
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0 }} />
+            <span>
+              I agree to the{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "#701890", fontWeight: "bold" }}>Terms of Service</a>,{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "#701890", fontWeight: "bold" }}>Privacy Policy</a>,{" "}
+              <a href="/community-guidelines" target="_blank" rel="noopener noreferrer" style={{ color: "#701890", fontWeight: "bold" }}>Community Guidelines</a> and{" "}
+              <a href="/payments-policy" target="_blank" rel="noopener noreferrer" style={{ color: "#701890", fontWeight: "bold" }}>Payments &amp; Refunds Policy</a>.
+            </span>
+          </label>
+        )}
+
         {mode === "login" && (
           <div style={{ textAlign: "right", marginBottom: 16 }}>
             <span onClick={() => router.push("/forgot-password")} style={{ color: "#701890", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Forgot password?</span>
@@ -373,6 +392,10 @@ export default function Home() {
           style={{ display: "block", width: "100%", padding: "13px", backgroundColor: "#222", color: "white", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 15, cursor: "pointer", marginBottom: 20 }}>
           🎪 Become an Organizer
         </button>
+
+        <div style={{ marginBottom: 16 }}>
+          <LegalLinks center size={12} color="#888" />
+        </div>
 
         <div style={{ textAlign: "center" }}>
           <span onClick={() => router.push("/marketplace")} style={{ color: "#AABB23", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>Browse Marketplace Without an Account</span>
